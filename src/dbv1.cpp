@@ -143,29 +143,44 @@ DBEntry* FilesystemDBV1::readEntry(const WsID id, const bool deleted) {
 }
 
 
+// read db entry from yaml file
+void DBEntryV1::readFromFile(const WsID id, const string filesystem, const string filename) {
+    if(traceflag) fmt::print(stderr, "Trace  : readFromFile({},{},{})\n", id, filesystem, filename);
+
+    this->id = id;
+    this->filesystem = filesystem;
+    this->dbfilepath = filename; // store location if db entry for later writing
+
+
+    std::string filecontent = utils::getFileContents(filename.c_str());
+    if(filecontent == "") {
+        fmt::print(stderr,"Error  : Could not read file {}", filename);
+        throw DatabaseException("could not read file");
+    }
+
+    readFromString(filecontent);
+
+    if(debugflag) {
+        fmt::print(stderr, "Debug  : creation={} released={} expiration={} reminder={} workspace={} extensions={} mailaddress={} comment={} group={}\n" , 
+                    creation, released, expiration, reminder, workspace, extensions, mailaddress, comment, group);
+    }
+}
 
 #ifndef WS_RAPIDYAML_DB
+// use yamlcpp
 
-// read db entry from yaml file
-//  throws on error
-void DBEntryV1::readFromFile(const WsID id, const string filesystem, const string filename) {
-    if(traceflag) fmt::print(stderr, "Trace  : readFromFile_YAMLCPP({},{},{})\n", id, filesystem, filename);
+void ::DBEntry::readFromString(std::string str) {
+    if(traceflag) fmt::print(stderr, "Trace  : readFromString_YAMLCPP\n");
 
     YAML::Node dbentry;
-
     try {
-        dbentry = YAML::LoadFile(filename);
+        dbentry = YAML::Load(str);
     } catch (const YAML::BadFile& e) {
         fmt::print(stderr,"Error  : Could not read db entry {}: {}", filename, e.what());
         throw DatabaseException("could not read db entry");
     }
 
-    dbfilepath = filename; // store location if db entry for later writing
-
-
     dbversion = dbentry["dbversion"] ? dbentry["dbversion"].as<int>() : 0;   // 0 = legacy
-    this->id = id;
-    this->filesystem = filesystem;
     creation = dbentry["creation"] ? dbentry["creation"].as<long>() : 0;  // FIXME: c++ tool does not write this field, but takes from stat
     released = dbentry["released"] ? dbentry["released"].as<long>() : 0;
     expiration = dbentry["expiration"] ? dbentry["expiration"].as<long>() : 0;
@@ -178,27 +193,16 @@ void DBEntryV1::readFromFile(const WsID id, const string filesystem, const strin
 }
 
 #else
+// use rapidyaml
 
-// read db entry from yaml file
-//  throws on error
-void DBEntryV1::readFromFile(const WsID id, const string filesystem, const string filename) {
-    if(traceflag) fmt::print(stderr, "Trace  : readFromFile_RAPIDYAML(id={},filesystem={},filename={})\n", id, filesystem, filename);
+void DBEntryV1::readFromString(std::string str) {
+    if(traceflag) fmt::print(stderr, "Trace  : readFromString_RAPIDYAML\n");
 
-    string filecontent = utils::getFileContents(filename.c_str());
-    if(filecontent=="") {
-        fmt::print(stderr,"Error  : Could not read db entry {}", filename);
-        throw DatabaseException("could not read db entry");
-    }
-
-    dbfilepath = filename; // store location if db entry for later writing
-
-    ryml::Tree dbentry = ryml::parse_in_place(ryml::to_substr(filecontent));  // FIXME: error check?
+    ryml::Tree dbentry = ryml::parse_in_place(ryml::to_substr(str));  // FIXME: error check?
 
     ryml::NodeRef node;
 
     node=dbentry["dbversion"]; if(node.has_val()) node>>dbversion; else dbversion = 0;  // 0 = legacy
-    this->id = id;
-    this->filesystem = filesystem;
     node=dbentry["creation"]; if(node.has_val()) node>>creation; else creation = 0;  // FIXME: c++ tool does not write this field, but takes from stat
     node=dbentry["released"]; if(node.has_val()) node>>released; else released = 0;
     node=dbentry["expiration"]; if(node.has_val()) node>>expiration; else expiration = 0;
@@ -208,11 +212,6 @@ void DBEntryV1::readFromFile(const WsID id, const string filesystem, const strin
     node=dbentry["mailaddress"]; if(node.has_val() && node.val()!="") node>>mailaddress; else mailaddress = "";
     node=dbentry["comment"]; if(node.has_val() && node.val()!="") node>>comment; else comment = "";
     node=dbentry["group"]; if(node.has_val() && node.val()!="") node>>group; else group = "";
-
-    if(debugflag) {
-        fmt::print(stderr, "Debug  : creation={} released={} expiration={} reminder={} workspace={} extensions={} mailaddress={} comment={} group={}\n" , 
-                    creation, released, expiration, reminder, workspace, extensions, mailaddress, comment, group);
-    }
 }
 
 #endif

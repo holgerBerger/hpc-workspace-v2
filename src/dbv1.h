@@ -70,6 +70,7 @@ private:
 
 public:
 
+        void readFromString(std::string str);
         // read yaml entry from file
         void readFromFile(const WsID id, const string filesystem, const string filename);
         // use extension and write back file
