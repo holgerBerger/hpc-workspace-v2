@@ -61,7 +61,7 @@ jobs:
 
     - name: Run bats non-sudo tests
       run: |
-        bats --filter-tags \!sudo  bats/test/
+        PRESET=${{ matrix.cmake_preset }} bats --filter-tags \!sudo  bats/test/
 
     - name: Run bats sudo tests
       run: |
