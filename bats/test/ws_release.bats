@@ -10,7 +10,7 @@ setup() {
     which ws_release
 }
 
-@test "ws_allocate print version" {
+@test "ws_release print version" {
     run ws_release --version
     assert_output --partial "workspace"
 }

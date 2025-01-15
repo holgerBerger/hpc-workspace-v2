@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
 	("help,h", "produce help message")
 	("version,V", "show version")
 	("filesystem,F", po::value<string>(&filesystem), "filesystem to list workspaces from")
-	("group,g", "enable listing of grou workspaces")
+	("group,g", "enable listing of group workspaces")
 	("listfilesystems,l", "list available filesystems")
     ("listfilesystemdetails,L", "list available filesystems with details")
 	("short,s", "short listing, only workspace names")

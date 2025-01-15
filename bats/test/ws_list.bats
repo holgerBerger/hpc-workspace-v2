@@ -153,7 +153,7 @@ Options:
   -h [ --help ]                   produce help message
   -V [ --version ]                show version
   -F [ --filesystem ] arg         filesystem to list workspaces from
-  -g [ --group ]                  enable listing of grou workspaces
+  -g [ --group ]                  enable listing of group workspaces
   -l [ --listfilesystems ]        list available filesystems
   -L [ --listfilesystemdetails ]  list available filesystems with details
   -s [ --short ]                  short listing, only workspace names
