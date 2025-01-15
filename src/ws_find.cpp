@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
     if (opts.count("help")) {
         fmt::print("Usage: {} [options] name\n", argv[0]);
         cout << cmd_options << endl; 
-        exit(1);
+        exit(0);
     }
 
     if (opts.count("version")) {

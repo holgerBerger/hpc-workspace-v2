@@ -13,11 +13,13 @@ setup() {
 @test "ws_find print version" {
     run ws_find --version
     assert_output --partial "workspace"
+    assert_success
 }
 
 @test "ws_find print help" {
     run ws_find --help
     assert_output --partial "Usage"
+    assert_success
 }
 
 @test "ws_find finds directory" {

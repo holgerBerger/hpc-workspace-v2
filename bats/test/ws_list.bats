@@ -14,11 +14,13 @@ setup() {
 @test "ws_list print version" {
     run ws_list --version
     assert_output --partial "workspace"
+    assert_success
 }
 
 @test "ws_list print help" {
     run ws_list --help
     assert_output --partial "Usage"
+    assert_success
 }
 
 @test "ws_list shows created workspace" {

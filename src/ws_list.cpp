@@ -161,7 +161,7 @@ int main(int argc, char **argv) {
     if (opts.count("help")) {
         fmt::print("Usage: {} [options] [pattern]\n", argv[0]);
         cout << cmd_options << endl; // FIXME: can not be printed with fmt??
-        exit(1);
+        exit(0);
     }
 
     if (opts.count("version")) {

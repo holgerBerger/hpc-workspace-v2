@@ -12,11 +12,13 @@ setup() {
 @test "ws_allocate print version" {
     run ws_allocate --version
     assert_output --partial "workspace"
+    assert_success
 }
 
 @test "ws_allocate print help" {
     run ws_allocate --help
     assert_output --partial "Usage"
+    assert_success
 }
 
 @test "ws_allocate creates directory" {

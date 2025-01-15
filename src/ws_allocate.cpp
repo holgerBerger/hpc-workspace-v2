@@ -115,7 +115,7 @@ void commandline(po::variables_map &opt, string &name, int &duration, string &fi
     if (opt.count("help")) {
         fmt::print("Usage: {} [options] workspace_name duration\n", argv[0]);
         cout << cmd_options << "\n";
-        exit(1);
+        exit(0);
     }
 
     if (opt.count("version")) {
@@ -125,7 +125,7 @@ void commandline(po::variables_map &opt, string &name, int &duration, string &fi
         fmt::println("workspace version {}", WS_VERSION );
 #endif
         utils::printBuildFlags();
-        exit(1);
+        exit(0);
     }
 
     // this allows user to extend foreign workspaces

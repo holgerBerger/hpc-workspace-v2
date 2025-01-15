@@ -13,11 +13,13 @@ setup() {
 @test "ws_allocate print version" {
     run ws_release --version
     assert_output --partial "workspace"
+    assert_success
 }
 
 @test "ws_release print help" {
     run ws_release --help
     assert_output --partial "Usage"
+    assert_success
 }
 
 @test "ws_release releases directory" {

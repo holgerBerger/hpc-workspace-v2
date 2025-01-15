@@ -103,7 +103,7 @@ void commandline(po::variables_map &opt, string &name, string &target,
         cout << "Usage:" << argv[0] << ": [options] workspace_name target_name | -l" << endl;
         cout << cmd_options << "\n";
                 cout << "attention: the workspace_name argument is as printed by " << argv[0] << " -l not as printed by ws_list!" << endl;
-        exit(1);
+        exit(0);
     }
 
     if (opt.count("version")) {
@@ -113,7 +113,7 @@ void commandline(po::variables_map &opt, string &name, string &target,
 #else
         cout << "workspace version " << WS_VERSION << endl;
 #endif
-        exit(1);
+        exit(0);
     }
 
     if (opt.count("list")) {
