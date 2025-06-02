@@ -1,11 +1,11 @@
 #pragma once
 #ifndef CONFIG_USER_H
-#define CONFIG_USER_H
+    #define CONFIG_USER_H
 /*
  *  hpc-workspace-v2
  *
  *  UserConfig.cpp
- * 
+ *
  *  - deals with user configuration file
  *
  *  c++ version of workspace utility
@@ -13,7 +13,7 @@
  *
  *  (c) Holger Berger 2021,2023,2024
  *  (c) Christoph Niethammer 2024
- * 
+ *
  *  hpc-workspace-v2 is based on workspace by Holger Berger, Thomas Beisel and Martin Hecht
  *
  *  hpc-workspace-v2 is free software: you can redistribute it and/or modify
@@ -31,19 +31,17 @@
  *
  */
 
-
-
-#include <string>
+    #include <string>
 
 // config in user home
 class UserConfig {
-private:
-    std::string mailaddress = "";   // default mailaddress for reminder
-    std::string groupname = "";     // FIXME: TODO: does this make sense?
-    int reminder = -1;              // days before expiration to send reminder email, send no mail if < 0
-    int duration = -1;              // default duration for workspaces, request system default if < 0
+  private:
+    std::string mailaddress = ""; // default mailaddress for reminder
+    std::string groupname = "";   // FIXME: TODO: does this make sense?
+    int reminder = -1;            // days before expiration to send reminder email, send no mail if < 0
+    int duration = -1;            // default duration for workspaces, request system default if < 0
 
-public:
+  public:
     // read config from string, either YAML or single line
     UserConfig(std::string userconf);
 

@@ -30,64 +30,60 @@
  *
  */
 
-
-
+#include <regex>
 #include <string>
 #include <vector>
-#include <regex>
 
 #include "fmt/core.h"
 
 namespace utils {
 
-    // helper to show sourcelocation in debugging
-    class SrcPos {
-        std::string file;
-        int line;
-        std::string func;
+// helper to show sourcelocation in debugging
+class SrcPos {
+    std::string file;
+    int line;
+    std::string func;
 
-    public:
-        SrcPos(const char* _file, const int _line, const char* _func) :  file(_file), line(_line), func(_func) {};
-        std::string getSrcPos() {
-            return fmt::format("{}:{}[{}]", file, line, func);
-        }
-    };
+  public:
+    SrcPos(const char* _file, const int _line, const char* _func) : file(_file), line(_line), func(_func) {};
+    std::string getSrcPos() { return fmt::format("{}:{}[{}]", file, line, func); }
+};
 
-    // return names of groups of user given
-    std::vector<std::string> getgroupnames(std::string username);
+// return names of groups of user given
+std::vector<std::string> getgroupnames(std::string username);
 
-    // read a small file and returnm as string
-    std::string getFileContents(const char *filename);
-    inline std::string getFileContents(const std::string filename) { return getFileContents(filename.c_str()); }
+// read a small file and returnm as string
+std::string getFileContents(const char* filename);
+inline std::string getFileContents(const std::string filename) { return getFileContents(filename.c_str()); }
 
-    // write a (small) string to a file
-	void writeFile(const std::string filename, const std::string content);
+// write a (small) string to a file
+void writeFile(const std::string filename, const std::string content);
 
-    // retrurn list of filesnames mit unix name globbing
-    std::vector<std::string> dirEntries(const std::string path, const std::string pattern);
+// retrurn list of filesnames mit unix name globbing
+std::vector<std::string> dirEntries(const std::string path, const std::string pattern);
 
-    // set C local in every thinkable way
-    void setCLocal();
+// set C local in every thinkable way
+void setCLocal();
 
-    // validate an email address (approximation)
-    bool isValidEmail(const std::string& email);
+// validate an email address (approximation)
+bool isValidEmail(const std::string& email);
 
-    // get first line of a multiline string
-    std::string getFirstLine(const std::string& multilineString);
+// get first line of a multiline string
+std::string getFirstLine(const std::string& multilineString);
 
-    // getID returns id part of workspace id <username-id>
-    std::string getID(const std::string wsid);
+// getID returns id part of workspace id <username-id>
+std::string getID(const std::string wsid);
 
-    // check if person behind tty is human
-    // bool ruh();
+// check if person behind tty is human
+// bool ruh();
 
-    // aRe yoU Human?
-	// new version, no terminfo
-	bool new_ruh();
+// aRe yoU Human?
+// new version, no terminfo
+bool new_ruh();
 
-	// parse a ACL
-	auto parseACL(const std::vector<std::string> acl) -> std::map<std::string, std::pair<std::string, std::vector<int>>>;
+// parse a ACL
+auto parseACL(const std::vector<std::string> acl) -> std::map<std::string, std::pair<std::string, std::vector<int>>>;
 
-}
+} // namespace utils
 
 #endif

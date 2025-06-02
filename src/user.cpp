@@ -28,11 +28,11 @@
  *
  */
 
-#include <string>
-#include <unistd.h>
-#include <sys/types.h>
-#include <pwd.h>
 #include <grp.h>
+#include <pwd.h>
+#include <string>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "user.h"
 
@@ -45,72 +45,68 @@ extern bool debugflag;
 
 namespace user {
 
-    // get current username via real user id and passwd
-    std::string getUsername() {
-        gsl::not_null<struct passwd*> pw = getpwuid(getuid());
-        return std::string(pw->pw_name);
-    }
+// get current username via real user id and passwd
+std::string getUsername() {
+    gsl::not_null<struct passwd*> pw = getpwuid(getuid());
+    return std::string(pw->pw_name);
+}
 
-    // get home of current user via real user id and pwassd
-    // we have this to avoid $HOME
-    std::string getUserhome() {
-        gsl::not_null<struct passwd*> pw = getpwuid(getuid());
-        return std::string(pw->pw_dir);
-    }
+// get home of current user via real user id and pwassd
+// we have this to avoid $HOME
+std::string getUserhome() {
+    gsl::not_null<struct passwd*> pw = getpwuid(getuid());
+    return std::string(pw->pw_dir);
+}
 
+// see if we are root
+// return true if current user is root, false otherwise
+bool isRoot() {
+    // uid is uid of caller, not 0 for setuid(root)
+    return getuid() == 0;
+}
 
-    // see if we are root
-    // return true if current user is root, false otherwise
-    bool isRoot() {
-        // uid is uid of caller, not 0 for setuid(root)
-        return getuid() == 0;
-    }
+// check if this process is not setuid
+bool isnotSetuid() { return getuid() == geteuid(); }
 
+// check if this process is setuid
+bool isSetuid() { return getuid() != geteuid(); }
 
-    // check if this process is not setuid
-    bool isnotSetuid() {
-        return getuid() == geteuid();
-    }
+// get name of effective group
+std::string getGroupname() {
+    std::string primarygroup;
+    gsl::not_null<struct group*> grp = getgrgid(getegid());
+    primarygroup = std::string(grp->gr_name);
+    return primarygroup;
+}
 
-    // check if this process is setuid
-    bool isSetuid() {
-        return getuid() != geteuid();
-    }
+// get list of group names of current process
+std::vector<std::string> getGrouplist() {
+    if (traceflag)
+        fmt::print(stderr, "Trace  : getGroupList()\n");
+    std::vector<std::string> grplist;
 
-    // get name of effective group
-    std::string getGroupname() {
-        std::string primarygroup;
-        gsl::not_null<struct group *> grp = getgrgid(getegid());
-        primarygroup = std::string(grp->gr_name);
-        return primarygroup;
-    }
+    // find first size and get list
+    int size = getgroups(0, nullptr);
 
-    // get list of group names of current process
-    std::vector<std::string> getGrouplist() {
-        if(traceflag) fmt::print(stderr, "Trace  : getGroupList()\n");
-        std::vector<std::string> grplist;
-
-        // find first size and get list
-        int size = getgroups(0, nullptr);
-
-        if (size == -1) {
-            fmt::print(stderr, "Error  : error in getgroups()!\n");
-            return grplist;
-        }
-
-        gsl::not_null<gid_t *> gids = new gid_t[size];
-        int ret = getgroups(size, gids);
-
-        for(int i=0; i<ret; i++) {
-            gsl::not_null<struct group*> group = getgrgid(gids.get()[i]);
-            grplist.push_back(std::string(group->gr_name));
-        }
-
-        delete[] gids;
-
-        if(debugflag) fmt::print(stderr, "Debug  : groups={}\n", grplist);
-
+    if (size == -1) {
+        fmt::print(stderr, "Error  : error in getgroups()!\n");
         return grplist;
     }
 
+    gsl::not_null<gid_t*> gids = new gid_t[size];
+    int ret = getgroups(size, gids);
+
+    for (int i = 0; i < ret; i++) {
+        gsl::not_null<struct group*> group = getgrgid(gids.get()[i]);
+        grplist.push_back(std::string(group->gr_name));
+    }
+
+    delete[] gids;
+
+    if (debugflag)
+        fmt::print(stderr, "Debug  : groups={}\n", grplist);
+
+    return grplist;
 }
+
+} // namespace user

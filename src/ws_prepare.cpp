@@ -29,23 +29,23 @@
  *
  */
 
-#include <iostream>   // for program_options  FIXME:
 #include <filesystem>
+#include <iostream> // for program_options  FIXME:
 
-#include <boost/program_options.hpp>
 #include "config.h"
+#include <boost/program_options.hpp>
 
 #include "build_info.h"
 #include "db.h"
-#include "user.h"
 #include "fmt/base.h"
 #include "fmt/ranges.h" // IWYU pragma: keep
+#include "user.h"
 
 #include "caps.h"
 
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 // init caps here, when euid!=uid
 Cap caps{};
@@ -57,7 +57,7 @@ using namespace std;
 bool debugflag = false;
 bool traceflag = false;
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
 
     // options and flags
     string configfile;
@@ -73,22 +73,18 @@ int main(int argc, char **argv) {
     utils::setCLocal();
 
     // define options
-    po::options_description cmd_options( "\nOptions" );
-    cmd_options.add_options()
-	("help,h", "produce help message")
-	("version,V", "show version")
-	("config", po::value<string>(&configfile), "config file");
+    po::options_description cmd_options("\nOptions");
+    cmd_options.add_options()("help,h", "produce help message")("version,V", "show version")(
+        "config", po::value<string>(&configfile), "config file");
 
     po::options_description secret_options("Secret");
-    secret_options.add_options()
-	("debug", "show debugging information")
-    ("trace", "show tracing information") ;
+    secret_options.add_options()("debug", "show debugging information")("trace", "show tracing information");
 
     po::options_description all_options;
     all_options.add(cmd_options).add(secret_options);
 
     // parse commandline
-    try{
+    try {
         po::store(po::command_line_parser(argc, argv).options(all_options).run(), opts);
         po::notify(opts);
     } catch (...) {
@@ -110,7 +106,7 @@ int main(int argc, char **argv) {
 
     if (opts.count("version")) {
 #ifdef IS_GIT_REPOSITORY
-        fmt::println("workspace build from git commit hash {} on top of release {}", GIT_COMMIT_HASH,WS_VERSION);
+        fmt::println("workspace build from git commit hash {} on top of release {}", GIT_COMMIT_HASH, WS_VERSION);
 #else
         fmt::println("workspace version {}", WS_VERSION);
 #endif
@@ -118,10 +114,9 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
-
     // read config
     //   user can change this if no setuid installation OR if root
-    auto configfilestoread = std::vector<cppfs::path>{"/etc/ws.d","/etc/ws.conf"};
+    auto configfilestoread = std::vector<cppfs::path>{"/etc/ws.d", "/etc/ws.conf"};
     if (configfile != "") {
         if (user::isRoot() || caps.isUserMode()) {
             configfilestoread = {configfile};
@@ -139,62 +134,68 @@ int main(int argc, char **argv) {
     // end of boilerplate
 
     // loop over all workspaces
-    for(auto const &fs: config.Filesystems()) {
-        fmt::println("workspace: {}",fs);
+    for (auto const& fs : config.Filesystems()) {
+        fmt::println("workspace: {}", fs);
 
         // create DB directory
         auto DBdir = cppfs::path(config.getFsConfig(fs).database);
-        fmt::println("  DB directory: {}",DBdir.string());
+        fmt::println("  DB directory: {}", DBdir.string());
         if (!cppfs::exists(DBdir)) {
             try {
                 cppfs::create_directory(DBdir);
-            } catch (cppfs::filesystem_error const &e) {
+            } catch (cppfs::filesystem_error const& e) {
                 fmt::println(stderr, e.what());
             }
             auto ret = chmod(DBdir.c_str(), 0755);
-            if (ret!=0) perror(NULL);
+            if (ret != 0)
+                perror(NULL);
             ret = chown(DBdir.c_str(), config.dbuid(), config.dbgid());
-            if (ret!=0) perror(NULL);
+            if (ret != 0)
+                perror(NULL);
         } else {
             fmt::println("    existed already, did not check/change permissions!");
         }
 
         // create DB deleted
         auto DBdeleted = cppfs::path(config.getFsConfig(fs).database) / cppfs::path(config.getFsConfig(fs).deletedPath);
-        fmt::println("  DB deleted directory: {}",DBdeleted.string());
+        fmt::println("  DB deleted directory: {}", DBdeleted.string());
         if (!cppfs::exists(DBdeleted)) {
             try {
                 cppfs::create_directory(DBdeleted);
-            } catch (cppfs::filesystem_error const &e) {
+            } catch (cppfs::filesystem_error const& e) {
                 fmt::println(stderr, e.what());
             }
             auto ret = chmod(DBdeleted.c_str(), 0755);
-            if (ret!=0) perror(NULL);
+            if (ret != 0)
+                perror(NULL);
             ret = chown(DBdeleted.c_str(), config.dbuid(), config.dbgid());
-            if (ret!=0) perror(NULL);
+            if (ret != 0)
+                perror(NULL);
         } else {
             fmt::println("    existed already, did not check/change permissions!");
         }
 
         // make sure magic is written
         if (!cppfs::exists(DBdir / ".ws_db_magic")) {
-            utils::writeFile(DBdir / ".ws_db_magic", fs+"\n");
+            utils::writeFile(DBdir / ".ws_db_magic", fs + "\n");
         }
 
         // workspace directories
-        for(auto const &sp: config.getFsConfig(fs).spaces) {
+        for (auto const& sp : config.getFsConfig(fs).spaces) {
             // workspace itself
             fmt::println("  workspace directory: {}", sp);
             if (!cppfs::exists(sp)) {
                 try {
                     cppfs::create_directories(sp);
-                } catch (cppfs::filesystem_error const &e) {
+                } catch (cppfs::filesystem_error const& e) {
                     fmt::println(stderr, e.what());
                 }
                 auto ret = chmod(sp.c_str(), 0755);
-                if (ret!=0) perror(NULL);
+                if (ret != 0)
+                    perror(NULL);
                 ret = chown(sp.c_str(), config.dbuid(), config.dbgid());
-                if (ret!=0) perror(NULL);
+                if (ret != 0)
+                    perror(NULL);
             } else {
                 fmt::println("    existed already, did not check/change permissions!");
             }
@@ -204,17 +205,18 @@ int main(int argc, char **argv) {
             if (!cppfs::exists(WSdeleted)) {
                 try {
                     cppfs::create_directories(WSdeleted);
-                } catch (cppfs::filesystem_error const &e) {
+                } catch (cppfs::filesystem_error const& e) {
                     fmt::println(stderr, e.what());
                 }
                 auto ret = chmod(WSdeleted.c_str(), 0755);
-                if (ret!=0) perror(NULL);
+                if (ret != 0)
+                    perror(NULL);
                 ret = chown(WSdeleted.c_str(), config.dbuid(), config.dbgid());
-                if (ret!=0) perror(NULL);
+                if (ret != 0)
+                    perror(NULL);
             } else {
                 fmt::println("    existed already, did not check/change permissions!");
             }
         }
-
     }
- }
+}

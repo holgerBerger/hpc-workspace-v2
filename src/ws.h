@@ -29,29 +29,16 @@
  *
  */
 
- #include <map>
+#include <map>
 
- namespace ws {
+namespace ws {
 
-     // intent for ACLs
-     enum intent {
-        LIST,
-        USE,
-        CREATE,
-        EXTEND,
-        RELEASE,
-        RESTORE
-     };
+// intent for ACLs
+enum intent { LIST, USE, CREATE, EXTEND, RELEASE, RESTORE };
 
-     // get enum for name, for parsing ACLs
-     const std::map<std::string, int> intentnames = {
-         {"list", LIST},
-         {"use", USE},
-         {"create", CREATE},
-         {"extend", EXTEND},
-         {"release", RELEASE},
-         {"restore", RESTORE}
-     };
- }
+// get enum for name, for parsing ACLs
+const std::map<std::string, int> intentnames = {{"list", LIST},     {"use", USE},         {"create", CREATE},
+                                                {"extend", EXTEND}, {"release", RELEASE}, {"restore", RESTORE}};
+} // namespace ws
 
- #endif
+#endif

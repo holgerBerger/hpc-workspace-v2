@@ -1,4 +1,4 @@
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
+#define CATCH_CONFIG_MAIN // This tells Catch to provide a main() - only do this in one cpp file
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 
@@ -16,27 +16,26 @@ namespace fs = std::filesystem;
 #include "../src/caps.h"
 #include "../src/config.h"
 
-
 bool debugflag = false;
 bool traceflag = false;
-
 
 // init caps here, when euid!=uid
 Cap caps{};
 
 ////// MULTIPLE FILES ///////
 
-TEST_CASE("config file: multiple files and order", "[config]") {
+TEST_CASE("config file: multiple files and order", "[config]")
+{
     auto tmpbase = fs::temp_directory_path();
     auto id = getpid();
-    auto basedirname = tmpbase / fs::path(fmt::format("wstest{}",id));
+    auto basedirname = tmpbase / fs::path(fmt::format("wstest{}", id));
 
     fs::create_directories(basedirname / "ws.d");
 
     // create a normal config file, V1 way
     std::ofstream wsconf(basedirname / "ws.conf");
     fmt::println(wsconf,
-R"yaml(
+                 R"yaml(
 admins: [root]
 clustername: old_ws_conf
 adminmail: [root]
@@ -55,14 +54,13 @@ workspaces:
         database: /tmp
         deleted: .removed
         spaces: [/tmp/ws2-old]
-)yaml"
-    );
+)yaml");
     wsconf.close();
 
     // create a bad normal config file, V1 way
     std::ofstream wsconfbad(basedirname / "ws.conf-bad");
     fmt::println(wsconfbad,
-R"yaml(
+                 R"yaml(
 admins: [root]
 clustername: old_ws_conf
 adminmail: [root]
@@ -79,15 +77,14 @@ workspaces:
         database: /tmp
         deleted: .removed
         spaces: [/tmp/ws2-old]
-)yaml"
-    );
+)yaml");
     wsconfbad.close();
 
     // create new style multi file config
 
     std::ofstream wsconf1(basedirname / "ws.d" / "0-global.conf");
     fmt::println(wsconf1,
-R"yaml(
+                 R"yaml(
 admins: [root]
 clustername: new_ws_conf
 adminmail: [root]
@@ -96,49 +93,45 @@ dbuid: 2
 duration: 10
 smtphost: mailhost
 default: ws2
-)yaml"
-    );
+)yaml");
     wsconf1.close();
 
     std::ofstream wsconf2(basedirname / "ws.d" / "1-ws2.conf");
     fmt::println(wsconf2,
-R"yaml(
+                 R"yaml(
 workspaces:
     ws2:
         database: /tmp
         deleted: .removed
         spaces: [/tmp/ws2]
-)yaml"
-    );
+)yaml");
     wsconf2.close();
 
     // write a file first with a name later in sorted list
     std::ofstream wsconf4(basedirname / "ws.d" / "3-ws3.conf");
     fmt::println(wsconf4,
-R"yaml(
+                 R"yaml(
 workspaces:
     ws3:
         database: /tmp
         deleted: .removed
         spaces: [/tmp/ws3-overwrite]
-)yaml"
-    );
+)yaml");
     wsconf4.close();
 
     std::ofstream wsconf3(basedirname / "ws.d" / "2-ws3.conf");
     fmt::println(wsconf3,
-R"yaml(
+                 R"yaml(
 workspaces:
     ws3:
         database: /tmp
         deleted: .removed
         spaces: [/tmp/ws3]
-)yaml"
-    );
+)yaml");
     wsconf3.close();
 
-
-    SECTION("readconfig") {
+    SECTION("readconfig")
+    {
 
         auto config = Config(std::vector<fs::path>{basedirname / "ws.conf"});
 
@@ -152,23 +145,16 @@ workspaces:
 
         // check if stop after first file works
 
-        auto config2 = Config(std::vector<fs::path>{
-                                basedirname / "ws.conf",
-                                basedirname / "ws.d"
-                            });
+        auto config2 = Config(std::vector<fs::path>{basedirname / "ws.conf", basedirname / "ws.d"});
 
         REQUIRE(config2.clustername() == "old_ws_conf");
         REQUIRE(config2.isValid());
 
-
         // check if multiple files are read and accumulated
-        auto config3 = Config(std::vector<fs::path>{
-                                basedirname / "ws.d",
-                                basedirname / "ws.conf"
-                            });
+        auto config3 = Config(std::vector<fs::path>{basedirname / "ws.d", basedirname / "ws.conf"});
 
         REQUIRE(config3.clustername() == "new_ws_conf");
-        REQUIRE(config3.maxextensions() ==10); // default form code
+        REQUIRE(config3.maxextensions() == 10); // default form code
         REQUIRE(config3.dbuid() == 2);
         REQUIRE(config3.dbgid() == 2);
         auto filesystem2 = config3.getFsConfig("ws2");
@@ -185,30 +171,31 @@ workspaces:
         REQUIRE(config4.isValid() == false);
 
         // check bad file
-        auto config5= Config(std::vector<fs::path>{basedirname / "invalid-file"});
+        auto config5 = Config(std::vector<fs::path>{basedirname / "invalid-file"});
         REQUIRE(config5.isValid() == false);
     }
 
     // TODO: could use more tests for errors in config file
-
 }
-
 
 /////  PERMISSIONS AND ORDER /////
 
-TEST_CASE("config file: permissions and order", "[config]") {
+TEST_CASE("config file: permissions and order", "[config]")
+{
 
-    SECTION("canFind") {
-        REQUIRE(canFind(std::vector<string>{"a","b"},string("a")) == true);
-        REQUIRE(canFind(std::vector<string>{"a","b"},string("b")) == true);
-        REQUIRE(canFind(std::vector<string>{"a"},string("a")) == true);
-        REQUIRE(canFind(std::vector<string>{"a","b"},string("c")) == false);
-        REQUIRE(canFind(std::vector<string>{"a"},string("c")) == false);
-        REQUIRE(canFind(std::vector<string>{},string("c")) == false);
+    SECTION("canFind")
+    {
+        REQUIRE(canFind(std::vector<string>{"a", "b"}, string("a")) == true);
+        REQUIRE(canFind(std::vector<string>{"a", "b"}, string("b")) == true);
+        REQUIRE(canFind(std::vector<string>{"a"}, string("a")) == true);
+        REQUIRE(canFind(std::vector<string>{"a", "b"}, string("c")) == false);
+        REQUIRE(canFind(std::vector<string>{"a"}, string("c")) == false);
+        REQUIRE(canFind(std::vector<string>{}, string("c")) == false);
     }
 
-    SECTION("validFilesystems" ) {
-        auto config =  Config(std::string(R"(
+    SECTION("validFilesystems")
+    {
+        auto config = Config(std::string(R"(
 default: third
 admins: [e]
 dbuid: 2
@@ -240,24 +227,31 @@ filesystems:
 )"));
 
         // see if workspace and filesystems are used
-        REQUIRE(config.validFilesystems("c", std::vector<string>{}, ws::LIST) == std::vector<string>{"third","fourth","second"} );
+        REQUIRE(config.validFilesystems("c", std::vector<string>{}, ws::LIST) ==
+                std::vector<string>{"third", "fourth", "second"});
         // see if userdefault and acl works
-        REQUIRE(config.validFilesystems("a", std::vector<string>{}, ws::LIST) == std::vector<string>{"second","third","first","fourth"});
+        REQUIRE(config.validFilesystems("a", std::vector<string>{}, ws::LIST) ==
+                std::vector<string>{"second", "third", "first", "fourth"});
         // see if ACL works, default does not override ACL
-        REQUIRE(config.validFilesystems("b", std::vector<string>{"gb"}, ws::LIST) == std::vector<string>{"third", "fourth","second"});
+        REQUIRE(config.validFilesystems("b", std::vector<string>{"gb"}, ws::LIST) ==
+                std::vector<string>{"third", "fourth", "second"});
         // global, groupdefault, others
-        REQUIRE(config.validFilesystems("d", std::vector<string>{"gb"}, ws::LIST) == std::vector<string>{"first","third","fourth","second"});
+        REQUIRE(config.validFilesystems("d", std::vector<string>{"gb"}, ws::LIST) ==
+                std::vector<string>{"first", "third", "fourth", "second"});
         // userdefault first, group second, multiple groups
-        REQUIRE(config.validFilesystems("a", std::vector<string>{"gc","gb"}, ws::LIST) == std::vector<string>{"second","first","third","fourth"});
+        REQUIRE(config.validFilesystems("a", std::vector<string>{"gc", "gb"}, ws::LIST) ==
+                std::vector<string>{"second", "first", "third", "fourth"});
         // user first, others, no denied, not only for first user, multiple groups
-        REQUIRE(config.validFilesystems("y", std::vector<string>{"ga","gc"}, ws::LIST) == std::vector<string>{"third","fourth","second"});
+        REQUIRE(config.validFilesystems("y", std::vector<string>{"ga", "gc"}, ws::LIST) ==
+                std::vector<string>{"third", "fourth", "second"});
         // admin user check, sees all filesystems
-        REQUIRE(config.validFilesystems("e", std::vector<string>{}, ws::LIST) == std::vector<string>{"third","first","fourth", "second"});
+        REQUIRE(config.validFilesystems("e", std::vector<string>{}, ws::LIST) ==
+                std::vector<string>{"third", "first", "fourth", "second"});
     }
 
-
-    SECTION( "hasAccess") {
-        auto config =  Config(std::string(R"(
+    SECTION("hasAccess")
+    {
+        auto config = Config(std::string(R"(
 admins: [d]
 dbuid: 2
 dbgid: 2
@@ -279,28 +273,28 @@ filesystems:
 )"));
 
         // workspace no acl
-        REQUIRE(config.hasAccess("a", std::vector<string>{"cg","dg"},"testnoacl", ws::LIST) == true);
+        REQUIRE(config.hasAccess("a", std::vector<string>{"cg", "dg"}, "testnoacl", ws::LIST) == true);
         // workspace with acl, through user
-        REQUIRE(config.hasAccess("a", std::vector<string>{"cg","dg"},"testacl", ws::LIST) == true);
+        REQUIRE(config.hasAccess("a", std::vector<string>{"cg", "dg"}, "testacl", ws::LIST) == true);
         // workspace with acl, unknown user
-        REQUIRE(config.hasAccess("c", std::vector<string>{},"testacl", ws::LIST) == false);
+        REQUIRE(config.hasAccess("c", std::vector<string>{}, "testacl", ws::LIST) == false);
         // workspace with acl, through group
-        REQUIRE(config.hasAccess("c", std::vector<string>{"bg"},"testacl", ws::LIST) == true);
+        REQUIRE(config.hasAccess("c", std::vector<string>{"bg"}, "testacl", ws::LIST) == true);
         // workspace with acl, through group but forbidden as user
-        REQUIRE(config.hasAccess("b", std::vector<string>{"bg"},"testacl", ws::LIST) == false);
+        REQUIRE(config.hasAccess("b", std::vector<string>{"bg"}, "testacl", ws::LIST) == false);
         // admin user
-        REQUIRE(config.hasAccess("d", std::vector<string>{""},"testacl", ws::LIST) == true);
+        REQUIRE(config.hasAccess("d", std::vector<string>{""}, "testacl", ws::LIST) == true);
 
         // acl extended syntax
-        REQUIRE(config.hasAccess("z", std::vector<string>{"cg","dg"},"testacl", ws::CREATE) == true);
-        REQUIRE(config.hasAccess("z", std::vector<string>{"cg","dg"},"testacl", ws::LIST) == false);
-        REQUIRE(config.hasAccess("y", std::vector<string>{"cg","dg"},"testacl", ws::LIST) == false);
-        REQUIRE(config.hasAccess("y", std::vector<string>{"cg","dg"},"testacl", ws::CREATE) == true);
-
+        REQUIRE(config.hasAccess("z", std::vector<string>{"cg", "dg"}, "testacl", ws::CREATE) == true);
+        REQUIRE(config.hasAccess("z", std::vector<string>{"cg", "dg"}, "testacl", ws::LIST) == false);
+        REQUIRE(config.hasAccess("y", std::vector<string>{"cg", "dg"}, "testacl", ws::LIST) == false);
+        REQUIRE(config.hasAccess("y", std::vector<string>{"cg", "dg"}, "testacl", ws::CREATE) == true);
     }
 
-    SECTION("isAdmin") {
-        auto config =  Config(std::string(R"(
+    SECTION("isAdmin")
+    {
+        auto config = Config(std::string(R"(
 admins: [d]
 dbuid: 2
 dbgid: 2
@@ -321,16 +315,14 @@ filesystems:
 
 )"));
 
-        REQUIRE(config.hasAccess("d", std::vector<string>{""},"testacl", ws::LIST) == true);
+        REQUIRE(config.hasAccess("d", std::vector<string>{""}, "testacl", ws::LIST) == true);
     }
+}
 
+TEST_CASE("config file: full sample", "[config]")
+{
 
- }
-
-
-TEST_CASE("config file: full sample", "[config]") {
-
-auto config =  Config(std::string(R"(
+    auto config = Config(std::string(R"(
 # this file illustrates and documents the workspace++ config files
 # use ws_validate_config to validate a config file
 clustername: aName              # mandatory, a name to identify the system
@@ -373,7 +365,8 @@ workspaces:                     # now the list of the workspaces
     deleted: .trash
 )"));
 
-    SECTION("check config") {
+    SECTION("check config")
+    {
 
         REQUIRE(config.clustername() == "aName");
         REQUIRE(config.smtphost() == "localhost");
@@ -382,7 +375,7 @@ workspaces:                     # now the list of the workspaces
         REQUIRE(config.maxduration() == 10);
         REQUIRE(config.durationdefault() == 1);
         REQUIRE(config.reminderdefault() == 2);
-        REQUIRE(config.maxextensions() ==1);
+        REQUIRE(config.maxextensions() == 1);
         REQUIRE(config.dbuid() == 9999);
         REQUIRE(config.dbgid() == 9999);
         REQUIRE(config.admins() == vector<string>{"root"});
@@ -398,7 +391,7 @@ workspaces:                     # now the list of the workspaces
         REQUIRE(filesystem1.spaceselection == "random");
         REQUIRE(filesystem1.database == "/lustre-db");
         REQUIRE(filesystem1.maxduration == 30);
-        REQUIRE(filesystem1.groupdefault == vector<string>{"inst1","inst2"});
+        REQUIRE(filesystem1.groupdefault == vector<string>{"inst1", "inst2"});
         REQUIRE(filesystem1.userdefault == vector<string>{"user1"});
         REQUIRE(filesystem1.user_acl == vector<string>{"user1"});
         REQUIRE(filesystem1.group_acl == vector<string>{"adm"});
@@ -409,7 +402,7 @@ workspaces:                     # now the list of the workspaces
 
         REQUIRE(filesystem2.comment == "what?");
 
-	    config.validate();
+        config.validate();
 
         REQUIRE(config.isValid());
     }

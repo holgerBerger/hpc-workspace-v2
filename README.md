@@ -145,6 +145,32 @@ cmake --preset release
 cmake --build --preset release  -j 12
 ```
 
+### Source Code Formatting
+
+We use [clang-format](https://clang.llvm.org/docs/ClangFormat.html) to ensure consistent code style across the entire
+codebase. This helps us to improve readability, avoid bikeshedding, enable automation and make contributions easier.
+
+#### Style Configuration
+
+Our formatting rules are defined in the `.clang-format` file. This configuration file is automatically picked up when
+running `clang-format`. We follow a style close to LLVM with some customizations. The style might be tweaked over time.
+
+### How to Use
+
+We provide a custom CMake target allowing to apply the style configuration to all source files in one sweep:
+
+```
+cmake -S . -B build
+cmake --build build --target clang-format
+```
+
+Using the dry-run option, you can check the compliance of a source code file without applying the style configuration.
+This is particularly useful before committing changes.
+
+```
+clang-format --dry-run --Werror <file>
+```
+
 ## Testing
 
 unit tests:

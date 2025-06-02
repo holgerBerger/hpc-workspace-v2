@@ -30,43 +30,40 @@
  *
  */
 
-
 #include <sys/types.h>
 #include <unistd.h>
 
 #include "utils.h"
 
 #ifdef WS_CAPA
-#include <sys/capability.h>
+    #include <sys/capability.h>
 #else
 typedef int cap_value_t;
 const int CAP_CHOWN = 0;
 const int CAP_DAC_OVERRIDE = 1;
-const int CAP_DAC_READ_SEARCH=2;
+const int CAP_DAC_READ_SEARCH = 2;
 const int CAP_FOWNER = 3;
 #endif
 
 class Cap {
-private:
+  private:
     bool hascaps;
     bool issetuid;
     bool isusermode;
-public:
+
+  public:
     Cap();
 
     // functions that can be called to raise and lower caps
-    void drop_caps(std::vector<cap_value_t>cap_arg, int uid, utils::SrcPos srcpos);
-    void lower_cap(std::vector<cap_value_t>cap_arg, int dbuid, utils::SrcPos);
-    void raise_cap(std::vector<cap_value_t>cap_arg, utils::SrcPos);
+    void drop_caps(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos srcpos);
+    void lower_cap(std::vector<cap_value_t> cap_arg, int dbuid, utils::SrcPos);
+    void raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos);
 
-    bool isSetuid() {return issetuid;};
-    bool hasCaps() {return hascaps;};
-    bool isUserMode() {return isusermode;};
+    bool isSetuid() { return issetuid; };
+    bool hasCaps() { return hascaps; };
+    bool isUserMode() { return isusermode; };
 
     void dump() const;
 };
-
-
-
 
 #endif

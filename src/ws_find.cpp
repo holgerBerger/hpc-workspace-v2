@@ -32,19 +32,18 @@
  *
  */
 
-
 #include <iostream>
 #include <memory>
 
-#include <boost/program_options.hpp>
 #include "config.h"
+#include <boost/program_options.hpp>
 
 #include "build_info.h"
 #include "db.h"
-#include "user.h"
 #include "fmt/base.h"
 #include "fmt/ranges.h" // IWYU pragma: keep
-//#include "fmt/ostream.h"
+#include "user.h"
+// #include "fmt/ostream.h"
 
 #include "caps.h"
 #include "ws.h"
@@ -58,14 +57,14 @@ using namespace std;
 bool debugflag = false;
 bool traceflag = false;
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
 
     // options and flags
     string filesystem;
     string user;
     string configfile;
     string name;
-    bool listgroups=false;
+    bool listgroups = false;
 
     po::variables_map opts;
 
@@ -73,20 +72,16 @@ int main(int argc, char **argv) {
     utils::setCLocal();
 
     // define options
-    po::options_description cmd_options( "\nOptions" );
-    cmd_options.add_options()
-	("help,h", "produce help message")
-	("version,V", "show version")
-    ("filesystem,F", po::value<string>(&filesystem), "filesystem to search workspaces in")
-	("group,g", "enable search for group workspaces")
-	("user,u", po::value<string>(&user), "only show workspaces for selected user")
-    ("name,n", po::value<string>(&name), "workspace name to search for")
-	("config", po::value<string>(&configfile), "config file");
+    po::options_description cmd_options("\nOptions");
+    cmd_options.add_options()("help,h", "produce help message")("version,V", "show version")(
+        "filesystem,F", po::value<string>(&filesystem), "filesystem to search workspaces in")(
+        "group,g", "enable search for group workspaces")("user,u", po::value<string>(&user),
+                                                         "only show workspaces for selected user")(
+        "name,n", po::value<string>(&name), "workspace name to search for")("config", po::value<string>(&configfile),
+                                                                            "config file");
 
     po::options_description secret_options("Secret");
-    secret_options.add_options()
-	("debug", "show debugging information")
-    ("trace", "show tracing information") ;
+    secret_options.add_options()("debug", "show debugging information")("trace", "show tracing information");
 
     // define options without names
     po::positional_options_description p;
@@ -96,7 +91,7 @@ int main(int argc, char **argv) {
     all_options.add(cmd_options).add(secret_options);
 
     // parse commandline
-    try{
+    try {
         po::store(po::command_line_parser(argc, argv).options(all_options).positional(p).run(), opts);
         po::notify(opts);
     } catch (...) {
@@ -128,7 +123,7 @@ int main(int argc, char **argv) {
 
     if (opts.count("version")) {
 #ifdef IS_GIT_REPOSITORY
-        fmt::println("workspace build from git commit hash {} on top of release {}", GIT_COMMIT_HASH,WS_VERSION);
+        fmt::println("workspace build from git commit hash {} on top of release {}", GIT_COMMIT_HASH, WS_VERSION);
 #else
         fmt::println("workspace version {}", WS_VERSION);
 #endif
@@ -136,14 +131,14 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
-    if (name=="") {
+    if (name == "") {
         fmt::println(stderr, "Error  : no workspace name given!");
         exit(-4);
     }
 
     // read config
     //   user can change this if no setuid installation OR if root
-    auto configfilestoread = std::vector<cppfs::path>{"/etc/ws.d","/etc/ws.conf"};
+    auto configfilestoread = std::vector<cppfs::path>{"/etc/ws.d", "/etc/ws.conf"};
     if (configfile != "") {
         if (user::isRoot() || caps.isUserMode()) {
             configfilestoread = {configfile};
@@ -158,27 +153,25 @@ int main(int argc, char **argv) {
         exit(-2);
     }
 
-
     // root and admins can choose usernames
-    string username = user::getUsername();        // used for rights checks
-    string userpattern;                     // used for pattern matching in DB
+    string username = user::getUsername(); // used for rights checks
+    string userpattern;                    // used for pattern matching in DB
     if (user::isRoot() || config.isAdmin(user::getUsername())) {
-        if (user!="") {
-                userpattern = user;
+        if (user != "") {
+            userpattern = user;
         } else {
-                userpattern = "*";
+            userpattern = "*";
         }
     } else {
         userpattern = username;
     }
-
 
     // list of groups of this process
     auto grouplist = user::getGrouplist();
 
     // where to list from?
     vector<string> fslist;
-    vector<string> validfs = config.validFilesystems(username,grouplist, ws::USE);
+    vector<string> validfs = config.validFilesystems(username, grouplist, ws::USE);
     if (filesystem != "") {
         if (canFind(validfs, filesystem)) {
             fslist.push_back(filesystem);
@@ -193,22 +186,22 @@ int main(int argc, char **argv) {
     vector<std::unique_ptr<DBEntry>> entrylist;
 
     // iterate over filesystems and print or create list to be sorted
-    for(auto const &fs: fslist) {
-        if (debugflag) fmt::print("Debug  : loop over fslist {} in {}\n", fs, fslist);
+    for (auto const& fs : fslist) {
+        if (debugflag)
+            fmt::print("Debug  : loop over fslist {} in {}\n", fs, fslist);
         std::unique_ptr<Database> db(config.openDB(fs));
 
         // catch DB access errors, if DB directory or DB is accessible
         try {
-            for(auto const &id: db->matchPattern(name, userpattern, grouplist, false, listgroups)) {
+            for (auto const& id : db->matchPattern(name, userpattern, grouplist, false, listgroups)) {
                 std::unique_ptr<DBEntry> entry(db->readEntry(id, false));
                 // if entry is valid
                 if (entry) {
-                    fmt::print("{}\n",entry->getWSPath());
+                    fmt::print("{}\n", entry->getWSPath());
                     exit(0);
                 }
             }
-        }
-        catch (DatabaseException &e) {
+        } catch (DatabaseException& e) {
             fmt::println(stderr, "{}", e.what());
             exit(-2);
         }
@@ -218,5 +211,4 @@ int main(int argc, char **argv) {
     // if we get here, we did not find the workspace
     fmt::println(stderr, "Error  : workspace not found!");
     exit(-1);
-
 }

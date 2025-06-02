@@ -110,3 +110,20 @@ if(BUILD_TESTS)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+
+# clang-format: Location of source files
+file(GLOB_RECURSE ALL_SOURCE_FILES
+     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h")
+
+# Custom target to format
+add_custom_target(
+  clang-format
+  COMMAND clang-format
+          -i
+          -style=file
+          ${ALL_SOURCE_FILES}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Running clang-format on source files"
+)

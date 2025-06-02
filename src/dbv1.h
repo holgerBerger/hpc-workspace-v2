@@ -31,8 +31,8 @@
  *
  */
 
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "config.h"
 #include "db.h"
@@ -46,108 +46,104 @@ class FilesystemDBV1;
 //  assoc would be very flexible and match the YAML model well, easy to extend
 //  and would carry unknown fields simply over. mix may be?
 class DBEntryV1 : public DBEntry {
-private:
-        // pointer to DB containing this entry (to get access to config)
-        FilesystemDBV1 *parent_db;
+  private:
+    // pointer to DB containing this entry (to get access to config)
+    FilesystemDBV1* parent_db;
 
-        // information of external format
-        int     dbversion;              // version
-        string  id;                     // ID of this workspace
+    // information of external format
+    int dbversion; // version
+    string id;     // ID of this workspace
 
-        // main components of external format
-        string  filesystem;             // location   // FIXME: is this used anywhere?
-        string  workspace;              // directory path
-        long    creation;               // epoch time of creation
-        long    expiration;             // epoch time of expiration
-        long    released;               // epoch time of manual release
-        long    reminder;               // epoch time of reminder to be sent out
-        int     extensions;             // extensions, counting down
-        string  group;                  // group for whom it is visible
-        string  mailaddress;            // address for reminder email
-        string  comment;                // some user defined comment
-        string  dbfilepath;             // if read from DB, this is the location to write to
+    // main components of external format
+    string filesystem;  // location   // FIXME: is this used anywhere?
+    string workspace;   // directory path
+    long creation;      // epoch time of creation
+    long expiration;    // epoch time of expiration
+    long released;      // epoch time of manual release
+    long reminder;      // epoch time of reminder to be sent out
+    int extensions;     // extensions, counting down
+    string group;       // group for whom it is visible
+    string mailaddress; // address for reminder email
+    string comment;     // some user defined comment
+    string dbfilepath;  // if read from DB, this is the location to write to
 
-public:
-        // simple constructor to read from file
-        DBEntryV1(FilesystemDBV1* pdb) : parent_db(pdb) {};
-        // constructor to make new entry to write out
-        DBEntryV1(FilesystemDBV1* pdb, const WsID _id, const string _workspace, const long _creation,
-                        const long _expiration, const long _reminder, const int _extensions,
-			const string _group, const string _mailaddress, const string _comment);
+  public:
+    // simple constructor to read from file
+    DBEntryV1(FilesystemDBV1* pdb) : parent_db(pdb) {};
+    // constructor to make new entry to write out
+    DBEntryV1(FilesystemDBV1* pdb, const WsID _id, const string _workspace, const long _creation,
+              const long _expiration, const long _reminder, const int _extensions, const string _group,
+              const string _mailaddress, const string _comment);
 
-        // read yaml entry from string
-        void readFromString(std::string str);
-        // read yaml entry from file
-        void readFromFile(const WsID id, const string filesystem, const string filename);
+    // read yaml entry from string
+    void readFromString(std::string str);
+    // read yaml entry from file
+    void readFromFile(const WsID id, const string filesystem, const string filename);
 
-        // use extension and write back file
-        void useExtension(const long expiration, const string mail, const int reminder, const string comment);
-        // change expiration time
-        void setExpiration(const time_t timestamp);
-        // change release date (mark as released and not expired) and write updated entry and move entry
-        void release(const std::string timestamp);
-	// write entry to DB after update (read with readEntry) or creation
-	void writeEntry();
-        // remove entry from DB
-        void remove();
+    // use extension and write back file
+    void useExtension(const long expiration, const string mail, const int reminder, const string comment);
+    // change expiration time
+    void setExpiration(const time_t timestamp);
+    // change release date (mark as released and not expired) and write updated entry and move entry
+    void release(const std::string timestamp);
+    // write entry to DB after update (read with readEntry) or creation
+    void writeEntry();
+    // remove entry from DB
+    void remove();
 
-        // print for ws_list
-        void print(const bool verbose, const bool terse) const;
+    // print for ws_list
+    void print(const bool verbose, const bool terse) const;
 
-        long getRemaining() const;
-        int getExtension() const;
-        string getMailaddress() const;
-        string getComment() const;
-        string getId() const;
-        long getCreation() const;
-        string getWSPath() const;
-        long getExpiration() const;
-        string getFilesystem() const;
+    long getRemaining() const;
+    int getExtension() const;
+    string getMailaddress() const;
+    string getComment() const;
+    string getId() const;
+    long getCreation() const;
+    string getWSPath() const;
+    long getExpiration() const;
+    string getFilesystem() const;
 
-        // return config of parent DB
-        const Config* getConfig() const;
+    // return config of parent DB
+    const Config* getConfig() const;
 };
-
-
 
 // implementation of V1 DB format from workspace++
 class FilesystemDBV1 : public Database {
-private:
-        const Config* config;
-        string fs;
-public:
-        FilesystemDBV1(const Config* config_, const string fs_) : config(config_), fs(fs_) {};
+  private:
+    const Config* config;
+    string fs;
 
-        // create new DB entry
-        void createEntry(const WsID id, const string workspace, const long creation, const long expiration,
-                        const long reminder, const int extensions,
-			const string group, const string mailaddress, const string comment);
+  public:
+    FilesystemDBV1(const Config* config_, const string fs_) : config(config_), fs(fs_) {};
 
-	// read entry
-	std::unique_ptr<DBEntry> readEntry(const WsID id, const bool deleted);
+    // create new DB entry
+    void createEntry(const WsID id, const string workspace, const long creation, const long expiration,
+                     const long reminder, const int extensions, const string group, const string mailaddress,
+                     const string comment);
 
-        // delete entry
-        void deleteEntry(const string wsid, const bool deleted);
+    // read entry
+    std::unique_ptr<DBEntry> readEntry(const WsID id, const bool deleted);
 
-        // return list of identifiers of DB entries matching pattern from filesystem or all valid filesystems
-        //  does not check if request for "deleted" is valid, has to be done on caller side
-        //  throws IO exceptions in case of access problems
-        std::vector<WsID> matchPattern(const string pattern, const string user, const vector<string> groups,
-                                                const bool deleted, const bool groupworkspaces);
+    // delete entry
+    void deleteEntry(const string wsid, const bool deleted);
 
-        // create workspace directory according to rules of this DB
-        // and return the name
-	std::string createWorkspace(const string name, const string user_option, const bool groupflag, const string groupname);
+    // return list of identifiers of DB entries matching pattern from filesystem or all valid filesystems
+    //  does not check if request for "deleted" is valid, has to be done on caller side
+    //  throws IO exceptions in case of access problems
+    std::vector<WsID> matchPattern(const string pattern, const string user, const vector<string> groups,
+                                   const bool deleted, const bool groupworkspaces);
 
-        // access to config
-        const Config* getconfig() const {
-                return config;
-        }
+    // create workspace directory according to rules of this DB
+    // and return the name
+    std::string createWorkspace(const string name, const string user_option, const bool groupflag,
+                                const string groupname);
 
-        // access to fs
-        std::string getfs() {
-                return fs;
-        }
+    // access to config
+    const Config* getconfig() const { return config; }
+
+    // access to fs
+    std::string getfs() { return fs; }
 };
 
 #endif

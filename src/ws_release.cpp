@@ -27,22 +27,22 @@
  *
  */
 
-#include <iostream>
-#include <string>
 #include "fmt/base.h"
 #include "fmt/ranges.h" // IWYU pragma: keep
+#include <iostream>
+#include <string>
 
 #include <regex> // buggy in redhat 7
 
 #include <syslog.h>
-#include <unistd.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "build_info.h"
+#include "caps.h"
 #include "config.h"
 #include "user.h"
 #include "utils.h"
-#include "caps.h"
 #include "ws.h"
 
 #include <boost/program_options.hpp>
@@ -60,49 +60,39 @@ bool traceflag = false;
 // init caps here, when euid!=uid
 Cap caps{};
 
-
-
-
 /*
  *  parse the commandline and see if all required arguments are passed, and check the workspace name for
  *  bad characters
  */
-void commandline(po::variables_map &opt, string &name, string &filesystem,
-                    string &user, string &groupname, bool &deletedata,
-                    int argc, char**argv, std::string &configfile) {
+void commandline(po::variables_map& opt, string& name, string& filesystem, string& user, string& groupname,
+                 bool& deletedata, int argc, char** argv, std::string& configfile) {
     // define all options
 
-    po::options_description cmd_options( "\nOptions" );
-    cmd_options.add_options()
-            ("help,h", "produce help message")
-            ("version,V", "show version")
-            ("name,n", po::value<string>(&name), "workspace name")
-            ("filesystem,F", po::value<string>(&filesystem), "filesystem")
-            ("username,u", po::value<string>(&user), "username")
-            ("groupname,G", po::value<string>(&groupname)->default_value(""), "groupname")
-            ("config,c", po::value<string>(&configfile), "config file")
-            ("delete-data", "delete all data, workspace can NOT BE RECOVERED!")
-    ;
+    po::options_description cmd_options("\nOptions");
+    cmd_options.add_options()("help,h", "produce help message")("version,V", "show version")(
+        "name,n", po::value<string>(&name), "workspace name")("filesystem,F", po::value<string>(&filesystem),
+                                                              "filesystem")("username,u", po::value<string>(&user),
+                                                                            "username")(
+        "groupname,G", po::value<string>(&groupname)->default_value(""),
+        "groupname")("config,c", po::value<string>(&configfile),
+                     "config file")("delete-data", "delete all data, workspace can NOT BE RECOVERED!");
 
     po::options_description secret_options("Secret");
-    secret_options.add_options()
-        ("debug", "show debugging information")
-        ("trace", "show calling information")
-        ;
+    secret_options.add_options()("debug", "show debugging information")("trace", "show calling information");
 
     // define options without names
     po::positional_options_description p;
-    p.add("name", 1).add("duration",2);
+    p.add("name", 1).add("duration", 2);
 
     po::options_description all_options;
     all_options.add(cmd_options).add(secret_options);
 
     // parse commandline
-    try{
+    try {
         po::store(po::command_line_parser(argc, argv).options(all_options).positional(p).run(), opt);
         po::notify(opt);
     } catch (...) {
-        fmt::print("Usage: {} [options] workspace_name duration\n", argv[0] );
+        fmt::print("Usage: {} [options] workspace_name duration\n", argv[0]);
         cout << cmd_options << "\n";
         exit(1);
     }
@@ -119,28 +109,27 @@ void commandline(po::variables_map &opt, string &name, string &filesystem,
 #ifdef IS_GIT_REPOSITORY
         fmt::println("workspace build from git commit hash {} on top of release {}", GIT_COMMIT_HASH, WS_VERSION);
 #else
-        fmt::println("workspace version {}", WS_VERSION );
+        fmt::println("workspace version {}", WS_VERSION);
 #endif
         utils::printBuildFlags();
         exit(0);
     }
 
     // this allows user to extend foreign workspaces
-    if(opt.count("username") && !( opt.count("extension") || getuid()==0 ) ) {
+    if (opt.count("username") && !(opt.count("extension") || getuid() == 0)) {
         fmt::print(stderr, "Info   : Ignoring username option.\n");
-        user="";
+        user = "";
     }
 
-    if (opt.count("name"))
-    {
-        //cout << " name: " << name << "\n";
+    if (opt.count("name")) {
+        // cout << " name: " << name << "\n";
     } else {
         fmt::print("{}: [options] workspace_name duration\n", argv[0]);
         cout << cmd_options << "\n"; // FIXME: iostream usage
         exit(1);
     }
 
-    deletedata = opt.count("delete-data");  // FIXME: unused
+    deletedata = opt.count("delete-data"); // FIXME: unused
 
     // globalflags
     debugflag = opt.count("debug");
@@ -151,11 +140,10 @@ void commandline(po::variables_map &opt, string &name, string &filesystem,
     // TODO: remove regexp dependency
     static const regex e("^[[:alnum:]][[:alnum:]_.-]*$");
     if (!regex_match(name, e)) {
-            fmt::print(stderr, "Error  : Illegal workspace name, use ASCII characters and numbers, '-','.' and '_' only!");
-            exit(1);
+        fmt::print(stderr, "Error  : Illegal workspace name, use ASCII characters and numbers, '-','.' and '_' only!");
+        exit(1);
     }
 }
-
 
 /*
  *  validate parameters vs config file
@@ -164,25 +152,25 @@ void commandline(po::variables_map &opt, string &name, string &filesystem,
  *
  *  changes duration and maxextensions, does return true if they are out of bounds
  */
-bool validateFsAndGroup(const Config &config, const po::variables_map &opt, const std::string username)
-{
-    if (traceflag) fmt::print(stderr, "Trace  : validateFsAndGroup(username={})", username);
+bool validateFsAndGroup(const Config& config, const po::variables_map& opt, const std::string username) {
+    if (traceflag)
+        fmt::print(stderr, "Trace  : validateFsAndGroup(username={})", username);
 
-    //auto groupnames=getgroupnames(username); // FIXME:  use getGrouplist ?
+    // auto groupnames=getgroupnames(username); // FIXME:  use getGrouplist ?
     auto groupnames = user::getGrouplist();
 
     // if a group was given, check if a valid group was given
-    if ( opt["groupname"].as<string>() != "" ) {
-        if ( find(groupnames.begin(), groupnames.end(), opt["groupname"].as<string>()) == groupnames.end() ) {
+    if (opt["groupname"].as<string>() != "") {
+        if (find(groupnames.begin(), groupnames.end(), opt["groupname"].as<string>()) == groupnames.end()) {
             fmt::print(stderr, "Error  : invalid group specified!\n");
             return false;
         }
     }
 
     // if the user specifies a filesystem, he must be allowed to use it
-    if(opt.count("filesystem")) {
+    if (opt.count("filesystem")) {
         auto validfs = config.validFilesystems(username, groupnames, ws::RELEASE);
-        if ( !canFind(validfs, opt["filesystem"].as<string>()) && getuid()!=0 ) {
+        if (!canFind(validfs, opt["filesystem"].as<string>()) && getuid() != 0) {
             fmt::print(stderr, "Error  : You are not allowed to use the specified filesystem!\n");
             return false;
         }
@@ -191,46 +179,41 @@ bool validateFsAndGroup(const Config &config, const po::variables_map &opt, cons
     return true;
 }
 
-
-
-
 /*
  *  release the workspace
  *  file accesses and config access are hidden in DB and config handling
  *  FIXME: make it -> int and return errors for tesing
  */
-void release(
-            const Config &config,
-            const po::variables_map &opt, string filesystem, const string name,
-            string user_option, const string groupname, const bool deletedata
-            )
-{
-    if (traceflag) fmt::print(stderr, "Trace  : releae({}, {}, {}, {}, {})\n", filesystem, name,
-                                user_option, groupname, deletedata);
-
+void release(const Config& config, const po::variables_map& opt, string filesystem, const string name,
+             string user_option, const string groupname, const bool deletedata) {
+    if (traceflag)
+        fmt::print(stderr, "Trace  : releae({}, {}, {}, {}, {})\n", filesystem, name, user_option, groupname,
+                   deletedata);
 
     std::string username = user::getUsername(); // current user
 
     // get valid filesystems to bail out if there is none
     auto valid_filesystems = config.validFilesystems(user::getUsername(), user::getGrouplist(), ws::RELEASE);
 
-    if (valid_filesystems.size()==0) {
+    if (valid_filesystems.size() == 0) {
         fmt::print(stderr, "Error: no valid filesystems in configuration, can not allocate\n");
         exit(-1); // FIXME: bad for testing
     }
 
     // validate filesystem and group given on command line
-    if (!validateFsAndGroup(config, opt, user_option )) {
+    if (!validateFsAndGroup(config, opt, user_option)) {
         fmt::print(stderr, "Error: aborting!\n");
     }
 
-
-    // if no filesystem provided, get valid filesystems from config, ordered: userdefault, groupdefault, globaldefault, others
+    // if no filesystem provided, get valid filesystems from config, ordered: userdefault, groupdefault, globaldefault,
+    // others
     vector<string> searchlist;
-    if(opt.count("filesystem")) {
+    if (opt.count("filesystem")) {
         searchlist.push_back(opt["filesystem"].as<string>());
     } else {
-        searchlist = config.validFilesystems(user::getUsername(), user::getGrouplist(), ws::RELEASE);  // FIXME: getUsername or user_option? getGrouplist uses current uid
+        searchlist =
+            config.validFilesystems(user::getUsername(), user::getGrouplist(),
+                                    ws::RELEASE); // FIXME: getUsername or user_option? getGrouplist uses current uid
     }
 
     //
@@ -247,7 +230,7 @@ void release(
 
     std::unique_ptr<Database> db;
 
-    for (std::string cfilesystem: searchlist) {
+    for (std::string cfilesystem : searchlist) {
         if (debugflag) {
             fmt::print(stderr, "Debug  : searching valid filesystems, currently {}\n", cfilesystem);
         }
@@ -256,25 +239,26 @@ void release(
 
         // check if entry exists
         try {
-            if(user_option.length()>0 && (getuid()==0))
-                dbid = user_option+"-"+name;
+            if (user_option.length() > 0 && (getuid() == 0))
+                dbid = user_option + "-" + name;
             else
-                dbid = username+"-"+name;
+                dbid = username + "-" + name;
 
             dbentry = std::unique_ptr<DBEntry>(candidate_db->readEntry(dbid, false));
             db = std::move(candidate_db);
             foundfs = cfilesystem;
             ws_exists = true;
             break;
-        } catch (DatabaseException &e) {
+        } catch (DatabaseException& e) {
             // silently ignore non existiong entries
-            if (debugflag) fmt::print(stderr, "Debug  :  existence check failed for {}/{}\n", cfilesystem, dbid);
+            if (debugflag)
+                fmt::print(stderr, "Debug  :  existence check failed for {}/{}\n", cfilesystem, dbid);
         }
     } // searchloop
 
     // workspace exists, release it
 
-    if(ws_exists) {
+    if (ws_exists) {
 
         // timestamp for versioning, has to be identical for DB and workspace DIR
         string timestamp = fmt::format("{}", time(NULL));
@@ -290,10 +274,10 @@ void release(
         // set released flag so released workspaces can be distinguished from expired ones,
         // update DB entry and move it
         try {
-            dbentry->release(timestamp);  // timestamp is version information, same as for directory later
-        } catch (const DatabaseException &e) {
+            dbentry->release(timestamp); // timestamp is version information, same as for directory later
+        } catch (const DatabaseException& e) {
             fmt::println(stderr, e.what());
-            exit(-1);   // on error we bail out, workspace will still exist and db most probably as well
+            exit(-1); // on error we bail out, workspace will still exist and db most probably as well
         }
         // we exit this as DB user on success
 
@@ -302,23 +286,28 @@ void release(
         //
 
         auto wsconfig = dbentry->getConfig()->getFsConfig(dbentry->getFilesystem());
-        cppfs::path target = cppfs::path(dbentry->getWSPath()).parent_path() / cppfs::path(wsconfig.deletedPath) / cppfs::path(fmt::format("{}-{}", dbentry->getId(), timestamp));
+        cppfs::path target = cppfs::path(dbentry->getWSPath()).parent_path() / cppfs::path(wsconfig.deletedPath) /
+                             cppfs::path(fmt::format("{}-{}", dbentry->getId(), timestamp));
 
         caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
         try {
-            if (debugflag) fmt::println("Debug  : rename({}, {})", dbentry->getWSPath() , target.string());
-            cppfs::rename(dbentry->getWSPath() , target);
-        } catch (const std::filesystem::filesystem_error &e) {
-            caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
-            if (debugflag) fmt::println(stderr, "Error  : {}", e.what());
+            if (debugflag)
+                fmt::println("Debug  : rename({}, {})", dbentry->getWSPath(), target.string());
+            cppfs::rename(dbentry->getWSPath(), target);
+        } catch (const std::filesystem::filesystem_error& e) {
+            caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
+                           utils::SrcPos(__FILE__, __LINE__, __func__));
+            if (debugflag)
+                fmt::println(stderr, "Error  : {}", e.what());
             fmt::println(stderr, "Error  : database entry could not be deleted!");
             exit(-1);
         }
 
         caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
 
-        syslog(LOG_INFO, "release for user <%s> from <%s> to <%s> done.", user::getUsername().c_str(), dbentry->getWSPath().c_str(), target.c_str());
+        syslog(LOG_INFO, "release for user <%s> from <%s> to <%s> done.", user::getUsername().c_str(),
+               dbentry->getWSPath().c_str(), target.c_str());
 
         //
         // third remove data is requested
@@ -332,7 +321,7 @@ void release(
             caps.raise_cap({CAP_FOWNER}, utils::SrcPos(__FILE__, __LINE__, __func__));
             if (caps.isSetuid()) {
                 // get process owner to be allowed to delete files
-                if(seteuid(getuid())) {
+                if (seteuid(getuid())) {
                     fmt::println(stderr, "Error  : can not setuid, bad installation?");
                 }
             }
@@ -342,7 +331,7 @@ void release(
             if (debugflag) {
                 fmt::println("Debug  : remove_all({})", cppfs::path(target).string());
             }
-            cppfs::remove_all(cppfs::path(target), ec);  // we ignore return wert as we expect an error return anyhow
+            cppfs::remove_all(cppfs::path(target), ec); // we ignore return wert as we expect an error return anyhow
 
             // we expect an error 13 for the topmost directory
             if (ec.value() != 13) {
@@ -351,7 +340,7 @@ void release(
 
             if (caps.isSetuid()) {
                 // get root so we can drop again
-                if(seteuid(0)) {
+                if (seteuid(0)) {
                     fmt::println(stderr, "Error  : can not setuid, bad installation?");
                 }
             }
@@ -363,25 +352,22 @@ void release(
             }
             cppfs::remove_all(cppfs::path(target), ec);
 
-            syslog(LOG_INFO, "delete-data for user <%s> from <%s>." , user::getUsername().c_str(), target.c_str());
+            syslog(LOG_INFO, "delete-data for user <%s> from <%s>.", user::getUsername().c_str(), target.c_str());
 
             // remove DB entry
             dbentry->remove();
 
-        }  // if delete-data
+        } // if delete-data
 
-    // if ws_exist
+        // if ws_exist
     } else {
         // workspace does not exist and needs to be created
 
         fmt::print(stderr, "Error  : Non-existent workspace given.\n");
     }
-
 }
 
-
-
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     string name;
     string filesystem;
     string mailaddress("");
@@ -402,7 +388,7 @@ int main(int argc, char **argv) {
 
     // find which config files to read
     //   user can change this if no setuid installation OR if root
-    auto configfilestoread = std::vector<cppfs::path>{"/etc/ws.d","/etc/ws.conf"};
+    auto configfilestoread = std::vector<cppfs::path>{"/etc/ws.d", "/etc/ws.conf"};
     if (configfile != "") {
         if (user::isRoot() || caps.isUserMode()) {
             configfilestoread = {configfile};
@@ -419,14 +405,14 @@ int main(int argc, char **argv) {
     }
 
     // read user config
-    string user_conf_filename = user::getUserhome()+"/.ws_user.conf";
+    string user_conf_filename = user::getUserhome() + "/.ws_user.conf";
     if (!cppfs::is_symlink(user_conf_filename)) {
         if (cppfs::is_regular_file(user_conf_filename)) {
             user_conf = utils::getFileContents(user_conf_filename.c_str());
         }
         // FIXME: could be parsed here and passed as object not string
     } else {
-        fmt::print(stderr,"Error  : ~/.ws_user.conf can not be symlink!");
+        fmt::print(stderr, "Error  : ~/.ws_user.conf can not be symlink!");
         exit(-1);
     }
 
@@ -434,5 +420,4 @@ int main(int argc, char **argv) {
 
     // release workspace
     release(config, opt, filesystem, name, user_option, groupname, deletedata);
-
 }

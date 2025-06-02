@@ -28,30 +28,29 @@
  *
  */
 
-
 #include <cstdlib>
 #include <sys/capability.h>
-
 
 #include "fmt/base.h"
 #include "fmt/ranges.h" // IWYU pragma: keep
 
-#include "user.h"
 #include "caps.h"
+#include "user.h"
 
 extern bool traceflag;
 extern bool debugflag;
 
 // TODO: is exit(1) ok here? better error handling?
 
-
 // constructor, check if we are setuid or have capabilites (only if linked with libcap)
 Cap::Cap() {
     // use those to enable tracing here, is called before arguments are parsed
-        // debugflag = true;
-        // traceflag = true;
-    if (traceflag) fmt::println(stderr, "Trace  : Cap::Cap()");
-    if (debugflag) fmt::println(stderr, "Debug  : euid={}, uid={}", geteuid(), getuid());
+    // debugflag = true;
+    // traceflag = true;
+    if (traceflag)
+        fmt::println(stderr, "Trace  : Cap::Cap()");
+    if (debugflag)
+        fmt::println(stderr, "Debug  : euid={}, uid={}", geteuid(), getuid());
 
     issetuid = user::isSetuid();
     hascaps = false;
@@ -74,7 +73,7 @@ Cap::Cap() {
             exit(1);
         }
 
-        cap_list[0] = CAP_DAC_OVERRIDE;  // this has to be set for all executables using this!
+        cap_list[0] = CAP_DAC_OVERRIDE; // this has to be set for all executables using this!
 
         if (cap_set_flag(caps, CAP_EFFECTIVE, 1, cap_list, CAP_SET) == -1) {
             fmt::println(stderr, "Error: Failed updating effective capability set.");
@@ -110,21 +109,20 @@ Cap::Cap() {
     }
 }
 
-
 // drop root/effective capabilities (not necessary), and verify the permitted set
-void Cap::drop_caps(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos srcpos)
-{
+void Cap::drop_caps(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos srcpos) {
     if (traceflag) {
         fmt::println(stderr, "Trace  : Cap::dropcap( {}, {}, {})", uid, cap_arg, srcpos.getSrcPos());
-        if (debugflag) dump();
+        if (debugflag)
+            dump();
     }
 #ifdef WS_CAPA
-    if(hascaps) {
+    if (hascaps) {
         cap_t caps;
-        cap_value_t cap_list[cap_arg.size()];   // FIXME: VLA not in ISO C++
+        cap_value_t cap_list[cap_arg.size()]; // FIXME: VLA not in ISO C++
 
-        int cnt=0;
-        for(const auto &ca: cap_arg) {
+        int cnt = 0;
+        for (const auto& ca : cap_arg) {
             cap_list[cnt++] = ca;
         }
 
@@ -133,13 +131,15 @@ void Cap::drop_caps(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos src
         // setting caps we should have in PERMITTED set
         if (cap_set_flag(caps, CAP_PERMITTED, cnt, cap_list, CAP_SET) == -1) {
             fmt::print(stderr, "Error  : problem with permitted capabilities. {}\n", srcpos.getSrcPos());
-            if (debugflag) dump();
+            if (debugflag)
+                dump();
             exit(1);
         }
 
         if (cap_set_proc(caps) != 0) {
             fmt::print(stderr, "Error  : problem setting permitted capabilities.\n");
-            if (debugflag) dump();
+            if (debugflag)
+                dump();
             cap_free(caps);
             exit(1);
         }
@@ -154,23 +154,21 @@ void Cap::drop_caps(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos src
             exit(1);
         }
     }
-
 }
 
 // remove a capability from the effective set
-void Cap::lower_cap(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos srcpos)
-{
+void Cap::lower_cap(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos srcpos) {
     if (traceflag) {
         fmt::println(stderr, "Trace  : Cap::lower_cap( {}, {})", uid, srcpos.getSrcPos());
         dump();
     }
 #ifdef WS_CAPA
-    if(hascaps) {
+    if (hascaps) {
         cap_t caps;
-        cap_value_t cap_list[cap_arg.size()];       // FIXME VLA not in ISO C++
+        cap_value_t cap_list[cap_arg.size()]; // FIXME VLA not in ISO C++
 
-        int cnt=0;
-        for(const auto &ca: cap_arg) {
+        int cnt = 0;
+        for (const auto& ca : cap_arg) {
             cap_list[cnt++] = ca;
         }
 
@@ -199,24 +197,21 @@ void Cap::lower_cap(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos src
             exit(1);
         }
     }
-
 }
 
-
 // add a capability to the effective set
-void Cap::raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos srcpos)
-{
+void Cap::raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos srcpos) {
     if (traceflag) {
         fmt::println(stderr, "Trace  : Cap::raise_cap( {}, {})", cap_arg, srcpos.getSrcPos());
         dump();
     }
 #ifdef WS_CAPA
-    if(hascaps) {
+    if (hascaps) {
         cap_t caps;
-        cap_value_t cap_list[cap_arg.size()];       // FIXME VLA not in ISO C++
+        cap_value_t cap_list[cap_arg.size()]; // FIXME VLA not in ISO C++
 
-        int cnt=0;
-        for(const auto &ca: cap_arg) {
+        int cnt = 0;
+        for (const auto& ca : cap_arg) {
             cap_list[cnt++] = ca;
         }
 
@@ -245,14 +240,13 @@ void Cap::raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos srcpos)
             exit(1);
         }
     }
-
 }
 
 // helper to dump current capabilities
 void Cap::dump() const {
 #ifdef WS_CAPA
     cap_t cap = cap_get_proc();
-    char * cap_text = cap_to_text(cap, NULL);
+    char* cap_text = cap_to_text(cap, NULL);
     fmt::print(stderr, "Debug  : running with capabilities: {}\n", cap_text);
     cap_free(cap_text);
     cap_free(cap);

@@ -5,14 +5,14 @@
  *  hpc-workspace-v2
  *
  *  user.h
- * 
+ *
  *  - helpers to deal with user information
- * 
+ *
  *  c++ version of workspace utility
  *  a workspace is a temporary directory created in behalf of a user with a limited lifetime.
  *
  *  (c) Holger Berger 2021,2023,2024
- * 
+ *
  *  hpc-workspace-v2 is based on workspace by Holger Berger, Thomas Beisel and Martin Hecht
  *
  *  hpc-workspace-v2 is free software: you can redistribute it and/or modify
@@ -33,17 +33,17 @@
 #include <string>
 #include <vector>
 
-#include <sys/types.h>
 #include <pwd.h>
+#include <sys/types.h>
 
 namespace user {
-    std::string getUsername();
-    std::string getUserhome();
-    bool isRoot();
-    bool isnotSetuid();
-    bool isSetuid();
-    std::string getGroupname();
-    std::vector<std::string> getGrouplist();
-}
+std::string getUsername();
+std::string getUserhome();
+bool isRoot();
+bool isnotSetuid();
+bool isSetuid();
+std::string getGroupname();
+std::vector<std::string> getGrouplist();
+} // namespace user
 
 #endif

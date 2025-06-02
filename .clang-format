@@ -1,0 +1,9 @@
+BasedOnStyle: LLVM
+AlignTrailingComments: true
+BreakBeforeBraces: Attach
+ColumnLimit: 120
+IndentPPDirectives: BeforeHash
+IndentWidth: 4
+InsertNewlineAtEOF: true
+PointerAlignment: Left
+UseTab: Never
