@@ -44,8 +44,10 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "caps.h"
+#include "config.h"
 #include "utils.h"
 #include "ws.h"
 
@@ -64,8 +66,15 @@ int debuglevel = 0;
 // init caps here, when euid!=uid
 Cap caps{};
 
+cppfs::perms perm0755 = cppfs::perms::owner_read | cppfs::perms::owner_write | cppfs::perms::owner_exec |
+                        cppfs::perms::group_read | cppfs::perms::group_exec | cppfs::perms::others_read |
+                        cppfs::perms::others_exec;
+
+cppfs::perms perm0644 =
+    cppfs::perms::owner_read | cppfs::perms::owner_write | cppfs::perms::group_read | cppfs::perms::others_read;
+
 int main(int argc, char** argv) {
-    std::string filename = "";
+    std::string configfile = "";
     // locals settings to prevent strange effects
     utils::setCLocal();
 
@@ -75,10 +84,12 @@ int main(int argc, char** argv) {
     po::variables_map opt;
     // define all options
     po::options_description cmd_options("\nOptions");
-    //clang-format off
-    cmd_options.add_options()("help,h", "produce help message")("filename,f", po::value<string>(&filename),
-                                                                "filename/directory");
-    //clang-format on
+
+    // clang-format off
+    cmd_options.add_options()
+        ("help,h", "produce help message")
+        ("config", po::value<string>(&configfile), "config file");
+    // clang-format on
 
     // define options without names
     po::positional_options_description p;
@@ -101,312 +112,249 @@ int main(int argc, char** argv) {
         exit(0);
     }
 
-    if (filename == "") {
-        filename = "/etc/ws.conf";
+    auto configfilestoread = std::vector<cppfs::path>{"/etc/ws.d", "/etc/ws.conf"};
+    if (configfile != "") {
+        if (user::isRoot() || caps.isUserMode()) {
+            configfilestoread = {configfile};
+        } else {
+            spdlog::warn("ignored config file options!");
+        }
     }
 
-    std::string yaml = utils::getFileContents(filename);
-    auto config = YAML::Load(yaml);
+    auto config = Config(configfilestoread);
 
-    spdlog::info("validating config from {}", filename);
-
-    std::vector<YAML::Node> wslist;
-    std::vector<string> wsnames;
+    spdlog::info("validating config from {}", configfile);
 
     // see if there are workspaces/filesystems defined
-    try {
-        if (config["workspaces"] || config["filesystems"]) {
-            for (auto key : std::vector<string>{"workspaces", "filesystems"}) {
-                if (config[key]) {
-                    auto list = config[key];
-                    wslist.push_back(list);
-                    for (auto it : list) {
-                        wsnames.push_back(it.first.as<string>());
-                    }
-                }
-            }
-        } else {
-            spdlog::error("No Workspaces defined");
-            exit(1);
-        }
-    } catch (...) {
+    auto wsnames = config.Filesystems();
+
+    if (wsnames.empty()) {
         spdlog::error("No Workspaces defined");
         exit(1);
     }
 
-    try {
-        auto clustername = config["clustername"].as<string>();
+    auto clustername = config.clustername();
+    if (clustername != "") {
         fmt::println("clustername: {}", clustername);
-    } catch (...) {
-        spdlog::error("No clustername definied");
+    } else {
+        spdlog::error("No clustername definied, please add \"clustername: <name>\" clause to toplevel");
         exit(1);
     }
 
-    try {
-        auto smtphost = config["smtphost"].as<string>();
+    auto smtphost = config.smtphost();
+    if (smtphost != "") {
         fmt::println("smtphost: {}", smtphost);
-    } catch (...) {
-        spdlog::warn("No smtphost found, beware: no reminder and error mails can be send");
+    } else {
+        spdlog::warn("No smtphost found, beware: no reminder and error mails can be send. Please add \"smtphost: "
+                     "<name>\" clause to toplevel");
     }
 
-    try {
-        auto mail_from = config["mail_from"].as<string>();
+    auto mail_from = config.mailfrom();
+    if (mail_from != "") {
         fmt::println("mail_from: {}", mail_from);
-    } catch (...) {
-        spdlog::warn("No mail_from found, beware: no reminder and error mails can be send");
+    } else {
+        spdlog::warn("No mail_from found, beware: no reminder and error mails can be send. Please add \"mail_from: "
+                     "<mail>\" clause to toplevel");
     }
 
     // default/default_workspace
-    std::string defaultws;
-
-    try {
-
-        if (config["default"] && config["default_workspace"]) {
-            spdlog::error("Both 'default and 'default_workspace defined. Choose one.");
-            exit(1);
-        } else if (config["default"]) {
-            defaultws = config["default"].as<string>();
-            fmt::println("default: {}", defaultws);
-        } else if (config["default_workspace"]) {
-            defaultws = config["default_workspace"].as<string>();
-            fmt::println("default_workspace: {}", defaultws);
-        } else {
-            spdlog::error("Neither 'default nor 'default_workspace' found.");
-            exit(1);
-        }
-    } catch (...) {
-        spdlog::error("No default found");
+    std::string defaultws = config.defaultworkspace();
+    if (defaultws != "") {
+        fmt::println("default: {}", defaultws);
+    } else {
+        spdlog::error("No default workspace found, please add \"default: <name>\" clause to toplevel");
         exit(1);
     }
+
     // try if defaultws is actually in the ws
     if (!(std::find(wsnames.begin(), wsnames.end(), defaultws) != wsnames.end())) {
         spdlog::error("default workspace is not defined as workspace in the file");
         exit(1);
     }
 
-    // duration/maxduration
-    try {
-        int duration;
+    int duration = config.maxduration();
+    fmt::println("maxduration: {}", duration);
 
-        if (config["duration"] && config["maxduration"]) {
-            spdlog::error("Both 'duration' and 'maxduration' defined, Choose one.");
-            exit(1);
-        } else if (config["duration"]) {
-            duration = config["duration"].as<int>();
-            fmt::println("maxduration: {}", duration);
-        } else if (config["maxduration"]) {
-            duration = config["maxduration"].as<int>();
-            fmt::println("maxduration: {}", duration);
-        } else {
-            fmt::println("No duration found, continuing");
-        }
+    auto durationdefault = config.durationdefault();
+    fmt::println("durationdefault: {}", durationdefault);
 
-    } catch (...) {
-        fmt::println("No duration found, continuing");
-    }
+    auto reminderdefault = config.reminderdefault();
+    fmt::println("reminderdefault: {}", reminderdefault);
 
-    try {
-        auto durationdefault = config["durationdefault"].as<int>();
-        fmt::println("durationdefault: {}", durationdefault);
-    } catch (...) {
-        spdlog::warn("No durationdefault found, defaults to 30 days, continuing");
-    }
+    auto maxextensions = config.maxextensions();
+    fmt::println("maxextensions: {}", maxextensions);
 
-    try {
-        auto reminderdefault = config["reminderdefault"].as<int>();
-        fmt::println("reminderdefault: {}", reminderdefault);
-    } catch (...) {
-        spdlog::warn("No reminderdefault found, defaults to 0 days, continuing");
-    }
+    auto dbuid = config.dbuid();
+    fmt::println("dbuid: {}", dbuid);
 
-    try {
-        auto maxextensions = config["maxextensions"].as<int>();
-        fmt::println("maxextensions: {}", maxextensions);
-    } catch (...) {
-        spdlog::warn(
-            "No maxextensions found, defaults to 10 days, please add <\"maxextensions\": number> clause to toplevel");
-    }
+    auto dbgid = config.dbgid();
+    fmt::println("dbgid: {}", dbgid);
 
-    try {
-        auto dbuid = config["dbuid"].as<int>();
-        fmt::println("dbuid: {}", dbuid);
-    } catch (...) {
-        spdlog::error("No dbuid defined, please add <\"dbuid\": uid> clause to toplevel");
-        exit(1);
-    }
-
-    try {
-        auto dbgid = config["dbgid"].as<int>();
-        fmt::println("dbgid: {}", dbgid);
-    } catch (...) {
-        spdlog::error("No dbgid defined, please add <\"dbgid\": gid> clause to toplevel");
-        exit(1);
-    }
-
-    try {
-        auto admins = config["admins"].as<vector<string>>();
+    auto admins = config.admins();
+    if (!admins.empty()) {
         fmt::println("admins: {}", admins);
-    } catch (...) {
-        spdlog::error("No admins found, continuing");
+    } else {
+        spdlog::error("No admins found, please add \"admins:: <[List]>\" clause to toplevel");
         exit(1);
     }
 
-    try {
-        auto adminmail = config["adminmail"].as<vector<string>>();
+    auto adminmail = config.adminmail();
+    if (!adminmail.empty()) {
         fmt::println("adminmail: {}", adminmail);
-    } catch (...) {
-        spdlog::error("No adminmail found, please add <\"adminmail\": []> clause to toplevel");
+    } else {
+        spdlog::error("No adminmail found, please add \"adminmail: <[List]>\" clause to toplevel");
         exit(1);
     }
 
-    try {
-        auto deldirtimeout = config["deldirtimeout"].as<string>();
-        fmt::println("deldirtimeout: {}", deldirtimeout);
-    } catch (...) {
-        fmt::println("No deldirtimeout found, continuing");
-    }
-
-    try {
-        auto expirerlogpath = config["expirerlogpath"].as<string>();
+    auto expirerlogpath = config.expirerlogpath();
+    if (expirerlogpath != "") {
         fmt::println("expirerlogpath: {}", expirerlogpath);
-    } catch (...) {
+        if (!cppfs::exists(expirerlogpath)) {
+            spdlog::warn("expirer directory {} does not exist", expirerlogpath);
+        }
+    } else {
         fmt::println("No expirerlogpath found, continuing");
     }
 
-    for (auto node : wslist) {
-        for (auto it : node) {
-            auto wsname = it.first.as<string>();
-            auto ws = it.second;
+    for (auto name : wsnames) {
+        auto ws = config.getFsConfig(name);
+
+        std::string wsname = ws.name;
+        if (wsname != "") {
             spdlog::info("checking config for filesystem {}", wsname);
-
-            try {
-                auto keeptime = ws["keeptime"].as<int>();
-                fmt::println("    keeptime: {}", keeptime);
-            } catch (...) {
-                spdlog::warn("No keeptime found for filesystem {}, continuing", wsname);
-            }
-
-            try {
-                auto spaces = ws["spaces"].as<vector<string>>();
-                fmt::println("    spaces: {}", spaces);
-            } catch (...) {
-                spdlog::error("No spaces found for filesystem {}, please add <\"spaces\": []>", wsname);
-                exit(1);
-            }
-
-            try {
-                auto spaceselection = ws["spaceselection"].as<string>();
-                fmt::println("    spaceselection: {}", spaceselection);
-            } catch (...) {
-                fmt::println("    No spaceselection found, defaults to 'random', continuing");
-            }
-
-            try {
-                auto deleted = ws["deleted"].as<string>();
-                fmt::println("    deleted: {}", deleted);
-            } catch (...) {
-                spdlog::error("No deleted directory found for filesystem {}, please add <\"deleted\": \"dir\"> clause "
-                              "to workspace",
-                              wsname);
-                exit(1);
-            }
-
-            try {
-                auto database = ws["database"].as<string>();
-                fmt::println("    workspace database directory: {}", database);
-                if (!cppfs::exists(database)) {
-                    spdlog::warn("database directory {} does not exist", database);
-                }
-                if (!cppfs::exists(database / cppfs::path(".ws_db_magic"))) {
-                    spdlog::warn("database directory {} does not contain .ws_db_magic!", database);
-                }
-                auto deleted = ws["deleted"].as<string>();
-                if (!cppfs::exists(database / cppfs::path("deleted"))) {
-                    spdlog::warn("database directory {} does not contain deleted folder {}", database, deleted);
-                }
-            } catch (...) {
-                spdlog::error("No database location define for filesystem {}, please add <\"database\": \"dir\"> "
-                              "clause to workspace",
-                              wsname);
-                exit(1);
-            }
-
-            // todo this is for duration/maxduration
-            try {
-                int duration;
-
-                if (ws["duration"] && ws["maxduration"]) {
-                    spdlog::error("Both 'duration' and 'maxduration' defined. Choose one.");
-                    exit(1);
-                } else if (ws["duration"]) {
-                    duration = ws["duration"].as<int>();
-                    fmt::println("    maxduration: {}", duration);
-                } else if (ws["maxduration"]) {
-                    duration = ws["maxduration"].as<int>();
-                    fmt::println("    maxduration: {}", duration);
-                } else {
-                    fmt::println("    No duration found, continuing");
-                }
-            } catch (...) {
-                fmt::println("    No duration found, continuing");
-            }
-
-            try {
-                auto groupdefault = ws["groupdefault"].as<vector<string>>();
-                fmt::println("    groupdefault: {}", groupdefault);
-            } catch (...) {
-                fmt::println("    No groupdefault found, continuing");
-            }
-
-            try {
-                auto userdefault = ws["userdefault"].as<vector<string>>();
-                fmt::println("    userdefault: {}", userdefault);
-            } catch (...) {
-                fmt::println("    No userdefault found, continuing");
-            }
-
-            try {
-                auto user_acl = ws["user_acl"].as<vector<string>>();
-                fmt::println("    user_acl: {}", user_acl);
-            } catch (...) {
-                fmt::println("    No user_acl found, continuing");
-            }
-
-            try {
-                auto group_acl = ws["group_acl"].as<vector<string>>();
-                fmt::println("    group_acl: {}", group_acl);
-            } catch (...) {
-                fmt::println("    No group_acl found, continuing");
-            }
-
-            try {
-                auto maxextensions = ws["maxextensions"].as<int>();
-                fmt::println("    maxextensions: {}", maxextensions);
-            } catch (...) {
-                fmt::println("    No maxextensions found, continuing");
-            }
-
-            try {
-                auto allocatable = ws["allocatable"].as<string>();
-                fmt::println("    allocatable: {}", allocatable);
-            } catch (...) {
-                fmt::println("    No allocatable found, defaults to 'yes', continuing");
-            }
-
-            try {
-                auto extendable = ws["extendable"].as<string>();
-                fmt::println("    extendable: {}", extendable);
-            } catch (...) {
-                fmt::println("    No extendable found, defaults to 'yes', continuing");
-            }
-
-            try {
-                auto restorable = ws["restorable"].as<int>();
-                fmt::println("    restorable: {}", restorable);
-            } catch (...) {
-                fmt::println("    No restorable found, defaults to 'yes', continuing");
-            }
+        } else {
+            spdlog::error("Invalid Filesystem Name");
+            exit(1);
         }
+
+        std::string deleted = ws.deletedPath;
+        if (deleted != "") {
+            fmt::println("    deleted: {}", deleted);
+        } else {
+            spdlog::error("No deleted directory found for filesystem {}, please add \"deleted: <dir>\" clause "
+                          "to workspace",
+                          wsname);
+            exit(1);
+        }
+
+        auto spaces = ws.spaces;
+        if (!spaces.empty()) {
+            fmt::println("    spaces: {}", spaces);
+            for (auto space : spaces) {
+                cppfs::path deletedpath = space + "/" + deleted;
+
+                if (!cppfs::exists(space)) {
+                    spdlog::warn("spaces directory {} does not exist", space);
+                }
+                if (!cppfs::exists(deletedpath)) {
+                    spdlog::warn("spaces directory {} does not contain deleted folder {}", space, deleted);
+                }
+
+                cppfs::perms perms;
+                perms = cppfs::status(space).permissions();
+                if (perms != perm0755) {
+                    spdlog::warn("spaces path {} has incorrect permissions", space);
+                }
+                perms = cppfs::status(deletedpath).permissions();
+                if (perms != perm0755) {
+                    spdlog::warn("deleted directory {} in space {} has incorrect permissions", deleted, space);
+                }
+            }
+        } else {
+            spdlog::error("No spaces found for filesystem {}, please add \"spaces: <[List]>\"", wsname);
+            exit(1);
+        }
+
+        auto spaceselection = ws.spaceselection;
+        if (spaceselection != "") {
+            fmt::println("    spaceselection: {}", spaceselection);
+        } else {
+            fmt::println("    No spaceselection found, defaults to 'random', continuing");
+        }
+
+        auto database = ws.database;
+
+        if (database != "") {
+            cppfs::path wsdbmagicpath = database + "/.ws_db_magic";
+            cppfs::path deletedpath = database + "/" + deleted;
+
+            fmt::println("    workspace database directory: {}", database);
+            if (!cppfs::exists(database)) {
+                spdlog::warn("database directory {} does not exist", database);
+            }
+            if (!cppfs::exists(wsdbmagicpath)) {
+                spdlog::warn("database directory {} does not contain .ws_db_magic!", database);
+            }
+            if (!cppfs::exists(deletedpath)) {
+                spdlog::warn("database directory {} does not contain deleted folder {}", database, deleted);
+            }
+
+            // Check if permissions are correct
+            cppfs::perms perms;
+            perms = cppfs::status(database).permissions();
+            if (perms != perm0755) {
+                spdlog::warn("database path {} has incorrect permissions", database);
+            }
+            perms = cppfs::status(wsdbmagicpath).permissions();
+            if (perms != perm0644) {
+                spdlog::warn(".ws_db_magic in database directory {} has incorrect permissions", database);
+            }
+            perms = cppfs::status(deletedpath).permissions();
+            if (perms != perm0755) {
+                spdlog::warn("deleted directory {} in database {} has incorrect permissions", deleted, database);
+            }
+        } else {
+            spdlog::error("No database location define for filesystem {}, please add \"database: <dir>\" "
+                          "clause to workspace",
+                          wsname);
+            exit(1);
+        }
+
+        auto groupdefault = ws.groupdefault;
+        if (!groupdefault.empty()) {
+            fmt::println("    groupdefault: {}", groupdefault);
+        } else {
+            fmt::println("    No groupdefault found, continuing");
+        }
+
+        auto userdefault = ws.userdefault;
+        if (!userdefault.empty()) {
+            fmt::println("    userdefault: {}", userdefault);
+        } else {
+            fmt::println("    No userdefault found, continuing");
+        }
+
+        auto user_acl = ws.user_acl;
+        if (!user_acl.empty()) {
+            fmt::println("    user_acl: {}", user_acl);
+        } else {
+            fmt::println("    No user_acl found, continuing");
+        }
+
+        auto group_acl = ws.group_acl;
+        if (!group_acl.empty()) {
+            fmt::println("    group_acl: {}", group_acl);
+        } else {
+            fmt::println("    No group_acl found, continuing");
+        }
+
+        auto keeptime = ws.keeptime;
+        fmt::println("    keeptime: {}", keeptime);
+
+        int duration = ws.maxduration;
+        fmt::println("    maxduration: {}", duration);
+
+        auto maxextensions = ws.maxextensions;
+        fmt::println("    maxextensions: {}", maxextensions);
+
+        auto allocatable = ws.allocatable;
+        fmt::println("    allocatable: {}", allocatable);
+
+        auto extendable = ws.extendable;
+        fmt::println("    extendable: {}", extendable);
+
+        auto restorable = ws.restorable;
+        fmt::println("    restorable: {}", restorable);
     }
     spdlog::info("config is valid!");
 }
