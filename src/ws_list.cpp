@@ -325,10 +325,11 @@ int main(int argc, char** argv) {
                      "keeptime", "allocatable", "extendable", "restorable", "comment");
         for (auto fs : config.validFilesystems(username, grouplist, ws::LIST)) {
             auto fsc = config.getFsConfig(fs);
+            bool allocateable = config.hasAccess(username, grouplist, fs, ws::CREATE) && fsc.allocatable;
+            bool extendable = config.hasAccess(username, grouplist, fs, ws::EXTEND) && fsc.extendable;
+            bool restorable = config.hasAccess(username, grouplist, fs, ws::RESTORE) && fsc.restorable;
             fmt::print("{:>10}{:>12}{:>12}{:>10}{:>12}{:>12}{:>12}   {}\n", fs, fsc.maxduration, fsc.maxextensions,
-                       fsc.keeptime, config.hasAccess(username, grouplist, fs, ws::CREATE),
-                       config.hasAccess(username, grouplist, fs, ws::EXTEND),
-                       config.hasAccess(username, grouplist, fs, ws::RESTORE), fsc.comment);
+                       fsc.keeptime, allocateable, extendable, restorable, fsc.comment);
         }
 
         if (verbose) {
