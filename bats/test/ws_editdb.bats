@@ -40,7 +40,7 @@ setup() {
     assert_output --partial "change expiration"
     assert_success
     run ws_list --config bats/ws.conf EDITTEST
-    assert_output --partial "expiration time      : Sat Dec 31 00:00:00 2050"
+    assert_output --partial "expiration time      : Sat Dec 31 23:59:59 2050"
     assert_success
 }
 

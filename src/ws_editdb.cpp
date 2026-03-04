@@ -189,17 +189,18 @@ int main(int argc, char** argv) {
     }
 
     if (!expireby.empty() || !ensureuntil.empty()) {
-        const std::string& datestr = !expireby.empty() ? expireby : ensureuntil;
+        const std::string& datestr = !expireby.empty() ? fmt::format("{} 00:00:00",expireby) : fmt::format("{} 23:59:59", ensureuntil);
 
         std::tm tm = {};
         std::istringstream ss(datestr);
-        ss >> std::get_time(&tm, "%Y-%m-%d");
+        ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
 
         if (ss.fail()) {
             spdlog::error("Date parsing failed for: {}", datestr);
             exit(-2);
         }
 
+        tm.tm_isdst = -1;
         date = std::mktime(&tm);
         if (date == -1) {
             spdlog::error("Invalid date: {}", datestr);
@@ -273,8 +274,10 @@ int main(int argc, char** argv) {
         fmt::println("Actions that would be performed on the workspaces selected:");
 
     for (const auto& entry : entrylist) {
-        fmt::println("Id: {} ({})", entry->getId(), entry->getWSPath());
-        // TODO logic here
+        if (debugflag){
+            spdlog::debug("Id: {} ({})", entry->getId(), entry->getWSPath());
+        }
+
         auto expiration = entry->getExpiration();
         std::optional<time_t> new_expiration;
         auto expired = entry->getExpired();
@@ -297,6 +300,7 @@ int main(int argc, char** argv) {
         }
 
         if (new_expiration.has_value()) {
+            fmt::println("Id: {} ({})", entry->getId(), entry->getWSPath());
             time_t new_exp_value = new_expiration.value();
             auto olddate = utils::ctime(&expiration);
             auto newdate = utils::ctime(&new_exp_value);
@@ -311,6 +315,7 @@ int main(int argc, char** argv) {
         }
 
         if (new_expired.has_value()) {
+            fmt::println("Id: {} ({})", entry->getId(), entry->getWSPath());
             time_t new_exp_value = new_expired.value();
             auto olddate = utils::ctime(&expired);
             auto newdate = utils::ctime(&new_exp_value);
