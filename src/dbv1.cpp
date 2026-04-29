@@ -764,6 +764,15 @@ void DBEntryV1::writeEntry() {
             spdlog::debug("isSetuid -> euid={}, egid={}", geteuid(), getegid());
     }
 
+    // write entry to DB file, overwrite existing contents <<<< this is the critical write operation
+    // if the write fails, the entry is not saved and the user is notified
+    // TODO: might be better to rename the file instead of overwriting, try to write to a temp file first
+    //       and rename it afterwards, or rename the old file back if it fails, or write to a new file and rename
+    //       it to the old name.
+    //       Question is:
+    //       - under which circumstances should we rename the old file back if the write fails?
+    //         there is not even always a file at the first place.
+    //       - what is a good name/location for the backup file/or the temp file? risk of collisions?
     ofstream fout(dbfilepath.c_str());
     if (!(fout << entry)) {
         spdlog::error("could not write DB file! Please check if the outcome is as expected, "
