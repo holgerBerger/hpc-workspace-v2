@@ -35,6 +35,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "config.h"
@@ -317,8 +318,9 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
         spdlog::warn(" These directories will be ignored and require manual intervention.");
     }
 
-    std::unique_ptr<Database> db;
+
     // check for errors, if this throws DB is invalid and we should skip this DB
+    std::unique_ptr<Database> db;
     try {
         db = std::unique_ptr<Database>(config.openDB(fs));
     } catch (DatabaseException& e) {
@@ -346,21 +348,28 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
     }
 
     // get all workspace pathes from DB
+    // this is a list of all workspace paths in the DB, used to compare with the filesystem
     auto wsIDs = db->matchPattern("*", "*", {}, false, false); // (1)
-    std::vector<std::string> workspacesInDB;
+    std::vector<std::pair<std::string, std::string>> workspacesInDB; // pair of (id, wspath)
 
     workspacesInDB.reserve(wsIDs.size());
     for (auto const& wsid : wsIDs) {
         try {
-            workspacesInDB.push_back(db->readEntry(wsid, false)->getWSPath());
+            workspacesInDB.push_back(std::make_pair(wsid, db->readEntry(wsid, false)->getWSPath()));
         } catch (const std::exception& e) {
+            workspacesInDB.push_back(std::make_pair(wsid, ""));  // store empty path for failed entries, but keep the id!
             spdlog::warn("    failed to read DB entry {}: {}", wsid, e.what());
+            // TODO: is that something to inform admin about? this workspace is immortal!
         }
     }
 
     // compare filesystem with DB
     for (auto const& founddir : dirs) { // (2)
-        if (!canFind(workspacesInDB, (cppfs::path(founddir.space) / cppfs::path(founddir.dir)).string())) {
+        if (std::none_of(workspacesInDB.begin(), workspacesInDB.end(), [&](const auto& item) {
+                // fmt::println("{} == {} || {} == {}", item.second, (cppfs::path(founddir.space) / cppfs::path(founddir.dir)).string(), item.first, cppfs::path(founddir.dir).string());
+                return item.second == (cppfs::path(founddir.space) / cppfs::path(founddir.dir)).string() ||
+                        item.first == cppfs::path(founddir.dir).string();
+            })) {
             spdlog::warn("    stray workspace {}", founddir.dir);
 
             // FIXME: a stray workspace will be moved to deleted here, and will be deleted in
@@ -388,11 +397,13 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
         }
     }
 
+    workspacesInDB.clear(); // clear old data
+
     spdlog::info("    {} valid, {} invalid directories found.", result.valid_ws, result.invalid_ws);
 
     spdlog::info("   ... deleted workspaces second...");
 
-    ///// deleted workspaces /////  (3)
+    ///// DELETED workspaces /////  (3)
     // delete deleted workspaces that no longer have any DB entry
     // ws_release moves DB entry first, workspace second, should be race free
     dirs.clear();
@@ -408,14 +419,15 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
 
     // get all workspace names from DB, this contains the timestamp
     wsIDs = db->matchPattern("*", "*", {}, true, false);
-    workspacesInDB.clear();
+    std::vector<std::string> workspacesInDeletedDB;
+    workspacesInDeletedDB.reserve(wsIDs.size());
     for (auto const& wsid : wsIDs) {
-        workspacesInDB.push_back(wsid);
+        workspacesInDeletedDB.push_back(wsid);
     }
 
     // compare filesystem with DB
     for (auto const& founddir : dirs) {
-        if (!canFind(workspacesInDB, founddir.dir)) {
+        if (!canFind(workspacesInDeletedDB, founddir.dir)) {
             spdlog::warn("    stray removed workspace {}", founddir.dir);
             spdlog::info("      {}remove {}", cleanermode ? "" : "would ",
                          (cppfs::path(founddir.space) / config.deletedPath(fs) / founddir.dir).string());
