@@ -310,12 +310,23 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
                 spdlog::debug("rename({}, {})", dbentry->getWSPath(), target.string());
             cppfs::rename(dbentry->getWSPath(), target);
         } catch (const std::filesystem::filesystem_error& e) {
-            caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
-                           utils::SrcPos(__FILE__, __LINE__, __func__));
-            if (debugflag)
-                spdlog::error("{}", e.what());
-            spdlog::error("database entry could not be deleted!");
-            return false;
+            if (e.code() == std::errc::cross_device_link) {
+                spdlog::info("cross device rename, falling back to 'mv'");
+                int ret = utils::mv(dbentry->getWSPath().c_str(), target.c_str());
+                caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
+                            utils::SrcPos(__FILE__, __LINE__, __func__));
+                if (ret != 0) {
+                    spdlog::error("workspace directory could not be moved to deleted path via 'mv': {}", strerror(errno));
+                    return false;
+                }
+            } else {
+                caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
+                            utils::SrcPos(__FILE__, __LINE__, __func__));
+                if (debugflag)
+                    spdlog::error("{}", e.what());
+                spdlog::error("workspace directory could not be moved to deleted path!");
+                return false;
+            }
         }
 
         caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
