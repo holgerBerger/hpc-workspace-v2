@@ -446,6 +446,7 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
             }
             result.invalid_deleted++;
         } else {
+            spdlog::info("       found valid workspace: {}", founddir.dir);
             result.valid_deleted++;
         }
     }
