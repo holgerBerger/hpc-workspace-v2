@@ -84,10 +84,9 @@ Functional extension and change of DB format is possible after this is achieved.
 
 ### Dependencies
 
-source is fetched and build as part of this tool:
+source is fetched and built as part of this tool:
 - {fmt}
-- yaml-cpp
-- rapidyaml
+- glaze
 - Guidelines Support Library (GSL)
 - spdlog
 - bshoshany/thread-pool
@@ -242,8 +241,7 @@ this list can be extended.
 
 there is no intention to support old platforms like centos7, but it might work (except ws_stat).
 
-C++ language level requirement might evolve from c++17 to c++20 if there is reasons.
-(building with c++26 seems to work as of early 2026)
+C++23 language level is required (due to glaze YAML support).
 
 
 
@@ -268,7 +266,7 @@ C++ language level requirement might evolve from c++17 to c++20 if there is reas
 ### Todo before release candidate
 
 - [x] move from single file ws.conf to multifile ws.d
-- [x] migrate config from yaml-cpp to ryaml and remove yaml-cpp dependency (on hold for the moment, uses both)
+- migrate config from yaml-cpp to glaze (done)
 - [x] move to compiletime+runtime detected capability/setuid/usermode switch (usermode is for testing mainly, does not elevate privileges)
 - [x] add more unit tests to existing code
 - [x] build/select a better test framework for the tools

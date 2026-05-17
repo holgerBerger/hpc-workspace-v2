@@ -81,7 +81,6 @@ find_package(CURL REQUIRED)
 
 # spdlog requires external fmt before it
 set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
-set(YAML_CPP_BUILD_TESTS OFF CACHE INTERNAL "" FORCE)
 
 # Use vcpkg for all dependencies (skips FetchContent)
 set(BUILD_WITH_VCPKG OFF CACHE BOOL "Build all dependencies via vcpkg instead of FetchContent")
@@ -96,23 +95,17 @@ if(NOT BUILD_WITH_VCPKG)
     set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 
     # Suppress subproject installations
-    set(YAML_CPP_INSTALL OFF CACHE BOOL "" FORCE)
-    set(RYML_INSTALL OFF CACHE BOOL "" FORCE)
+    set(GLAZE_INSTALL OFF CACHE BOOL "" FORCE)
     set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
     set(MS_GSL_INSTALL OFF CACHE BOOL "" FORCE)
     set(SPDLIB_INSTALL OFF CACHE BOOL "" FORCE)
 
-    FetchContent_Declare(yaml-cpp
-        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-        GIT_TAG yaml-cpp-0.9.0
+    FetchContent_Declare(glaze
+        GIT_REPOSITORY https://github.com/stephenberry/glaze.git
+        GIT_TAG v7.6.0
+        GIT_SHALLOW TRUE
     )
-    FetchContent_MakeAvailable(yaml-cpp)
-
-    FetchContent_Declare(rapidyaml
-        GIT_REPOSITORY https://github.com/biojppm/rapidyaml.git
-        GIT_TAG v0.11.1
-    )
-    FetchContent_MakeAvailable(rapidyaml)
+    FetchContent_MakeAvailable(glaze)
 
     FetchContent_Declare(fmt
         GIT_REPOSITORY https://github.com/fmtlib/fmt.git

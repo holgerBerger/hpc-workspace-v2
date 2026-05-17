@@ -28,16 +28,6 @@
  *
  */
 
-#ifdef WS_RAPIDYAML_CONFIG
-    #define RYML_USE_ASSERT 0
-    #include "c4/format.hpp"
-    #include "c4/std/std.hpp"
-    #include "ryml.hpp"
-    #include "ryml_std.hpp"
-#else
-    #include "yaml-cpp/yaml.h" // IWYU pragma: keep
-#endif
-
 #include "fmt/base.h"
 #include "fmt/ostream.h"
 #include "fmt/ranges.h" // IWYU pragma: keep

@@ -32,17 +32,11 @@
 #include <string>
 #include <vector>
 
-// use for speed, but needs testing // FIXME:
-#define WS_RAPIDYAML_DB
+// use for speed, but needs testing
+// FIXME:
 
-#ifdef WS_RAPIDYAML_DB
-    #define RYML_USE_ASSERT 0
-    #include "c4/format.hpp" // IWYU pragma: keep
-    #include "ryml.hpp"      // IWYU pragma: keep
-    #include "ryml_std.hpp"  // IWYU pragma: keep
-#else
-    #include <yaml-cpp/yaml.h>
-#endif
+#include <glaze/glaze.hpp>
+#include <glaze/yaml.hpp>
 
 #include "dbv1.h"
 #include "fmt/base.h"
@@ -220,6 +214,40 @@ void FilesystemDBV1::createEntry(const WsID id, const string workspace, const lo
     entry.writeEntry();
 }
 
+// Glaze struct for DB entries — matches legacy YAML layout
+struct DBEntryV1_YAML {
+    int dbversion = 0;
+    std::string workspace;
+    long creation = 0;
+    long expiration = 0;
+    long released = 0;
+    long expired = 0;
+    long reminder = 0;
+    int extensions = 0;
+    std::string mailaddress;
+    std::string comment;
+    std::string group;
+};
+
+template <>
+struct glz::meta<DBEntryV1_YAML> {
+    using T = DBEntryV1_YAML;
+    static constexpr auto value = glz::object(
+        "dbversion",  &T::dbversion,
+        "workspace",  &T::workspace,
+        "creation",   &T::creation,
+        "expiration", &T::expiration,
+        "released",   &T::released,
+        "expired",    &T::expired,
+        "reminder",   &T::reminder,
+        "extensions", &T::extensions,
+        "mailaddress",&T::mailaddress,
+        "comment",    &T::comment,
+        "group",      &T::group
+    );
+    static constexpr auto opts = glz::opts{.error_on_unknown_keys = false};
+};
+
 // get a list of ids of matching DB entries for a user
 // groupworkspaces flag determines if content of DB entry has to be checked for correct group
 //  unittest: yes
@@ -247,30 +275,13 @@ vector<WsID> FilesystemDBV1::matchPattern(const string pattern, const string use
                     if (parts.size() == 2 && !groupintersection.hasCommonGroups(parts[0]))
                         continue;
 
-#ifndef WS_RAPIDYAML_DB
-                    YAML::Node dbentry;
-                    try {
-                        dbentry = YAML::LoadFile((cppfs::path(pathname) / f).string().c_str());
-                    } catch (const YAML::BadFile& e) {
-                        spdlog::error("Could not read db entry {}: {}", f, e.what());
-                    }
-
-                    string group = "";
-                    if (dbentry["group"]) {
-                        group = dbentry["group"].as<string>();
-                    }
-#else
                     string filecontent = utils::getFileContents((cppfs::path(pathname) / f).string().c_str());
-                    ryml::Tree dbentry = ryml::parse_in_place(ryml::to_substr(filecontent)); // FIXME: error check?
-
-                    ryml::NodeRef node;
-                    string group;
-                    node = dbentry["group"];
-                    if (node.has_val() && node.val() != "")
-                        node >> group;
-                    else
-                        group = "";
-#endif
+                    DBEntryV1_YAML entry{};
+                    std::string group;
+                    auto ec = glz::read_yaml<glz::opts{.error_on_unknown_keys = false}>(entry, filecontent);
+                    if (!ec) {
+                        group = entry.group;
+                    }
 
                     if (canFind(groups, group)) {
                         list.push_back(f);
@@ -376,144 +387,38 @@ void DBEntryV1::readFromFile(const WsID id, const string filesystem, const strin
     */
 }
 
-#ifndef WS_RAPIDYAML_DB
-// use yamlcpp
-
-// read db entry from yaml file
-//  unittest: yes
-void DBEntryV1::readFromString(std::string str) {
-    if (traceflag)
-        spdlog::trace("readFromString_YAMLCPP");
-
-    YAML::Node dbentry;
-    try {
-        dbentry = YAML::Load(str);
-    } catch (const YAML::BadFile& e) {
-        throw DatabaseException("could not read db entry");
-    }
-
-    if (dbentry.size() == 0) {
-        fmt::println(">>>", str);
-        throw DatabaseException("Invalid DB entry! Empty file?");
-    }
-
-    dbversion = dbentry["dbversion"] ? dbentry["dbversion"].as<int>() : 0; // 0 = legacy
-    creation = dbentry["creation"] ? dbentry["creation"].as<long>()
-                                   : 0; // FIXME: c++ tool does not write this field, but takes from stat
-    released = dbentry["released"] ? dbentry["released"].as<long>() : 0;
-    expiration = dbentry["expiration"] ? dbentry["expiration"].as<long>() : 0;
-    expired = dbentry["expired"] ? dbentry["expired"].as<long>() : 0;
-    reminder = dbentry["reminder"] ? dbentry["reminder"].as<long>() : 0;
-    workspace = dbentry["workspace"] ? dbentry["workspace"].as<string>() : "";
-    extensions = dbentry["extensions"] ? dbentry["extensions"].as<int>() : 0;
-    mailaddress = dbentry["mailaddress"] ? dbentry["mailaddress"].as<string>() : "";
-    comment = dbentry["comment"] ? dbentry["comment"].as<string>() : "";
-    group = dbentry["group"] ? dbentry["group"].as<string>() : "";
-    if (group != "")
-        groupflag = true;
-    else
-        groupflag = false;
-}
-
-#else
-// use rapidyaml
-
 // read db entry from yaml string
 //  unittest: yes
 void DBEntryV1::readFromString(std::string str) {
     if (traceflag)
-        spdlog::trace("readFromString_RAPIDYAML");
+        spdlog::trace("readFromString_GLAZE");
 
-    // Set up temporary error handler for parsing
-    ryml::Callbacks const prev_callbacks = ryml::get_callbacks();
-    ryml::Callbacks callbacks = {};
+    DBEntryV1_YAML y{};
+    auto ec = glz::read_yaml<glz::opts{.error_on_unknown_keys = false}>(y, str);
+    if (ec) {
+        throw DatabaseException(std::string("YAML parse error: ") + glz::format_error(ec, str));
+    }
 
-    // Error handler that throws DatabaseException on parse errors
-    callbacks.m_error_parse = [](ryml::csubstr msg, ryml::ErrorDataParse const&, void*) {
-        throw DatabaseException("YAML parse error: " + std::string(msg.str, msg.len));
-    };
-    callbacks.set_user_data(nullptr);
-
-    // Also set basic error handler as fallback
-    callbacks.m_error_basic = [](ryml::csubstr msg, ryml::ErrorDataBasic const&, void*) {
-        throw DatabaseException("YAML error: " + std::string(msg.str, msg.len));
-    };
-
-    ryml::set_callbacks(callbacks);
-
-    ryml::Tree dbentry = ryml::parse_in_place(ryml::to_substr(str));
-
-    // Restore previous callbacks
-    ryml::set_callbacks(prev_callbacks);
-
-    // error check, see if the file looks like yaml and is a map
-    ryml::NodeRef node;
-    auto root = dbentry.crootref();
-    if (!root.is_map()) {
+    // Check for truly empty or whitespace-only file
+    std::string trimmed = str;
+    trimmed.erase(trimmed.begin(), std::find_if(trimmed.begin(), trimmed.end(), [](unsigned char ch){ return !std::isspace(ch); }));
+    if (trimmed.empty()) {
         throw DatabaseException("Invalid DB entry! Empty file?");
     }
 
-    node = dbentry["dbversion"];
-    if (node.has_val())
-        node >> dbversion;
-    else
-        dbversion = 0; // 0 = legacy
-    node = dbentry["creation"];
-    if (node.has_val())
-        node >> creation;
-    else
-        creation = 0; // FIXME: c++ tool does not write this field, but takes from stat
-    node = dbentry["released"];
-    if (node.has_val())
-        node >> released;
-    else
-        released = 0;
-    node = dbentry["expiration"];
-    if (node.has_val())
-        node >> expiration;
-    else
-        expiration = 0;
-    node = dbentry["expired"];
-    if (node.has_val())
-        node >> expired;
-    else
-        expired = 0;
-    node = dbentry["reminder"];
-    if (node.has_val())
-        node >> reminder;
-    else
-        reminder = 0;
-    node = dbentry["workspace"];
-    if (node.has_val() && node.val() != "")
-        node >> workspace;
-    else
-        workspace = "";
-    node = dbentry["extensions"];
-    if (node.has_val())
-        node >> extensions;
-    else
-        extensions = 0;
-    node = dbentry["mailaddress"];
-    if (node.has_val() && node.val() != "")
-        node >> mailaddress;
-    else
-        mailaddress = "";
-    node = dbentry["comment"];
-    if (node.has_val() && node.val() != "")
-        node >> comment;
-    else
-        comment = "";
-    node = dbentry["group"];
-    if (node.has_val() && node.val() != "") {
-        groupflag = true;
-        node >> group;
-    } else {
-        groupflag = false;
-        group = "";
-    }
+    dbversion    = y.dbversion;
+    creation     = y.creation;
+    released     = y.released;
+    expiration   = y.expiration;
+    expired      = y.expired;
+    reminder     = y.reminder;
+    workspace    = y.workspace;
+    extensions   = y.extensions;
+    mailaddress  = y.mailaddress;
+    comment      = y.comment;
+    group        = y.group;
+    groupflag    = !group.empty();
 }
-
-#endif
 
 // Use extension or update content of entry
 //  unittest: yes
@@ -695,49 +600,29 @@ void DBEntryV1::writeEntry() {
     if (traceflag)
         spdlog::trace("writeEntry()");
     int perm;
-#ifndef WS_RAPIDYAML_DB
-    YAML::Node entry;
-    entry["workspace"] = workspace;
-    entry["creation"] = creation;
-    entry["expiration"] = expiration;
+    DBEntryV1_YAML entry{};
+    entry.workspace = workspace;
+    entry.creation = creation;
+    entry.expiration = expiration;
     if (expired > 0) {
-        entry["expired"] = expired;
+        entry.expired = expired;
     }
-    entry["extensions"] = extensions;
-    entry["acctcode"] = "";
-    entry["reminder"] = reminder;
-    entry["mailaddress"] = mailaddress;
+    entry.extensions = extensions;
+    entry.reminder = reminder;
+    entry.mailaddress = mailaddress;
     if (groupflag && group.length() > 0) {
-        entry["group"] = group;
+        entry.group = group;
     }
     if (released > 0) {
-        entry["released"] = released;
+        entry.released = released;
     }
-    entry["comment"] = comment;
-#else
-    ryml::Tree tree;
-    ryml::NodeRef root = tree.rootref();
-    root |= ryml::MAP; // mark root as a MAP
-    root["workspace"] << workspace;
-    root["creation"] << creation;
-    root["expiration"] << expiration;
-    if (expired > 0) {
-        root["expired"] << expired;
-    }
-    root["extensions"] << extensions;
-    root["acctcode"] << "";
-    root["reminder"] << reminder;
-    root["mailaddress"] << mailaddress;
-    if (groupflag && group.length() > 0) {
-        root["group"] << group;
-    }
-    if (released > 0) {
-        root["released"] << released;
-    }
-    root["comment"] << comment;
+    entry.comment = comment;
 
-    std::string entry = ryml::emitrs_yaml<std::string>(tree);
-#endif
+    std::string yaml_str;
+    auto ec = glz::write_yaml(entry, yaml_str);
+    if (ec) {
+        spdlog::error("could not serialize DB entry: {}", glz::format_error(ec, yaml_str));
+    }
 
     // suppress ctrl-c to prevent broken DB entries when FS is hanging and user gets nervous
     signal(SIGINT, SIG_IGN);
@@ -774,7 +659,7 @@ void DBEntryV1::writeEntry() {
     //         there is not even always a file at the first place.
     //       - what is a good name/location for the backup file/or the temp file? risk of collisions?
     ofstream fout(dbfilepath.c_str());
-    if (!(fout << entry)) {
+    if (!(fout << yaml_str)) {
         spdlog::error("could not write DB file! Please check if the outcome is as expected, "
                       "you might have to make a backup of the workspace to prevent loss of data!");
         if (debugflag)

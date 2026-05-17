@@ -131,7 +131,7 @@ setup() {
 @test "ws_expirer handle bad database entries" {
     echo "invalid_entry" > /tmp/ws/ws1-db/${USER}-BAD_ENTRY
     run ws_expirer --config bats/ws.conf
-    assert_output --partial "Empty file?"
+    assert_output --partial "while reading file"
     assert_success
     rm -f /tmp/ws/ws1-db/${USER}-BAD_ENTRY
 }
@@ -373,7 +373,7 @@ setup() {
     echo "invalid2" > /tmp/ws/ws1-db/${USER}-BAD_MULTI2
     echo "invalid3" > /tmp/ws/ws1-db/${USER}-BAD_MULTI3
     run ws_expirer --config bats/ws.conf
-    assert_output --partial "Empty file?"
+    assert_output --partial "while reading file"
     assert_output --partial "skipping db entry"
     assert_success
     rm -f /tmp/ws/ws1-db/${USER}-BAD_MULTI1
@@ -399,10 +399,10 @@ setup() {
 @test "ws_expirer handles corrupted YAML DB entry" {
     ws_allocate --config bats/ws.conf CORRUPT_TEST 1
     local db_file=$(find /tmp/ws/ws2-db -name "*CORRUPT_TEST" | head -1)
-    # Inject corrupted YAML
+    # Inject corrupted YAML (valid YAML but no workspace/expiration fields → bad db entry)
     echo "invalid: yaml: content: without: proper: structure" > "$db_file"
     run ws_expirer --config bats/ws.conf
-    assert_output --partial "YAML parse error"
+    assert_output --partial "bad db entries"
     assert_success
     rm -f "$db_file"
 }

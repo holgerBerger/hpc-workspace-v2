@@ -2,18 +2,17 @@ if(BUILD_WITH_VCPKG)
     find_package(CURL CONFIG REQUIRED)
     find_package(fmt CONFIG REQUIRED)
     find_package(Microsoft.GSL CONFIG)
-    find_package(ryml CONFIG REQUIRED)
+    find_package(glaze CONFIG REQUIRED)
     find_package(spdlog CONFIG REQUIRED)
-    find_package(yaml-cpp CONFIG REQUIRED)
 endif()
 
 find_package(Threads REQUIRED)
 
 # Check for C++17 thread support
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++17" COMPILER_SUPPORTS_CXX17)
-if(NOT COMPILER_SUPPORTS_CXX17)
-    message(FATAL_ERROR "Compiler does not support C++17")
+check_cxx_compiler_flag("-std=c++23" COMPILER_SUPPORTS_CXX23)
+if(NOT COMPILER_SUPPORTS_CXX23)
+    message(FATAL_ERROR "Compiler does not support C++23")
 endif()
 
 add_library(ws_common
@@ -31,18 +30,9 @@ add_library(ws_common
     utils.h
     UserConfig.cpp
 )
-target_compile_features(ws_common PUBLIC cxx_std_17)
+target_compile_features(ws_common PUBLIC cxx_std_23)
 
-# vcpkg ryml installs ryml.hpp under ryml/; add that subdirectory to include path
-if(BUILD_WITH_VCPKG)
-    get_target_property(_RYML_INCLUDES ryml::ryml INTERFACE_INCLUDE_DIRECTORIES)
-    if(_RYML_INCLUDES)
-        list(GET _RYML_INCLUDES 0 _RYML_BASE)
-        if(EXISTS "${_RYML_BASE}/ryml/ryml.hpp")
-            include_directories(BEFORE ${_RYML_BASE}/ryml)
-        endif()
-    endif()
-endif()
+
 
 if(BUILD_WITH_VCPKG)
     # ms-gsl is header-only, no cmake config — just need the include dir
@@ -58,8 +48,7 @@ endif()
 target_link_libraries(ws_common
     PUBLIC
         fmt::fmt
-        ryml::ryml
-        yaml-cpp::yaml-cpp
+        glaze::glaze
         ${LIBCAP}
         spdlog::spdlog
     PRIVATE
@@ -71,7 +60,7 @@ add_library(mail
     mail.cpp
     mail.h
 )
-target_compile_features(mail PUBLIC cxx_std_17)
+target_compile_features(mail PUBLIC cxx_std_23)
 target_link_libraries(mail
     PUBLIC
         CURL::libcurl

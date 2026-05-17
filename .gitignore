@@ -20,5 +20,6 @@ docker/coverage
 external
 .vagrant
 fetchdeps
+ryml/
 vcpkg/
 vcpkg_installed/

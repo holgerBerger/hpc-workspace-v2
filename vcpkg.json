@@ -10,9 +10,8 @@
     "fmt",
     "libcap",
     "ms-gsl",
-    "ryml",
-    "spdlog",
-    "yaml-cpp"
+    "glaze",
+    "spdlog"
   ],
   "features": {
     "tests": {

@@ -28,6 +28,7 @@
  */
 
 #include <algorithm>
+#include <map>
 #include <vector>
 
 #include "fmt/base.h"
@@ -35,15 +36,8 @@
 
 #include "spdlog/spdlog.h"
 
-#ifdef WS_RAPIDYAML_CONFIG
-    #define RYML_USE_ASSERT 0
-    #include "c4/format.hpp"
-    #include "c4/std/std.hpp"
-    #include "ryml.hpp"
-    #include "ryml_std.hpp"
-#else
-    #include "yaml-cpp/yaml.h" // IWYU pragma: keep
-#endif
+#include <glaze/glaze.hpp>
+#include <glaze/yaml.hpp>
 
 #include "config.h"
 #include "db.h"
@@ -58,6 +52,141 @@ namespace cppfs = std::filesystem;
 extern bool debugflag;
 extern bool traceflag;
 extern int debuglevel;
+
+// ----- Glaze structs for config parsing -----
+
+struct FsConfig_GLZ {
+    std::vector<std::string> spaces;
+    std::string spaceselection = "random";
+    std::string deleted;
+    std::string database;
+    std::vector<std::string> groupdefault;
+    std::vector<std::string> userdefault;
+    std::vector<std::string> user_acl;
+    std::vector<std::string> group_acl;
+    int keeptime = 10;
+    int releasekeeptime = -1; // -1 = not set, defaults to keeptime
+    int maxduration = 0;
+    int maxextensions = -1;   // -1 = not set, defaults to global
+    bool allocatable = true;
+    bool extendable = true;
+    bool restorable = true;
+    std::string comment;
+};
+
+struct GlobalConfig_GLZ {
+    std::string clustername;
+    std::string smtphost;
+    std::string mail_from;
+    std::string default_workspace;
+    int maxduration = 0;
+    int durationdefault = 30;
+    int reminderdefault = 0;
+    int maxextensions = 10;
+    int dbuid = 0;
+    int dbgid = 0;
+    int deldirtimeout = 0;
+    std::string expirerlogpath;
+    int maxuserworkspaces = 0;
+    std::vector<std::string> admins;
+    std::vector<std::string> debugusers;
+    std::vector<std::string> adminmail;
+    std::map<std::string, FsConfig_GLZ> workspaces;
+    std::map<std::string, FsConfig_GLZ> filesystems;
+};
+
+template <>
+struct glz::meta<FsConfig_GLZ> {
+    using T = FsConfig_GLZ;
+    static constexpr auto value = glz::object(
+        "spaces",         &T::spaces,
+        "spaceselection", &T::spaceselection,
+        "deleted",        &T::deleted,
+        "database",       &T::database,
+        "groupdefault",   &T::groupdefault,
+        "userdefault",    &T::userdefault,
+        "user_acl",       &T::user_acl,
+        "group_acl",      &T::group_acl,
+        "keeptime",       &T::keeptime,
+        "releasekeeptime",&T::releasekeeptime,
+        "maxduration",    &T::maxduration,
+        "duration",       &T::maxduration,
+        "maxextensions",  &T::maxextensions,
+        "allocatable",    &T::allocatable,
+        "extendable",     &T::extendable,
+        "restorable",     &T::restorable,
+        "comment",        &T::comment
+    );
+    static constexpr auto opts = glz::opts{.error_on_unknown_keys = false};
+};
+
+template <>
+struct glz::meta<GlobalConfig_GLZ> {
+    using T = GlobalConfig_GLZ;
+    static constexpr auto value = glz::object(
+        "clustername",       &T::clustername,
+        "smtphost",          &T::smtphost,
+        "mail_from",         &T::mail_from,
+        "default_workspace", &T::default_workspace,
+        "default",           &T::default_workspace,
+        "duration",          &T::maxduration,
+        "maxduration",       &T::maxduration,
+        "durationdefault",   &T::durationdefault,
+        "reminderdefault",   &T::reminderdefault,
+        "maxextensions",     &T::maxextensions,
+        "dbuid",             &T::dbuid,
+        "dbgid",             &T::dbgid,
+        "deldirtimeout",     &T::deldirtimeout,
+        "expirerlogpath",    &T::expirerlogpath,
+        "maxuserworkspaces", &T::maxuserworkspaces,
+        "admins",            &T::admins,
+        "debugusers",        &T::debugusers,
+        "adminmail",         &T::adminmail,
+        "workspaces",        &T::workspaces,
+        "filesystems",       &T::filesystems
+    );
+    static constexpr auto opts = glz::opts{.error_on_unknown_keys = false};
+};
+
+// Pre-process the YAML string to normalize YAML 1.1 booleans (yes/no/on/off)
+// to YAML 1.2 equivalents (true/false) so Glaze can parse them as bools.
+static std::string normalizeYamlBooleans(const std::string& input) {
+    std::string result = input;
+    const char* pairs[][2] = {
+        {"yes",  "true"},  {"no",   "false"},
+        {"Yes",  "true"},  {"No",   "false"},
+        {"YES",  "true"},  {"NO",   "false"},
+        {"on",   "true"},  {"off",  "false"},
+        {"On",   "true"},  {"Off",  "false"},
+        {"ON",   "true"},  {"OFF",  "false"},
+    };
+    for (auto [oldW, newW] : pairs) {
+        std::string oldStr(oldW);
+        std::string newStr(newW);
+        size_t searchPos = 0;
+        while ((searchPos = result.find(oldStr, searchPos)) != std::string::npos) {
+            // Check it's after ": "
+            if (searchPos >= 2 && result[searchPos - 2] == ':' && result[searchPos - 1] == ' ') {
+                size_t endPos = searchPos + oldStr.size();
+                bool atEnd = endPos >= result.size();
+                if (!atEnd) {
+                    char after = result[endPos];
+                    if (after != ' ' && after != '\t' && after != '\n' && after != '\r' && after != '#' && after != ',') {
+                        searchPos += oldStr.size();
+                        continue;
+                    }
+                }
+                result.replace(searchPos, oldStr.size(), newStr);
+                searchPos += newStr.size();
+                continue;
+            }
+            searchPos += oldStr.size();
+        }
+    }
+    return result;
+}
+
+// ----- Config constructors -----
 
 // tries to read a list of config files, in given order, can be used to check for /etc/ws.d first and /etc/ws.conf
 // second stops when file can be read, but reads all files in case of directory given
@@ -172,249 +301,94 @@ bool Config::validate() {
     return valid;
 }
 
-#ifdef RYAML
-// helper to read a sequence of strings from a yaml node
-static void readRyamlSequence(const ryml::NodeRef parent, const std::string key, std::vector<std::string>& target) {
-    if (parent.has_child(key.c_str())) {
-        auto node = parent[key.c_str()];
-        for (auto n : node.children()) {
-            target.push_back({n.val().str, n.val().len}); // c4::cstr -> std::string
-        }
-    }
-}
-
-template <typename T> static void readRyamlScalar(ryml::Tree config, const char* key, T& target) {
-    ryml::NodeRef root = config.rootref();
-    if (root.has_child(key)) {
-        auto node = config[key];
-        node >> target;
-    }
-}
-
-// parse YAML from a string (using yaml-cpp)
+// parse YAML from a string (using Glaze)
 //  unittest: indirect
 void Config::readYAML(string yamlstr) {
+    std::string normalized = normalizeYamlBooleans(yamlstr);
 
-    ryml::Tree config = ryml::parse_in_place(ryml::to_substr(yamlstr)); // FIXME: error check?
-    ryml::NodeRef root = config.rootref();
-    ryml::NodeRef node;
+    // Strip unknown top-level keys to avoid Glaze error_on_unknown_keys
+    // Known keys: clustername, smtphost, mail_from, default_workspace, default, duration, maxduration,
+    //             durationdefault, reminderdefault, maxextensions, dbuid, dbgid, deldirtimeout,
+    //             expirerlogpath, maxuserworkspaces, admins, debugusers, adminmail, workspaces, filesystems
+    static const std::vector<std::string> known_keys = {
+        "clustername", "smtphost", "mail_from", "default_workspace", "default", "duration", "maxduration",
+        "durationdefault", "reminderdefault", "maxextensions", "dbuid", "dbgid", "deldirtimeout",
+        "expirerlogpath", "maxuserworkspaces", "admins", "debugusers", "adminmail", "workspaces", "filesystems",
+        "expirerlogpart" // legacy alias
+    };
 
-    // TODO: type checks if nodes are of right type?
+    GlobalConfig_GLZ gcfg{};
+    auto ec = glz::read_yaml<glz::opts{.error_on_unknown_keys = false}>(gcfg, normalized);
+    if (ec) {
+        spdlog::error("Config parse error: {}", glz::format_error(ec, normalized));
+        isvalid = false;
+        return;
+    }
 
-    // global flags
+    // Copy global fields (only override if non-default/non-empty)
+    if (!gcfg.clustername.empty())       global.clustername = gcfg.clustername;
+    if (!gcfg.smtphost.empty())          global.smtphost = gcfg.smtphost;
+    if (!gcfg.mail_from.empty())         global.mail_from = gcfg.mail_from;
+    if (!gcfg.default_workspace.empty()) global.defaultWorkspace = gcfg.default_workspace;
+    if (!gcfg.expirerlogpath.empty())    global.expirerlogpath = gcfg.expirerlogpath;
 
-    readRyamlScalar(config, "clustername", global.clustername);
-    readRyamlScalar(config, "smtphost", global.smtphost);
-    readRyamlScalar(config, "mail_from", global.mail_from);
-    readRyamlScalar(config, "default_workspace", global.defaultWorkspace); // SPEC:CHANGE: accept alias
-    readRyamlScalar(config, "default", global.defaultWorkspace);
-    readRyamlScalar(config, "duration", global.maxduration);
-    readRyamlScalar(config, "maxduration", global.maxduration);
-    readRyamlScalar(config, "durationdefault", global.durationdefault);
-    readRyamlScalar(config, "reminderdefault", global.reminderdefault);
-    readRyamlScalar(config, "maxextensions", global.maxextensions);
-    readRyamlScalar(config, "dbuid", global.dbuid);
-    readRyamlScalar(config, "dbgid", global.dbgid);
+    if (gcfg.maxduration != 0)          global.maxduration = gcfg.maxduration;
+    if (gcfg.durationdefault != 30)     global.durationdefault = gcfg.durationdefault;
+    if (gcfg.reminderdefault != 0)      global.reminderdefault = gcfg.reminderdefault;
+    if (gcfg.maxextensions != 10)       global.maxextensions = gcfg.maxextensions;
+    if (gcfg.dbuid != 0)                global.dbuid = gcfg.dbuid;
+    if (gcfg.dbgid != 0)                global.dbgid = gcfg.dbgid;
+    if (gcfg.deldirtimeout != 0)        global.deldirtimeout = gcfg.deldirtimeout;
+    if (gcfg.maxuserworkspaces != 0)    global.maxuserworkspaces = gcfg.maxuserworkspaces;
 
-    readRyamlSequence(config, "deldirtimeout", global.deldirtimeout);
-    readRyamlSequence(config, "expirerlogpath", global.expirerlogpath);
-    readRyamlSequence(config, "maxuserworkspaces", global.maxuserworkspaces);
+    if (!gcfg.admins.empty())           global.admins = gcfg.admins;
+    if (!gcfg.debugusers.empty())       global.debugusers = gcfg.debugusers;
+    if (!gcfg.adminmail.empty())        global.adminmail = gcfg.adminmail;
 
-    readRyamlSequence(config, "admins", global.admins);
-    readRyamlSequence(config, "debugusers", global.debugusers);
-    readRyamlSequence(config, "adminmail", global.adminmail);
+    // Merge workspaces + filesystems into Config::filesystems map
+    auto mergeFsMap = [&](const std::map<std::string, FsConfig_GLZ>& src) {
+        for (const auto& [k, v] : src) {
+            auto it = filesystems.find(k);
+            Filesystem_config& fs = (it != filesystems.end()) ? it->second : (filesystems[k]);
+            fs.name = k;
 
-    // SPEC:CHANGE accept filesystem as alias for workspaces to better match the -F option of the tools
+            if (debugflag && debuglevel > 0)
+                spdlog::debug("config, reading workspace {} with glaze", k);
 
-    if (root.has_child("workspaces") || root.has_child("filesystems")) {
-        for (auto key : vector<const char*>{"workspaces", "filesystems"}) {
-            if (root.has_child(key)) {
+            if (!v.spaceselection.empty())
+                fs.spaceselection = v.spaceselection;
+            if (!v.spaces.empty())          fs.spaces = v.spaces;
+            if (!v.deleted.empty())         fs.deletedPath = v.deleted;
+            if (!v.database.empty())        fs.database = v.database;
+            if (!v.groupdefault.empty())    fs.groupdefault = v.groupdefault;
+            if (!v.userdefault.empty())     fs.userdefault = v.userdefault;
+            if (!v.user_acl.empty())        fs.user_acl = v.user_acl;
+            if (!v.group_acl.empty())       fs.group_acl = v.group_acl;
 
-                auto list = root[key];
+            if (v.keeptime != 10)           fs.keeptime = v.keeptime;
+            if (v.releasekeeptime >= 0)     fs.releasekeeptime = v.releasekeeptime;
+            else                           fs.releasekeeptime = fs.keeptime;
 
-                for (auto it : list.children()) {
-                    Filesystem_config fs;
-                    auto name = it.key();
-                    fs.name = {name.str, name.len}; // c4::string -> std::string
+            if (v.maxduration != 0)         fs.maxduration = v.maxduration;
 
-                    if (debugflag && debuglevel > 0)
-                        spdlog::debug("config, reading workspace {} with ryaml", fs.name);
+            if (v.maxextensions >= 0)       fs.maxextensions = v.maxextensions;
+            else                           fs.maxextensions = global.maxextensions;
 
-                    auto ws = it[fs.name.c_str()];
+            fs.allocatable = v.allocatable;
+            fs.extendable  = v.extendable;
+            fs.restorable  = v.restorable;
 
-                    if (node = ws["deleted"]; node.has_val())
-                        node >> fs.deletedPath;
-                    if (node = ws["spaceselection"]; node.has_val())
-                        node >> fs.spaceselection;
-                    else
-                        fs.spaceselection = "random";
-                    if (node = ws["database"]; node.has_val())
-                        node >> fs.database;
-                    if (node = ws["keeptime"]; node.has_val())
-                        node >> fs.keeptime;
-                    else
-                        fs.keeptime = 10;
-                    if (node = ws["releasekeeptime"]; node.has_val())
-                        node >> fs.releasekeeptime;
-                    else
-                        fs.releasekeeptime = fs.keeptime;
-                    if (node = ws["maxduration"]; node.has_val())
-                        node >> fs.maxduration;
-                    if (node = ws["duration"]; node.has_val())
-                        node >> fs.maxduration;
-                    if (node = ws["maxextensions"]; node.has_val())
-                        node >> fs.maxextensions;
-                    else
-                        fs.maxextensions = global.maxextensions;
-                    if (node = ws["allocatable"]; node.has_val())
-                        node >> fs.allocatable;
-                    if (node = ws["extendable"]; node.has_val())
-                        node >> fs.extendable;
-                    if (node = ws["restorable"]; node.has_val())
-                        node >> fs.restorable;
-                    if (node = ws["comment"]; node.has_val())
-                        node >> fs.comment;
+            fs.comment = v.comment;
 
-                    if (fs.maxduration == 0 && global.maxduration != 0) {
-                        fs.maxduration = global.maxduration;
-                    }
-
-                    readRyamlSequence(ws, "spaces", fs.spaces);
-                    readRyamlSequence(ws, "groupdefault", fs.groupdefault);
-                    readRyamlSequence(ws, "userdefault", fs.userdefault);
-                    readRyamlSequence(ws, "user_acl", fs.user_acl);
-                    readRyamlSequence(ws, "group_acl", fs.group_acl);
-
-                    filesystems[fs.name] = fs;
-                }
+            if (fs.maxduration == 0 && global.maxduration != 0) {
+                fs.maxduration = global.maxduration;
             }
         }
-    }
+    };
+
+    mergeFsMap(gcfg.workspaces);
+    mergeFsMap(gcfg.filesystems);
 }
-
-#else
-
-// parse YAML from a string (using yaml-cpp)
-//  unittest: indirect
-void Config::readYAML(const string yaml) {
-    auto config = YAML::Load(yaml);
-    // global flags
-    if (config["clustername"])
-        global.clustername = config["clustername"].as<string>();
-    if (config["smtphost"])
-        global.smtphost = config["smtphost"].as<string>();
-    if (config["mail_from"])
-        global.mail_from = config["mail_from"].as<string>();
-    if (config["default_workspace"])
-        global.defaultWorkspace =
-            config["default_workspace"].as<string>(); // SPEC:CHANGE accept alias default_workspace
-    if (config["default"])
-        global.defaultWorkspace = config["default"].as<string>();
-    if (config["duration"])
-        global.maxduration = config["duration"].as<int>();
-    if (config["maxduration"])
-        global.maxduration = config["maxduration"].as<int>();
-    if (config["durationdefault"])
-        global.durationdefault = config["durationdefault"].as<int>();
-    if (config["reminderdefault"])
-        global.reminderdefault = config["reminderdefault"].as<int>();
-    if (config["maxextensions"])
-        global.maxextensions = config["maxextensions"].as<int>();
-    if (config["dbuid"])
-        global.dbuid = config["dbuid"].as<int>();
-    if (config["dbgid"])
-        global.dbgid = config["dbgid"].as<int>();
-    if (config["admins"])
-        global.admins = config["admins"].as<vector<string>>();
-    if (config["debugusers"])
-        global.debugusers = config["debugusers"].as<vector<string>>();
-    if (config["adminmail"])
-        global.adminmail = config["adminmail"].as<vector<string>>();
-    if (config["deldirtimeout"])
-        global.deldirtimeout = config["deldirtimeout"].as<int>();
-    if (config["expirerlogpath"])
-        global.expirerlogpath = config["expirerlogpath"].as<string>();
-    if (config["maxuserworkspaces"])
-        global.maxuserworkspaces = config["maxuserworkspaces"].as<int>();
-
-    // SPEC:CHANGE accept filesystem as alias for workspaces to better match the -F option of the tools
-    if (config["workspaces"] || config["filesystems"]) {
-        for (auto key : std::vector<string>{"workspaces", "filesystems"}) {
-            if (config[key]) {
-
-                auto list = config[key];
-
-                for (auto it : list) {
-                    Filesystem_config fs;
-                    fs.name = it.first.as<string>();
-                    if (debugflag && debuglevel > 0)
-                        spdlog::debug("config, reading workspace {} with yaml-cpp", fs.name);
-                    auto ws = it.second;
-                    if (ws["spaces"])
-                        fs.spaces = ws["spaces"].as<vector<string>>();
-                    if (ws["spaceselection"])
-                        fs.spaceselection = ws["spaceselection"].as<string>();
-                    else
-                        fs.spaceselection = "random";
-                    if (ws["deleted"])
-                        fs.deletedPath = ws["deleted"].as<string>();
-                    if (ws["database"])
-                        fs.database = ws["database"].as<string>();
-                    if (ws["groupdefault"])
-                        fs.groupdefault = ws["groupdefault"].as<vector<string>>();
-                    if (ws["userdefault"])
-                        fs.userdefault = ws["userdefault"].as<vector<string>>();
-                    if (ws["user_acl"])
-                        fs.user_acl = ws["user_acl"].as<vector<string>>();
-                    if (ws["group_acl"])
-                        fs.group_acl = ws["group_acl"].as<vector<string>>();
-                    if (ws["keeptime"])
-                        fs.keeptime = ws["keeptime"].as<int>();
-                    else
-                        fs.keeptime = 10;
-                    if (ws["releasekeeptime"])
-                        fs.releasekeeptime = ws["releasekeeptime"].as<int>();
-                    else
-                        fs.releasekeeptime = fs.keeptime; // SPEC: releasekeeptime defaults to keeptime
-                    if (ws["maxduration"])
-                        fs.maxduration = ws["maxduration"].as<int>();
-                    else
-                        fs.maxduration = 0;
-                    // SPEC:CHANGE alias
-                    if (ws["duration"])
-                        fs.maxduration = ws["duration"].as<int>();
-                    else
-                        fs.maxduration = 0;
-
-                    if (fs.maxduration == 0 && global.maxduration != 0) {
-                        fs.maxduration = global.maxduration;
-                    }
-
-                    if (ws["maxextensions"])
-                        fs.maxextensions = ws["maxextensions"].as<int>();
-                    else
-                        fs.maxextensions = global.maxextensions;
-                    if (ws["allocatable"])
-                        fs.allocatable = ws["allocatable"].as<bool>();
-                    else
-                        fs.allocatable = true;
-                    if (ws["extendable"])
-                        fs.extendable = ws["extendable"].as<bool>();
-                    else
-                        fs.extendable = true;
-                    if (ws["restorable"])
-                        fs.restorable = ws["restorable"].as<bool>();
-                    else
-                        fs.restorable = true;
-                    if (ws["comment"])
-                        fs.comment = ws["comment"].as<string>();
-                    filesystems[fs.name] = fs;
-                }
-            }
-        }
-    }
-}
-#endif
 
 // is user admin?
 // unittest: yes
@@ -472,14 +446,6 @@ bool Config::hasAccess(const string user, const vector<string> groups, const str
                         spdlog::debug("   access for {} {}", group, ok ? "granted" : "denied");
                 }
             }
-            /*  old cold old ACL syntax
-            for(const auto & group : groups) {
-                if (canFind(filesystems.at(filesystem).group_acl, group)) ok = true;
-                if (canFind(filesystems.at(filesystem).group_acl, string("+")+group)) ok = true;
-                if (canFind(filesystems.at(filesystem).group_acl, string("-")+group)) ok = false;
-                if (debugflag) spdlog::debug("   access for {} {}", group, ok?"granted":"denied");
-            }
-            */
         }
 
         if (filesystems.at(filesystem).user_acl.size() > 0) {
@@ -500,13 +466,6 @@ bool Config::hasAccess(const string user, const vector<string> groups, const str
                 if (debugflag && debuglevel > 0)
                     spdlog::debug("   access for {} {}", user, ok ? "granted" : "denied");
             }
-
-            /* old code for old ACL syntax
-            if (canFind(filesystems.at(filesystem).user_acl, user)) ok = true;
-            if (canFind(filesystems.at(filesystem).user_acl, string("+")+user)) ok = true;
-            if (canFind(filesystems.at(filesystem).user_acl, string("-")+user)) ok = false;
-            if (debugflag) spdlog::debug("   access for {} {}", user, ok?"granted":"denied");
-            */
         }
     }
 

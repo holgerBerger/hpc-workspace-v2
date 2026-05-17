@@ -30,56 +30,52 @@
 
 #include "UserConfig.h"
 
-#ifdef WS_RAPIDYAML_CONFIG
-    #define RYML_USE_ASSERT 0
-    #include "c4/format.hpp"
-    #include "c4/std/std.hpp"
-    #include "ryml.hpp"
-    #include "ryml_std.hpp"
-#else
-    #include "yaml-cpp/yaml.h"
-#endif
+#include <glaze/glaze.hpp>
+#include <glaze/yaml.hpp>
 
 #include "user.h"
 #include "utils.h"
 
 #include "spdlog/spdlog.h"
 
-#ifdef WS_RAPIDYAML_CONFIG
+struct UserConfig_GLZ {
+    std::string mail;
+    std::string groupname = "";
+    int duration = -1;
+    int reminder = -1;
+};
 
-// TODO: FIXME: check if used correctly in the codebase!
+template <>
+struct glz::meta<UserConfig_GLZ> {
+    using T = UserConfig_GLZ;
+    static constexpr auto value = glz::object(
+        "mail", &T::mail,
+        "groupname", &T::groupname,
+        "duration", &T::duration,
+        "reminder", &T::reminder
+    );
+};
+
 // read user config from string (has to be read before dropping privileges)
-//  unitest: yes
+//  unittest: yes
 UserConfig::UserConfig(std::string userconf) {
     // get first line, this is either a mailaddress or something like key: value
     //  this is for compatibility with very old tools, which did not have a yaml file here
     // check if file looks like yaml
-    if ((userconf.find(":", 0) != string::npos) || (userconf[0] == '#')) {
-
-        ryml::Tree config = ryml::parse_in_place(ryml::to_substr(userconf)); // FIXME: error check?
-        ryml::NodeRef node;
-        ryml::NodeRef root = config.rootref();
-
-        // TODO: type checks if nodes are of right type?
-
-        readRyamlScalar(config, "mail", mailaddress);
-
-        // if (node=config["mailaddress"]; node.has_val()) node>>mailaddress; else mailaddress="";
-        if (node = config["groupname"]; node.has_val())
-            node >> groupname;
-        else
-            groupname = "";
-        if (root.has_child("duration")) {
-            node = config["duration"];
-            node >> duration;
-        } else
-            duration = -1;
-        if (node = config["reminder"]; node.has_val())
-            node >> reminder;
-        else
-            reminder = -1;
+    if ((userconf.find(":", 0) != std::string::npos) || (userconf[0] == '#')) {
+        UserConfig_GLZ ucfg{};
+        auto ec = glz::read<glz::opts{.format = glz::YAML}>(ucfg, userconf);
+        if (!ec) {
+            mailaddress = ucfg.mail;
+            groupname   = ucfg.groupname;
+            duration    = ucfg.duration;
+            reminder    = ucfg.reminder;
+        } else {
+            // YAML parse failed, fall through to bare-email mode
+            mailaddress = utils::getFirstLine(userconf);
+        }
     } else {
-        // get first line of userconf only that will include the mailaddress for reminder mails
+        // bare email mode
         mailaddress = utils::getFirstLine(userconf);
     }
 
@@ -88,35 +84,3 @@ UserConfig::UserConfig(std::string userconf) {
         mailaddress = "";
     }
 }
-
-#else
-
-// TODO: FIXME: check if used correctly in the codebase!
-// read user config from string (has to be read before dropping privileges)
-//  unitest: yes
-UserConfig::UserConfig(std::string userconf) {
-    YAML::Node user_home_config; // load yaml file from home here, not used anywhere else so far
-    // get first line, this is either a mailaddress or something like key: value
-    // std::getline(userconf, mailaddress);
-    // check if file looks like yaml
-    if ((userconf.find(":", 0) != std::string::npos) || (userconf[0] == '#')) {
-        user_home_config = YAML::Load(userconf);
-        if (user_home_config["mail"])
-            mailaddress = user_home_config["mail"].as<std::string>();
-        if (user_home_config["groupname"])
-            groupname = user_home_config["groupname"].as<std::string>();
-        if (user_home_config["duration"])
-            duration = user_home_config["duration"].as<int>();
-        if (user_home_config["reminder"])
-            reminder = user_home_config["reminder"].as<int>();
-    } else {
-        // get first line of userconf only that will include the mailaddress for reminder mails
-        mailaddress = utils::getFirstLine(userconf);
-    }
-
-    if (mailaddress != "" && !utils::isValidEmail(mailaddress)) {
-        spdlog::error("invalid email address in ~/.ws_user.conf, ignored.");
-        mailaddress = "";
-    }
-}
-#endif
