@@ -35,7 +35,6 @@
 #include <filesystem>
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include "config.h"
