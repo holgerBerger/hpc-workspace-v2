@@ -67,7 +67,7 @@ struct FsConfig_GLZ {
     int keeptime = 10;
     int releasekeeptime = -1; // -1 = not set, defaults to keeptime
     int maxduration = 0;
-    int maxextensions = -1;   // -1 = not set, defaults to global
+    int maxextensions = -1; // -1 = not set, defaults to global
     bool allocatable = true;
     bool extendable = true;
     bool restorable = true;
@@ -95,56 +95,27 @@ struct GlobalConfig_GLZ {
     std::map<std::string, FsConfig_GLZ> filesystems;
 };
 
-template <>
-struct glz::meta<FsConfig_GLZ> {
+template <> struct glz::meta<FsConfig_GLZ> {
     using T = FsConfig_GLZ;
     static constexpr auto value = glz::object(
-        "spaces",         &T::spaces,
-        "spaceselection", &T::spaceselection,
-        "deleted",        &T::deleted,
-        "database",       &T::database,
-        "groupdefault",   &T::groupdefault,
-        "userdefault",    &T::userdefault,
-        "user_acl",       &T::user_acl,
-        "group_acl",      &T::group_acl,
-        "keeptime",       &T::keeptime,
-        "releasekeeptime",&T::releasekeeptime,
-        "maxduration",    &T::maxduration,
-        "duration",       &T::maxduration,
-        "maxextensions",  &T::maxextensions,
-        "allocatable",    &T::allocatable,
-        "extendable",     &T::extendable,
-        "restorable",     &T::restorable,
-        "comment",        &T::comment
-    );
+        "spaces", &T::spaces, "spaceselection", &T::spaceselection, "deleted", &T::deleted, "database", &T::database,
+        "groupdefault", &T::groupdefault, "userdefault", &T::userdefault, "user_acl", &T::user_acl, "group_acl",
+        &T::group_acl, "keeptime", &T::keeptime, "releasekeeptime", &T::releasekeeptime, "maxduration", &T::maxduration,
+        "duration", &T::maxduration, "maxextensions", &T::maxextensions, "allocatable", &T::allocatable, "extendable",
+        &T::extendable, "restorable", &T::restorable, "comment", &T::comment);
     static constexpr auto opts = glz::opts{.error_on_unknown_keys = false};
 };
 
-template <>
-struct glz::meta<GlobalConfig_GLZ> {
+template <> struct glz::meta<GlobalConfig_GLZ> {
     using T = GlobalConfig_GLZ;
-    static constexpr auto value = glz::object(
-        "clustername",       &T::clustername,
-        "smtphost",          &T::smtphost,
-        "mail_from",         &T::mail_from,
-        "default_workspace", &T::default_workspace,
-        "default",           &T::default_workspace,
-        "duration",          &T::maxduration,
-        "maxduration",       &T::maxduration,
-        "durationdefault",   &T::durationdefault,
-        "reminderdefault",   &T::reminderdefault,
-        "maxextensions",     &T::maxextensions,
-        "dbuid",             &T::dbuid,
-        "dbgid",             &T::dbgid,
-        "deldirtimeout",     &T::deldirtimeout,
-        "expirerlogpath",    &T::expirerlogpath,
-        "maxuserworkspaces", &T::maxuserworkspaces,
-        "admins",            &T::admins,
-        "debugusers",        &T::debugusers,
-        "adminmail",         &T::adminmail,
-        "workspaces",        &T::workspaces,
-        "filesystems",       &T::filesystems
-    );
+    static constexpr auto value =
+        glz::object("clustername", &T::clustername, "smtphost", &T::smtphost, "mail_from", &T::mail_from,
+                    "default_workspace", &T::default_workspace, "default", &T::default_workspace, "duration",
+                    &T::maxduration, "maxduration", &T::maxduration, "durationdefault", &T::durationdefault,
+                    "reminderdefault", &T::reminderdefault, "maxextensions", &T::maxextensions, "dbuid", &T::dbuid,
+                    "dbgid", &T::dbgid, "deldirtimeout", &T::deldirtimeout, "expirerlogpath", &T::expirerlogpath,
+                    "maxuserworkspaces", &T::maxuserworkspaces, "admins", &T::admins, "debugusers", &T::debugusers,
+                    "adminmail", &T::adminmail, "workspaces", &T::workspaces, "filesystems", &T::filesystems);
     static constexpr auto opts = glz::opts{.error_on_unknown_keys = false};
 };
 
@@ -153,12 +124,8 @@ struct glz::meta<GlobalConfig_GLZ> {
 static std::string normalizeYamlBooleans(const std::string& input) {
     std::string result = input;
     const char* pairs[][2] = {
-        {"yes",  "true"},  {"no",   "false"},
-        {"Yes",  "true"},  {"No",   "false"},
-        {"YES",  "true"},  {"NO",   "false"},
-        {"on",   "true"},  {"off",  "false"},
-        {"On",   "true"},  {"Off",  "false"},
-        {"ON",   "true"},  {"OFF",  "false"},
+        {"yes", "true"}, {"no", "false"},  {"Yes", "true"}, {"No", "false"},  {"YES", "true"}, {"NO", "false"},
+        {"on", "true"},  {"off", "false"}, {"On", "true"},  {"Off", "false"}, {"ON", "true"},  {"OFF", "false"},
     };
     for (auto [oldW, newW] : pairs) {
         std::string oldStr(oldW);
@@ -171,7 +138,8 @@ static std::string normalizeYamlBooleans(const std::string& input) {
                 bool atEnd = endPos >= result.size();
                 if (!atEnd) {
                     char after = result[endPos];
-                    if (after != ' ' && after != '\t' && after != '\n' && after != '\r' && after != '#' && after != ',') {
+                    if (after != ' ' && after != '\t' && after != '\n' && after != '\r' && after != '#' &&
+                        after != ',') {
                         searchPos += oldStr.size();
                         continue;
                     }
@@ -311,9 +279,10 @@ void Config::readYAML(string yamlstr) {
     //             durationdefault, reminderdefault, maxextensions, dbuid, dbgid, deldirtimeout,
     //             expirerlogpath, maxuserworkspaces, admins, debugusers, adminmail, workspaces, filesystems
     static const std::vector<std::string> known_keys = {
-        "clustername", "smtphost", "mail_from", "default_workspace", "default", "duration", "maxduration",
-        "durationdefault", "reminderdefault", "maxextensions", "dbuid", "dbgid", "deldirtimeout",
-        "expirerlogpath", "maxuserworkspaces", "admins", "debugusers", "adminmail", "workspaces", "filesystems",
+        "clustername",   "smtphost",    "mail_from",       "default_workspace", "default",
+        "duration",      "maxduration", "durationdefault", "reminderdefault",   "maxextensions",
+        "dbuid",         "dbgid",       "deldirtimeout",   "expirerlogpath",    "maxuserworkspaces",
+        "admins",        "debugusers",  "adminmail",       "workspaces",        "filesystems",
         "expirerlogpart" // legacy alias
     };
 
@@ -326,24 +295,40 @@ void Config::readYAML(string yamlstr) {
     }
 
     // Copy global fields (only override if non-default/non-empty)
-    if (!gcfg.clustername.empty())       global.clustername = gcfg.clustername;
-    if (!gcfg.smtphost.empty())          global.smtphost = gcfg.smtphost;
-    if (!gcfg.mail_from.empty())         global.mail_from = gcfg.mail_from;
-    if (!gcfg.default_workspace.empty()) global.defaultWorkspace = gcfg.default_workspace;
-    if (!gcfg.expirerlogpath.empty())    global.expirerlogpath = gcfg.expirerlogpath;
+    if (!gcfg.clustername.empty())
+        global.clustername = gcfg.clustername;
+    if (!gcfg.smtphost.empty())
+        global.smtphost = gcfg.smtphost;
+    if (!gcfg.mail_from.empty())
+        global.mail_from = gcfg.mail_from;
+    if (!gcfg.default_workspace.empty())
+        global.defaultWorkspace = gcfg.default_workspace;
+    if (!gcfg.expirerlogpath.empty())
+        global.expirerlogpath = gcfg.expirerlogpath;
 
-    if (gcfg.maxduration != 0)          global.maxduration = gcfg.maxduration;
-    if (gcfg.durationdefault != 30)     global.durationdefault = gcfg.durationdefault;
-    if (gcfg.reminderdefault != 0)      global.reminderdefault = gcfg.reminderdefault;
-    if (gcfg.maxextensions != 10)       global.maxextensions = gcfg.maxextensions;
-    if (gcfg.dbuid != 0)                global.dbuid = gcfg.dbuid;
-    if (gcfg.dbgid != 0)                global.dbgid = gcfg.dbgid;
-    if (gcfg.deldirtimeout != 0)        global.deldirtimeout = gcfg.deldirtimeout;
-    if (gcfg.maxuserworkspaces != 0)    global.maxuserworkspaces = gcfg.maxuserworkspaces;
+    if (gcfg.maxduration != 0)
+        global.maxduration = gcfg.maxduration;
+    if (gcfg.durationdefault != 30)
+        global.durationdefault = gcfg.durationdefault;
+    if (gcfg.reminderdefault != 0)
+        global.reminderdefault = gcfg.reminderdefault;
+    if (gcfg.maxextensions != 10)
+        global.maxextensions = gcfg.maxextensions;
+    if (gcfg.dbuid != 0)
+        global.dbuid = gcfg.dbuid;
+    if (gcfg.dbgid != 0)
+        global.dbgid = gcfg.dbgid;
+    if (gcfg.deldirtimeout != 0)
+        global.deldirtimeout = gcfg.deldirtimeout;
+    if (gcfg.maxuserworkspaces != 0)
+        global.maxuserworkspaces = gcfg.maxuserworkspaces;
 
-    if (!gcfg.admins.empty())           global.admins = gcfg.admins;
-    if (!gcfg.debugusers.empty())       global.debugusers = gcfg.debugusers;
-    if (!gcfg.adminmail.empty())        global.adminmail = gcfg.adminmail;
+    if (!gcfg.admins.empty())
+        global.admins = gcfg.admins;
+    if (!gcfg.debugusers.empty())
+        global.debugusers = gcfg.debugusers;
+    if (!gcfg.adminmail.empty())
+        global.adminmail = gcfg.adminmail;
 
     // Merge workspaces + filesystems into Config::filesystems map
     auto mergeFsMap = [&](const std::map<std::string, FsConfig_GLZ>& src) {
@@ -357,26 +342,39 @@ void Config::readYAML(string yamlstr) {
 
             if (!v.spaceselection.empty())
                 fs.spaceselection = v.spaceselection;
-            if (!v.spaces.empty())          fs.spaces = v.spaces;
-            if (!v.deleted.empty())         fs.deletedPath = v.deleted;
-            if (!v.database.empty())        fs.database = v.database;
-            if (!v.groupdefault.empty())    fs.groupdefault = v.groupdefault;
-            if (!v.userdefault.empty())     fs.userdefault = v.userdefault;
-            if (!v.user_acl.empty())        fs.user_acl = v.user_acl;
-            if (!v.group_acl.empty())       fs.group_acl = v.group_acl;
+            if (!v.spaces.empty())
+                fs.spaces = v.spaces;
+            if (!v.deleted.empty())
+                fs.deletedPath = v.deleted;
+            if (!v.database.empty())
+                fs.database = v.database;
+            if (!v.groupdefault.empty())
+                fs.groupdefault = v.groupdefault;
+            if (!v.userdefault.empty())
+                fs.userdefault = v.userdefault;
+            if (!v.user_acl.empty())
+                fs.user_acl = v.user_acl;
+            if (!v.group_acl.empty())
+                fs.group_acl = v.group_acl;
 
-            if (v.keeptime != 10)           fs.keeptime = v.keeptime;
-            if (v.releasekeeptime >= 0)     fs.releasekeeptime = v.releasekeeptime;
-            else                           fs.releasekeeptime = fs.keeptime;
+            if (v.keeptime != 10)
+                fs.keeptime = v.keeptime;
+            if (v.releasekeeptime >= 0)
+                fs.releasekeeptime = v.releasekeeptime;
+            else
+                fs.releasekeeptime = fs.keeptime;
 
-            if (v.maxduration != 0)         fs.maxduration = v.maxduration;
+            if (v.maxduration != 0)
+                fs.maxduration = v.maxduration;
 
-            if (v.maxextensions >= 0)       fs.maxextensions = v.maxextensions;
-            else                           fs.maxextensions = global.maxextensions;
+            if (v.maxextensions >= 0)
+                fs.maxextensions = v.maxextensions;
+            else
+                fs.maxextensions = global.maxextensions;
 
             fs.allocatable = v.allocatable;
-            fs.extendable  = v.extendable;
-            fs.restorable  = v.restorable;
+            fs.extendable = v.extendable;
+            fs.restorable = v.restorable;
 
             fs.comment = v.comment;
 

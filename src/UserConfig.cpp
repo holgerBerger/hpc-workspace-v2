@@ -45,15 +45,10 @@ struct UserConfig_GLZ {
     int reminder = -1;
 };
 
-template <>
-struct glz::meta<UserConfig_GLZ> {
+template <> struct glz::meta<UserConfig_GLZ> {
     using T = UserConfig_GLZ;
-    static constexpr auto value = glz::object(
-        "mail", &T::mail,
-        "groupname", &T::groupname,
-        "duration", &T::duration,
-        "reminder", &T::reminder
-    );
+    static constexpr auto value =
+        glz::object("mail", &T::mail, "groupname", &T::groupname, "duration", &T::duration, "reminder", &T::reminder);
 };
 
 // read user config from string (has to be read before dropping privileges)
@@ -67,9 +62,9 @@ UserConfig::UserConfig(std::string userconf) {
         auto ec = glz::read<glz::opts{.format = glz::YAML}>(ucfg, userconf);
         if (!ec) {
             mailaddress = ucfg.mail;
-            groupname   = ucfg.groupname;
-            duration    = ucfg.duration;
-            reminder    = ucfg.reminder;
+            groupname = ucfg.groupname;
+            duration = ucfg.duration;
+            reminder = ucfg.reminder;
         } else {
             // YAML parse failed, fall through to bare-email mode
             mailaddress = utils::getFirstLine(userconf);

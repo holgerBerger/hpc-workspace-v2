@@ -264,7 +264,8 @@ int main(int argc, char** argv) {
                 }
                 if (stat(space.c_str(), &sb) == 0) {
                     if (sb.st_uid != dbuid || sb.st_gid != dbgid) {
-                        spdlog::warn("spaces path {} has incorrect ownership (expected {}:{}, got {}:{})", space, dbuid, dbgid, sb.st_uid, sb.st_gid);
+                        spdlog::warn("spaces path {} has incorrect ownership (expected {}:{}, got {}:{})", space, dbuid,
+                                     dbgid, sb.st_uid, sb.st_gid);
                     }
                 }
                 perms = cppfs::status(deletedpath).permissions();
@@ -273,7 +274,9 @@ int main(int argc, char** argv) {
                 }
                 if (stat(deletedpath.c_str(), &sb) == 0) {
                     if (sb.st_uid != dbuid || sb.st_gid != dbgid) {
-                        spdlog::warn("deleted directory {} in space {} has incorrect ownership (expected {}:{}, got {}:{})", deleted, space, dbuid, dbgid, sb.st_uid, sb.st_gid);
+                        spdlog::warn(
+                            "deleted directory {} in space {} has incorrect ownership (expected {}:{}, got {}:{})",
+                            deleted, space, dbuid, dbgid, sb.st_uid, sb.st_gid);
                     }
                 }
             }
@@ -314,7 +317,8 @@ int main(int argc, char** argv) {
             }
             if (stat(database.c_str(), &sb) == 0) {
                 if (sb.st_uid != dbuid || sb.st_gid != dbgid) {
-                    spdlog::warn("database path {} has incorrect ownership (expected {}:{}, got {}:{})", database, dbuid, dbgid, sb.st_uid, sb.st_gid);
+                    spdlog::warn("database path {} has incorrect ownership (expected {}:{}, got {}:{})", database,
+                                 dbuid, dbgid, sb.st_uid, sb.st_gid);
                 }
             }
             perms = cppfs::status(wsdbmagicpath).permissions();
@@ -323,7 +327,9 @@ int main(int argc, char** argv) {
             }
             if (stat(wsdbmagicpath.c_str(), &sb) == 0) {
                 if (sb.st_uid != dbuid || sb.st_gid != dbgid) {
-                    spdlog::warn(".ws_db_magic in database directory {} has incorrect ownership (expected {}:{}, got {}:{})", database, dbuid, dbgid, sb.st_uid, sb.st_gid);
+                    spdlog::warn(
+                        ".ws_db_magic in database directory {} has incorrect ownership (expected {}:{}, got {}:{})",
+                        database, dbuid, dbgid, sb.st_uid, sb.st_gid);
                 }
             }
             perms = cppfs::status(deletedpath).permissions();
@@ -332,7 +338,9 @@ int main(int argc, char** argv) {
             }
             if (stat(deletedpath.c_str(), &sb) == 0) {
                 if (sb.st_uid != dbuid || sb.st_gid != dbgid) {
-                    spdlog::warn("deleted directory {} in database {} has incorrect ownership (expected {}:{}, got {}:{})", deleted, database, dbuid, dbgid, sb.st_uid, sb.st_gid);
+                    spdlog::warn(
+                        "deleted directory {} in database {} has incorrect ownership (expected {}:{}, got {}:{})",
+                        deleted, database, dbuid, dbgid, sb.st_uid, sb.st_gid);
                 }
             }
         } else {

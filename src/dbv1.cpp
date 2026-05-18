@@ -229,22 +229,12 @@ struct DBEntryV1_YAML {
     std::string group;
 };
 
-template <>
-struct glz::meta<DBEntryV1_YAML> {
+template <> struct glz::meta<DBEntryV1_YAML> {
     using T = DBEntryV1_YAML;
     static constexpr auto value = glz::object(
-        "dbversion",  &T::dbversion,
-        "workspace",  &T::workspace,
-        "creation",   &T::creation,
-        "expiration", &T::expiration,
-        "released",   &T::released,
-        "expired",    &T::expired,
-        "reminder",   &T::reminder,
-        "extensions", &T::extensions,
-        "mailaddress",&T::mailaddress,
-        "comment",    &T::comment,
-        "group",      &T::group
-    );
+        "dbversion", &T::dbversion, "workspace", &T::workspace, "creation", &T::creation, "expiration", &T::expiration,
+        "released", &T::released, "expired", &T::expired, "reminder", &T::reminder, "extensions", &T::extensions,
+        "mailaddress", &T::mailaddress, "comment", &T::comment, "group", &T::group);
     static constexpr auto opts = glz::opts{.error_on_unknown_keys = false};
 };
 
@@ -401,23 +391,29 @@ void DBEntryV1::readFromString(std::string str) {
 
     // Check for truly empty or whitespace-only file
     std::string trimmed = str;
-    trimmed.erase(trimmed.begin(), std::find_if(trimmed.begin(), trimmed.end(), [](unsigned char ch){ return !std::isspace(ch); }));
+    trimmed.erase(trimmed.begin(),
+                  std::find_if(trimmed.begin(), trimmed.end(), [](unsigned char ch) { return !std::isspace(ch); }));
     if (trimmed.empty()) {
         throw DatabaseException("Invalid DB entry! Empty file?");
     }
 
-    dbversion    = y.dbversion;
-    creation     = y.creation;
-    released     = y.released;
-    expiration   = y.expiration;
-    expired      = y.expired;
-    reminder     = y.reminder;
-    workspace    = y.workspace;
-    extensions   = y.extensions;
-    mailaddress  = y.mailaddress;
-    comment      = y.comment;
-    group        = y.group;
-    groupflag    = !group.empty();
+    // Every DB entry must have a non-empty workspace path
+    if (y.workspace.empty()) {
+        throw DatabaseException("Invalid DB entry: missing or empty workspace field");
+    }
+
+    dbversion = y.dbversion;
+    creation = y.creation;
+    released = y.released;
+    expiration = y.expiration;
+    expired = y.expired;
+    reminder = y.reminder;
+    workspace = y.workspace;
+    extensions = y.extensions;
+    mailaddress = y.mailaddress;
+    comment = y.comment;
+    group = y.group;
+    groupflag = !group.empty();
 }
 
 // Use extension or update content of entry

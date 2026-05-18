@@ -317,7 +317,6 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
         spdlog::warn(" These directories will be ignored and require manual intervention.");
     }
 
-
     // check for errors, if this throws DB is invalid and we should skip this DB
     std::unique_ptr<Database> db;
     try {
@@ -348,7 +347,7 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
 
     // get all workspace pathes from DB
     // this is a list of all workspace paths in the DB, used to compare with the filesystem
-    auto wsIDs = db->matchPattern("*", "*", {}, false, false); // (1)
+    auto wsIDs = db->matchPattern("*", "*", {}, false, false);       // (1)
     std::vector<std::pair<std::string, std::string>> workspacesInDB; // pair of (id, wspath)
 
     workspacesInDB.reserve(wsIDs.size());
@@ -356,7 +355,7 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
         try {
             workspacesInDB.push_back(std::make_pair(wsid, db->readEntry(wsid, false)->getWSPath()));
         } catch (const std::exception& e) {
-            workspacesInDB.push_back(std::make_pair(wsid, ""));  // store empty path for failed entries, but keep the id!
+            workspacesInDB.push_back(std::make_pair(wsid, "")); // store empty path for failed entries, but keep the id!
             spdlog::warn("    failed to read DB entry {}: {}", wsid, e.what());
             // TODO: is that something to inform admin about? this workspace is immortal!
         }
@@ -365,9 +364,10 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
     // compare filesystem with DB
     for (auto const& founddir : dirs) { // (2)
         if (std::none_of(workspacesInDB.begin(), workspacesInDB.end(), [&](const auto& item) {
-                // fmt::println("{} == {} || {} == {}", item.second, (cppfs::path(founddir.space) / cppfs::path(founddir.dir)).string(), item.first, cppfs::path(founddir.dir).string());
+                // fmt::println("{} == {} || {} == {}", item.second, (cppfs::path(founddir.space) /
+                // cppfs::path(founddir.dir)).string(), item.first, cppfs::path(founddir.dir).string());
                 return item.second == (cppfs::path(founddir.space) / cppfs::path(founddir.dir)).string() ||
-                        item.first == cppfs::path(founddir.dir).string();
+                       item.first == cppfs::path(founddir.dir).string();
             })) {
             spdlog::warn("    stray workspace {}", founddir.dir);
 

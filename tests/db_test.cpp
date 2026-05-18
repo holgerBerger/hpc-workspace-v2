@@ -198,9 +198,8 @@ comment: ""
         // is no yaml
         REQUIRE_THROWS([&]() { std::unique_ptr<DBEntry> entry3(db2->readEntry("user3-BROKEN", false)); }());
 
-        // is yaml, but has no known entries, should give default
-        std::unique_ptr<DBEntry> entry4(db2->readEntry("user3-BROKEN2", false));
-        REQUIRE(entry4->getExtension() == 0);
+        // is yaml, but has no known entries, should throw
+        REQUIRE_THROWS([&]() { std::unique_ptr<DBEntry> entry4(db2->readEntry("user3-BROKEN2", false)); }());
     }
 
     SECTION("modify entry") {

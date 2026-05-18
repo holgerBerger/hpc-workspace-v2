@@ -90,9 +90,9 @@ static string getMaskedID(const DBEntry* entry) {
 template <> struct fmt::formatter<po::options_description> : ostream_formatter {};
 
 // print entry in traditional format, one below each other, multiline
-void print_entry(const DBEntry* entry, const Config config ,const bool verbose, const bool terse, const bool permissions, const bool listexpired) {
+void print_entry(const DBEntry* entry, const Config config, const bool verbose, const bool terse,
+                 const bool permissions, const bool listexpired) {
     lock_guard<mutex> lock(print_entry_mtx);
-
 
     fmt::println("Id: {}", getMaskedID(entry));
 
@@ -101,30 +101,31 @@ void print_entry(const DBEntry* entry, const Config config ,const bool verbose, 
     auto fs = entry->getFilesystem();
     auto fsconfig = config.getFsConfig(fs);
 
-    if (!listexpired){
+    if (!listexpired) {
         remaining = entry->getRemaining();
         fmt::println("    remaining time       : {} days, {} hours", remaining / (24 * 3600),
                      (remaining % (24 * 3600)) / 3600);
     } else {
-        if (entry->getReleaseTime() != 0){
+        if (entry->getReleaseTime() != 0) {
             fmt::println("    remaining time       : {}", "released");
-            remaining = (entry->getReleaseTime()+(fsconfig.releasekeeptime*86400))-time(0L);
+            remaining = (entry->getReleaseTime() + (fsconfig.releasekeeptime * 86400)) - time(0L);
         } else {
             fmt::println("    remaining time       : {}", "expired");
-            remaining = (entry->getExpired()+(fsconfig.keeptime*86400)) - time(0L);
-            if (remaining == 0){ // compatability with v1 --> get expiration from the name if expired is not defined 
+            remaining = (entry->getExpired() + (fsconfig.keeptime * 86400)) - time(0L);
+            if (remaining == 0) { // compatability with v1 --> get expiration from the name if expired is not defined
                 std::string id = entry->getId();
-                remaining = (std::stol(utils::splitString(id, '-').at(std::count(id.begin(), id.end(), '-')))+(fsconfig.keeptime*86400)) - time(0L);
+                remaining = (std::stol(utils::splitString(id, '-').at(std::count(id.begin(), id.end(), '-'))) +
+                             (fsconfig.keeptime * 86400)) -
+                            time(0L);
             }
         }
 
-        if (remaining <= 0){
+        if (remaining <= 0) {
             fmt::println("    until deletion       : 0 days, 0 hours");
         } else {
             fmt::println("    until deletion       : {} days, {} hours", remaining / (24 * 3600),
-                        (remaining % (24 * 3600)) / 3600);
+                         (remaining % (24 * 3600)) / 3600);
         }
-
     }
 
     if (!terse) {
@@ -155,8 +156,8 @@ void print_entry(const DBEntry* entry, const Config config ,const bool verbose, 
     }
 }
 
-void print_entry_tableformat(const DBEntry* entry, const Config config, [[maybe_unused]] const bool verbose, const bool terse, 
-                             [[maybe_unused]] const bool permissions, const bool listexpired) {
+void print_entry_tableformat(const DBEntry* entry, const Config config, [[maybe_unused]] const bool verbose,
+                             const bool terse, [[maybe_unused]] const bool permissions, const bool listexpired) {
     static bool headerprinted = false;
     static bool color_checked = false;
     static bool color_output = true;
@@ -166,16 +167,18 @@ void print_entry_tableformat(const DBEntry* entry, const Config config, [[maybe_
     auto fs = entry->getFilesystem();
     auto fsconfig = config.getFsConfig(fs);
 
-    if (!listexpired){
+    if (!listexpired) {
         remaining = entry->getRemaining();
     } else {
-        if (entry->getReleaseTime() != 0){
-            remaining = (entry->getReleaseTime()+(fsconfig.releasekeeptime*86400))-time(0L);
+        if (entry->getReleaseTime() != 0) {
+            remaining = (entry->getReleaseTime() + (fsconfig.releasekeeptime * 86400)) - time(0L);
         } else {
-            remaining = (entry->getExpired()+(fsconfig.keeptime*86400)) - time(0L);
-            if (remaining == 0){ // compatability with v1 --> get expiration from the name if expired is not defined 
+            remaining = (entry->getExpired() + (fsconfig.keeptime * 86400)) - time(0L);
+            if (remaining == 0) { // compatability with v1 --> get expiration from the name if expired is not defined
                 std::string id = entry->getId();
-                remaining = (std::stol(utils::splitString(id, '-').at(std::count(id.begin(), id.end(), '-')))+(fsconfig.keeptime*86400)) - time(0L);
+                remaining = (std::stol(utils::splitString(id, '-').at(std::count(id.begin(), id.end(), '-'))) +
+                             (fsconfig.keeptime * 86400)) -
+                            time(0L);
             }
         }
     }
@@ -228,22 +231,24 @@ void print_entry_tableformat(const DBEntry* entry, const Config config, [[maybe_
 
     if (terse) {
         if (color_output)
-            fmt::println("{:<30}{} {:<50}{} {:<9}", ID, ID.length()>30 ? fmt::format("{:31}","\n") : "",
-			 entry->getWSPath(), entry->getWSPath().length()>50 ? fmt::format("{:82}","\n") : "",
+            fmt::println("{:<30}{} {:<50}{} {:<9}", ID, ID.length() > 30 ? fmt::format("{:31}", "\n") : "",
+                         entry->getWSPath(), entry->getWSPath().length() > 50 ? fmt::format("{:82}", "\n") : "",
                          fmt::styled(remaining / (24 * 3600), fg(remaincolor)));
         else
-            fmt::println("{:<30}{} {:<50}{} {:<9}", ID, ID.length()>30 ? fmt::format("{:31}","\n") : "",
-			 entry->getWSPath(), entry->getWSPath().length()>50 ? fmt::format("{:82}","\n") : "",
-			 remaining / (24 * 3600));
+            fmt::println("{:<30}{} {:<50}{} {:<9}", ID, ID.length() > 30 ? fmt::format("{:31}", "\n") : "",
+                         entry->getWSPath(), entry->getWSPath().length() > 50 ? fmt::format("{:82}", "\n") : "",
+                         remaining / (24 * 3600));
     } else {
         if (color_output)
-            fmt::println("{:<30}{} {:<50}{} {:<25} {:<10} {:<9}", ID, ID.length()>30 ? fmt::format("{:31}","\n") : "",
-			 entry->getWSPath(), entry->getWSPath().length()>50 ? fmt::format("{:82}","\n") : "",
+            fmt::println("{:<30}{} {:<50}{} {:<25} {:<10} {:<9}", ID,
+                         ID.length() > 30 ? fmt::format("{:31}", "\n") : "", entry->getWSPath(),
+                         entry->getWSPath().length() > 50 ? fmt::format("{:82}", "\n") : "",
                          utils::ctime(entry->getExpiration()), entry->getExtension(),
                          fmt::styled(remaining / (24 * 3600), fg(remaincolor)));
-        else 
-            fmt::println("{:<30}{} {:<50}{} {:<25} {:<10} {:<9}", ID, ID.length()>30 ? fmt::format("{:31}","\n") : "",
-			 entry->getWSPath(), entry->getWSPath().length()>50 ? fmt::format("{:82}","\n") : "",
+        else
+            fmt::println("{:<30}{} {:<50}{} {:<25} {:<10} {:<9}", ID,
+                         ID.length() > 30 ? fmt::format("{:31}", "\n") : "", entry->getWSPath(),
+                         entry->getWSPath().length() > 50 ? fmt::format("{:82}", "\n") : "",
                          utils::ctime(entry->getExpiration()), entry->getExtension(), remaining / (24 * 3600));
     }
 #pragma GCC diagnostic pop
@@ -520,10 +525,12 @@ int main(int argc, char** argv) {
                                                      fmt::println("{}", getMaskedID(entry.get()));
                                                  } else {
                                                      if (!tableformat)
-                                                         print_entry(entry.get(), config, verbose, terselisting, permissions, listexpired);
+                                                         print_entry(entry.get(), config, verbose, terselisting,
+                                                                     permissions, listexpired);
                                                      else
-                                                         print_entry_tableformat(entry.get(), config, verbose, terselisting,
-                                                                                 permissions, listexpired);
+                                                         print_entry_tableformat(entry.get(), config, verbose,
+                                                                                 terselisting, permissions,
+                                                                                 listexpired);
                                                  }
                                              }
                                          }
