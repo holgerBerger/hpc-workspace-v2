@@ -399,10 +399,11 @@ setup() {
 @test "ws_expirer handles corrupted YAML DB entry" {
     ws_allocate --config bats/ws.conf CORRUPT_TEST 1
     local db_file=$(find /tmp/ws/ws2-db -name "*CORRUPT_TEST" | head -1)
-    # Inject corrupted YAML (valid YAML but no workspace/expiration fields → bad db entry)
+    # Inject corrupted YAML (valid YAML but no workspace/expiration fields → caught at parse time)
     echo "invalid: yaml: content: without: proper: structure" > "$db_file"
     run ws_expirer --config bats/ws.conf
-    assert_output --partial "bad db entries"
+    assert_output --partial "while reading file"
+    assert_output --partial "missing or empty workspace field"
     assert_success
     rm -f "$db_file"
 }
