@@ -272,6 +272,12 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
         // timestamp for versioning, has to be identical for DB and workspace DIR
         time_t timestamp_time = time(NULL);
 
+        if (deletedata) {
+            spdlog::info("deleting workspace as --delete-data was given");
+            spdlog::info("you have 5 seconds to interrupt with CTRL-C to prevent deletion");
+            sleep(5);
+        }
+
         //
         // first handle DB entry
         //
@@ -293,6 +299,7 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
         // we exit this as DB user on success
 
         //
+<<<<<<< HEAD
         // second handle workspace directory
         //
 
@@ -344,13 +351,11 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
         }
 
         //
-        // third remove data if requested
+        // second remove data if requested
         //
 
         if (deletedata) {
-            spdlog::info("deleting workspace as --delete-data was given");
-            spdlog::info("you have 5 seconds to interrupt with CTRL-C to prevent deletion");
-            sleep(5);
+            auto src = dbentry->getWSPath();
 
             caps.raise_cap({CAP_FOWNER}, utils::SrcPos(__FILE__, __LINE__, __func__));
             if (caps.isSetuid()) {
@@ -363,9 +368,9 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             // remove the directory
             std::error_code ec;
             if (debugflag) {
-                spdlog::debug("rmtree({})", target.string());
+                spdlog::debug("rmtree_below({})", src);
             }
-            utils::rmtree(target); // #66
+            utils::rmtree_below(src); // #66
 
             if (caps.isSetuid()) {
                 // get root so we can drop again
@@ -376,17 +381,81 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
 
             caps.lower_cap({CAP_FOWNER}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
 
-            // call again with different user
-            utils::rmtree(target); // #66
+            //if (debugflag) {
+            //  spdlog::debug("uid={}", geteuid());
+            //}
 
-            syslog(LOG_INFO, "delete-data for user <%s> from <%s>.", user::getUsername().c_str(), target.c_str());
+            // call again with different user
+            // utils::rmtree(src); // #66
+            try {
+                cppfs::remove(src);
+            } catch (const std::exception& e) {
+                spdlog::error("remove {} -> {}", src, e.what());
+            }
+
+            syslog(LOG_INFO, "delete-data for user <%s> from <%s>.", user::getUsername().c_str(), src.c_str());
 
             // remove DB entry
             dbentry->remove();
 
             spdlog::info("workspace {} and data deleted, can not be restored.", name);
 
-        } // if delete-data
+        } else { // no delete-data, just release workspace
+
+            //
+            // third handle workspace directory
+            //
+
+            // use timestamp_time which can be modified by db->release to avoid collisions
+            // new name is still identical to DB, but does not collide
+            string timestamp = fmt::format("{}", timestamp_time);
+
+            auto wsconfig = dbentry->getConfig()->getFsConfig(dbentry->getFilesystem());
+            cppfs::path target = cppfs::path(dbentry->getWSPath()).parent_path() / cppfs::path(wsconfig.deletedPath) /
+                                cppfs::path(fmt::format("{}-{}", dbentry->getId(), timestamp));
+
+            caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
+
+            try {
+                if (debugflag)
+                    spdlog::debug("rename({}, {})", dbentry->getWSPath(), target.string());
+                cppfs::rename(dbentry->getWSPath(), target);
+            } catch (const std::filesystem::filesystem_error& e) {
+                if (e.code() == std::errc::cross_device_link) {
+                    spdlog::info("cross device rename, falling back to 'mv'");
+                    int ret = utils::mv(dbentry->getWSPath().c_str(), target.c_str());
+                    caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
+                                utils::SrcPos(__FILE__, __LINE__, __func__));
+                    if (ret != 0) {
+                        spdlog::error("workspace directory could not be moved to deleted path via 'mv': {}", strerror(errno));
+                        return false;
+                    }
+                } else {
+                    caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
+                                utils::SrcPos(__FILE__, __LINE__, __func__));
+                    if (debugflag)
+                        spdlog::error("{}", e.what());
+                    spdlog::error("workspace directory could not be moved to deleted path!");
+                    return false;
+                }
+            }
+
+            caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+
+            syslog(LOG_INFO, "release for user <%s> from <%s> to <%s> done.", user::getUsername().c_str(),
+                   dbentry->getWSPath().c_str(), target.c_str());
+
+            spdlog::info("workspace {} released.", name);
+        }
+
+
+        if (!deletedata) {
+            spdlog::info("workspace is still recoverable as --delete-data was not given.");
+        } else {
+            spdlog::info("workspace is not recoverable as --delete-data was given.");
+        }
+
+
 
         // if ws_exist
     } else {
