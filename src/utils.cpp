@@ -497,6 +497,7 @@ void rmtree(std::string path, std::time_t deadline) {
             close(dirfd);
             dirfd_closed = true;
 
+            // FIXME: this is strange and may be wrong, why 0? why unlinkat? parent is not open...
             r = unlinkat(0, path.c_str(), AT_REMOVEDIR);
             if (r) {
                 spdlog::error("unlinkat {} -> {}", path, strerror(errno));
@@ -510,6 +511,35 @@ void rmtree(std::string path, std::time_t deadline) {
 // delete path be deleting contents and deleting path itself
 // without deadline
 void rmtree(std::string path) { rmtree(path, (std::time_t)0L); }
+
+// delete path be deleting contents and NOT deleting path itself
+// with deadline
+void rmtree_below(std::string path) {
+    auto deadline = (std::time_t)0L;
+
+    if (traceflag) {
+        spdlog::trace("rmtree_below({}, {})", path, deadline);
+    }
+
+    struct stat orig_stat, new_stat;
+
+    int r = fstatat(0, path.c_str(), &orig_stat, AT_SYMLINK_NOFOLLOW);
+    if (r) {
+        spdlog::error("fstatat {} -> {}", path, errno);
+    }
+
+    if (S_ISDIR(orig_stat.st_mode)) {
+        bool dirfd_closed = false;
+        int dirfd = openat(0, path.c_str(), O_RDONLY | O_CLOEXEC);
+        r = fstatat(dirfd, "", &new_stat, AT_EMPTY_PATH);
+        if (r == 0 && memcmp(&new_stat, &orig_stat, sizeof(struct stat)) == 0) {
+            rmtree_fd(dirfd, path, deadline);
+            close(dirfd);
+        }
+        if (!dirfd_closed)
+            close(dirfd);
+    }
+}
 
 // pretty print a size in bytes
 string prettyBytes(const uint64_t size) {

@@ -95,6 +95,9 @@ void rmtree(std::string path, const std::time_t deadline);
 // delete a directory and its contents, should be temper safe
 void rmtree(std::string path);
 
+// delete a directorys contents, but not the directory itself
+void rmtree_below(std::string path) ;
+
 // split a string at delimiter and return vector
 std::vector<std::string> splitString(const std::string& str, char delimiter);
 
