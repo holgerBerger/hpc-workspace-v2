@@ -272,6 +272,50 @@ setup() {
     assert_output --partial "Error: workspace name missing"
 }
 
+@test "ws_share error missing user for share" {
+    run ws_allocate --config bats/ws.conf ${ws_name}_nouser_share
+    assert_success
+
+    run ws_share --config bats/ws.conf share ${ws_name}_nouser_share
+    assert_failure
+    assert_output --partial "Error: No user specified"
+
+    ws_release --config bats/ws.conf ${ws_name}_nouser_share
+}
+
+@test "ws_share error missing user for unshare" {
+    run ws_allocate --config bats/ws.conf ${ws_name}_nouser_unshare
+    assert_success
+
+    run ws_share --config bats/ws.conf unshare ${ws_name}_nouser_unshare
+    assert_failure
+    assert_output --partial "Error: No user specified"
+
+    ws_release --config bats/ws.conf ${ws_name}_nouser_unshare
+}
+
+@test "ws_share error missing group for sharegroup" {
+    run ws_allocate --config bats/ws.conf ${ws_name}_nogroup_share
+    assert_success
+
+    run ws_share --config bats/ws.conf sharegroup ${ws_name}_nogroup_share
+    assert_failure
+    assert_output --partial "Error: No group specified"
+
+    ws_release --config bats/ws.conf ${ws_name}_nogroup_share
+}
+
+@test "ws_share error missing group for unsharegroup" {
+    run ws_allocate --config bats/ws.conf ${ws_name}_nogroup_unshare
+    assert_success
+
+    run ws_share --config bats/ws.conf unsharegroup ${ws_name}_nogroup_unshare
+    assert_failure
+    assert_output --partial "Error: No group specified"
+
+    ws_release --config bats/ws.conf ${ws_name}_nogroup_unshare
+}
+
 @test "ws_share filesystem selection" {
     run ws_allocate --config bats/ws.conf -F ws2 ${ws_name}_fs
     assert_success
