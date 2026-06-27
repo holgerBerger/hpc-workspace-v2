@@ -321,6 +321,16 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             }
             utils::rmtree_below(src); // #66
 
+            if (caps.isSetuid()) {
+                // get root so we can drop again
+                if (seteuid(0)) {
+                    spdlog::error("can not setuid, bad installation?");
+                }
+            }
+            caps.lower_cap({CAP_FOWNER}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+
+	    caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
+
             // to be allowed to delete the toplevel, we need to be DB user
             if (caps.isSetuid()) {
                 if (seteuid(dbentry->getConfig()->dbuid())) {
@@ -340,7 +350,7 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
                     spdlog::error("can not setuid, bad installation?");
                 }
             }
-            caps.lower_cap({CAP_FOWNER}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+            caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
 
             syslog(LOG_INFO, "delete-data for user <%s> from <%s>.", user::getUsername().c_str(), src.c_str());
 
