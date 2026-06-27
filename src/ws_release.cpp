@@ -321,31 +321,32 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             }
             utils::rmtree_below(src); // #66
 
+            // to be allowed to delete the toplevel, we need to be DB user
             if (caps.isSetuid()) {
-                // get root so we can drop again
-                if (seteuid(0)) {
-                    spdlog::error("can not setuid, bad installation?");
+                if (seteuid(dbentry->getConfig()->dbuid())) {
+                    spdlog::error("can not setuid to DB user, bad installation?");
                 }
             }
-
-            caps.lower_cap({CAP_FOWNER}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
-
-            //if (debugflag) {
-            //  spdlog::debug("uid={}", geteuid());
-            //}
-
-            // call again with different user
-            // utils::rmtree(src); // #66
+            // delete toplevel, not recursively, as we are not allowed to delete/look inside
             try {
                 cppfs::remove(src);
             } catch (const std::exception& e) {
                 spdlog::error("remove {} -> {}", src, e.what());
             }
 
+            if (caps.isSetuid()) {
+                // get root so we can drop again
+                if (seteuid(0)) {
+                    spdlog::error("can not setuid, bad installation?");
+                }
+            }
+            caps.lower_cap({CAP_FOWNER}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+
             syslog(LOG_INFO, "delete-data for user <%s> from <%s>.", user::getUsername().c_str(), src.c_str());
 
             // remove DB entry
             dbentry->remove();
+
 
             spdlog::info("workspace {} and data deleted, can not be restored.", name);
 
