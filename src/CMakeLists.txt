@@ -66,6 +66,11 @@ target_link_libraries(ws_common
         ${GSL_TARGET}
 )
 
+# std::filesystem lives in a separate lib on GCC < 9; link it there.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+    target_link_libraries(ws_common PUBLIC stdc++fs)
+endif()
+
 # Mail library with curl dependency
 add_library(mail
     mail.cpp
