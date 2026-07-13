@@ -46,6 +46,8 @@
 #include "utils.h"
 #include "ws.h"
 
+#include <fcntl.h>
+
 #include "spdlog/spdlog.h"
 
 #include <boost/program_options.hpp>
@@ -386,47 +388,88 @@ void restore(const string name, const string target, const string username, cons
         string wssourcename = cppfs::path(wsdir).parent_path().string() + "/" +
                               config.getFsConfig(source_filesystem).deletedPath + "/" + name;
 
-        string targetpathname = targetpath + "/" + cppfs::path(wssourcename).filename().string();
-
         caps.raise_cap({CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-        // do the move
-        int ret = rename(wssourcename.c_str(), targetpathname.c_str());
-        // some filesystems can not rename across some borders, examples are lustre DNE1 and NEC ScateFS for metadata
-        // targets and WEKA for directories with quotas, for those, fall back to /bin/mv which does a copy + delete
-        // under the hood
-        if ((ret == -1) && (errno == EXDEV)) {
-            ret = utils::mv(wssourcename.c_str(), targetpathname.c_str());
-            if (ret != 0) {
-                spdlog::error("mv failed: {}", strerror(errno));
+        if (config.restorenosub()) { // restore without subdirectory, e.g. for WEKA with quota
+            // background: WEKA is very slow for mv from a directory without quotas to a
+            // directory with quotas. But it can quickly rename a directory iwhtout quotas as a directory in a directory
+            // without quotas. So when toplevel of workspace does not have quotas but workspaces have, it is better to restore
+            // to the name of the new workspace instead into thet workspace.
+            // e.g.  .../ws/new will not get .../ws/new/restored-XXXXX but .../ws/new
+            // problems: group workspaces, permissions do not match DB entry
+            string targetpathname = targetpath;
+            // spdlog::info("restoring {} to {}", wssourcename, targetpathname);
+            int ret = renameat(AT_FDCWD, wssourcename.c_str(), AT_FDCWD, targetpathname.c_str());
+            if (ret == -1) {
+                spdlog::error("renameat failed: {}", strerror(errno));
             }
-        }
 
-        // FIXME: move this to deleteEntry?
-        if (caps.isSetuid()) {
-            // get db user to be able to unlink db entry from root_squash filesystems
-            if (setegid(config.dbgid()) || seteuid(config.dbuid())) {
-                spdlog::error("can not seteuid or setgid. Bad installation?");
-                exit(-1);
+            if (caps.isSetuid()) {
+                // get db user to be able to unlink db entry from root_squash filesystems
+                if (setegid(config.dbgid()) || seteuid(config.dbuid())) {
+                    spdlog::error("can not seteuid or setgid. Bad installation?");
+                    exit(-1);
+                }
             }
-        }
 
-        if (ret == 0) {
-            // remove DB entry
-            try {
-                db->deleteEntry(name, true);
-                syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> done, removed DB entry <%s>.",
-                       username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
-                spdlog::info("restore successful, database entry removed.");
-            } catch (DatabaseException const& ex) {
-                spdlog::error("error in DB entry removal, {}", ex.what());
+            if (ret == 0) {
+                // remove DB entry
+                try {
+                    db->deleteEntry(name, true);
+                    syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> done, removed DB entry <%s>.",
+                        username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
+                    spdlog::info("restore successful, database entry removed.");
+                } catch (DatabaseException const& ex) {
+                    spdlog::error("error in DB entry removal, {}", ex.what());
+                }
+            } else {
+                syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.", username.c_str(),
+                    wssourcename.c_str(), targetpathname.c_str(), name.c_str());
+                spdlog::error("moving data failed, database entry kept! {}", ret);
+                ;
             }
-        } else {
-            syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.", username.c_str(),
-                   wssourcename.c_str(), targetpathname.c_str(), name.c_str());
-            spdlog::error("moving data failed, database entry kept! {}", ret);
-            ;
-        }
+
+        } else { // restore with subdirectory
+
+            string targetpathname = targetpath + "/" + cppfs::path(wssourcename).filename().string();
+            // do the move
+            int ret = rename(wssourcename.c_str(), targetpathname.c_str());
+            // some filesystems can not rename across some borders, examples are lustre DNE1 and NEC ScateFS for metadata
+            // targets and WEKA for directories with quotas, for those, fall back to /bin/mv which does a copy + delete
+            // under the hood
+            if ((ret == -1) && (errno == EXDEV)) {
+                ret = utils::mv(wssourcename.c_str(), targetpathname.c_str());
+                if (ret != 0) {
+                    spdlog::error("mv failed: {}", strerror(errno));
+                }
+            }
+
+            // FIXME: move this to deleteEntry?
+            if (caps.isSetuid()) {
+                // get db user to be able to unlink db entry from root_squash filesystems
+                if (setegid(config.dbgid()) || seteuid(config.dbuid())) {
+                    spdlog::error("can not seteuid or setgid. Bad installation?");
+                    exit(-1);
+                }
+            }
+
+            if (ret == 0) {
+                // remove DB entry
+                try {
+                    db->deleteEntry(name, true);
+                    syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> done, removed DB entry <%s>.",
+                        username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
+                    spdlog::info("restore successful, database entry removed.");
+                } catch (DatabaseException const& ex) {
+                    spdlog::error("error in DB entry removal, {}", ex.what());
+                }
+            } else {
+                syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.", username.c_str(),
+                    wssourcename.c_str(), targetpathname.c_str(), name.c_str());
+                spdlog::error("moving data failed, database entry kept! {}", ret);
+                ;
+            }
+        } // restorenosub
 
         // get user again
         if (caps.isSetuid()) {
