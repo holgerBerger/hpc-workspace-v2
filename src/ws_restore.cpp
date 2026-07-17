@@ -351,6 +351,7 @@ void restore(const string name, const string target, const string username, cons
         // find target workspace
         validfs = config.validFilesystems(username, grouplist, ws::RESTORE);
         std::unique_ptr<Database> db;
+        std::unique_ptr<DBEntry> target_entry;
         string targetpath;
         for (auto const& fs : fslist) {
             if (debugflag)
@@ -366,7 +367,8 @@ void restore(const string name, const string target, const string username, cons
 
             try {
                 std::unique_ptr<DBEntry> entry(candiate_db->readEntry(fmt::format("{}-{}", username, target), false));
-                targetpath = entry->getWSPath();
+                target_entry = std::move(entry);
+                targetpath = target_entry->getWSPath();
                 db = std::move(candiate_db);
                 break;
             } catch (DatabaseException& e) {
@@ -396,7 +398,6 @@ void restore(const string name, const string target, const string username, cons
             // without quotas. So when toplevel of workspace does not have quotas but workspaces have, it is better to restore
             // to the name of the new workspace instead into thet workspace.
             // e.g.  .../ws/new will not get .../ws/new/restored-XXXXX but .../ws/new
-            // problems: group workspaces, permissions do not match DB entry
             string targetpathname = targetpath;
             // spdlog::info("restoring {} to {}", wssourcename, targetpathname);
             int ret = renameat(AT_FDCWD, wssourcename.c_str(), AT_FDCWD, targetpathname.c_str());
@@ -413,6 +414,13 @@ void restore(const string name, const string target, const string username, cons
             }
 
             if (ret == 0) {
+                // carry over group workspace flag from source entry
+                string src_group = source_entry->getGroup();
+                if (!src_group.empty()) {
+                    target_entry->setGroup(src_group);
+                    target_entry->writeEntry();
+                }
+
                 // remove DB entry
                 try {
                     db->deleteEntry(name, true);

@@ -111,6 +111,7 @@ class DBEntryV1 : public DBEntry {
     string getFilesystem() const;
     long getReminder() const;
     string getGroup() const;
+    void setGroup(const string& group);
 
     // return config of parent DB
     const Config* getConfig() const;
