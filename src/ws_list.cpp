@@ -82,7 +82,7 @@ static string getMaskedID(const DBEntry* entry) {
     if (entry->getConfig()->isAdmin(user::getUsername())) {
         return entry->getId();
     } else {
-        return utils::getID(user::getUsername(), entry->getId());
+        return utils::getID(entry->getId());
     }
 }
 

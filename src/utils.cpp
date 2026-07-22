@@ -274,21 +274,14 @@ std::string getFirstLine(const std::string& multilineString) {
 }
 
 // getID returns id part of workspace id <username-id>
-// Updated to accept the username explicitly and correctly handle usernames that contain '-'
-std::string getID(const std::string username, const std::string wsid) {
-    const std::string prefix = username + "-";
-    /*
-     * FIXME: this was removed to avoid false positives for group workspaces,
-     * but the code does for grou workspaces probably on then the expected thing
-     * when both usernames (caller and owner) have same length
-     *
-    // Verify that wsid actually starts with the expected "username-" prefix
-    if (wsid.rfind(prefix, 0) != 0) {
-        spdlog::error("wsid '{}' does not start with expected username- prefix '{}'", wsid, prefix);
+// Updated to handle wsid format "username-id" where username can contain '-'
+// It returns what is after the last "-" (everything from the right up to the first "-")
+std::string getID(const std::string wsid) {
+    size_t last_dash = wsid.find_last_of('-');
+    if (last_dash == std::string::npos) {
         return "";
     }
-    */
-    return wsid.substr(prefix.size());
+    return wsid.substr(last_dash + 1);
 }
 
 /*
