@@ -103,6 +103,8 @@ Vagrant.configure("2") do |config|
 
     sudo -i -u vagrant bash /home/vagrant/hpc-workspace-v2/vm/scripts/rh_build_master.sh
 
+    sudo -i -u vagrant bash /home/vagrant/hpc-workspace-v2/vm/scripts/rh_run_tests.sh
+
     true
   SHELL
 end
