@@ -400,7 +400,7 @@ setup() {
     local testgroup1="nogroup"
     local testgroup2="nobody"
     getent group "$testgroup1" >/dev/null || testgroup1="nobody"
-    getent group "$testgroup2" >/dev/null || testgroup2="staff"
+    getent group "$testgroup2" >/dev/null || testgroup2="video"
 
     run ws_share --config bats/ws.conf sharegroup ${ws_name}_multi_group $testgroup1 $testgroup2
     assert_success
@@ -638,7 +638,7 @@ setup() {
     local testgroup1="nogroup"
     local testgroup2="nobody"
     getent group "$testgroup1" >/dev/null || testgroup1="nobody"
-    getent group "$testgroup2" >/dev/null || testgroup2="staff"
+    getent group "$testgroup2" >/dev/null || testgroup2="video"
 
     # Share with multiple groups
     run ws_share --config bats/ws.conf sharegroup ${ws_name}_multi_unsharegroup $testgroup1 $testgroup2
@@ -732,7 +732,7 @@ setup() {
 
     # Use a valid group (nogroup typically has no members)
     local testgroup="nogroup"
-    getent group "$testgroup" >/dev/null || testgroup="staff"
+    getent group "$testgroup" >/dev/null || testgroup="video"
 
     run ws_share --config bats/ws.conf sharegroup ${ws_name}_member_check $testgroup
     assert_success
