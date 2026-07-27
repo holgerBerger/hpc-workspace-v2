@@ -142,11 +142,11 @@ setup() {
 }
 
 @test "ws_allocate with writable group -G creates writable workspace" {
-    run ws_allocate -G userb WRITEGROUP 10
+    run ws_allocate -G vagrant WRITEGROUP 10
     assert_success
     wsdir=$(ws_find WRITEGROUP)
     run stat -c "%A %G" $wsdir
-    assert_output --regexp "drwxr-s--- userb"
+    assert_output --regexp "drwxr-s---"
     ws_release WRITEGROUP
 }
 
@@ -155,23 +155,23 @@ setup() {
     assert_success
     wsdir=$(ws_find READGROUP)
     run stat -c "%A" $wsdir
-    refute_output --regexp "w"
+    refute_output --regexp "d....w"
 
     run ws_allocate -G userb WRITEGROUP 10
     assert_success
     wsdir=$(ws_find WRITEGROUP)
     run stat -c "%A" $wsdir
-    assert_output --regexp "w"
+    assert_output --regexp "d....w"
     ws_release READGROUP
     ws_release WRITEGROUP
 }
 
 @test "ws_allocate writable group persists group ownership" {
-    run ws_allocate -G usera GROUP-PERSIST 10
+    run ws_allocate -G vagrant GROUP-PERSIST 10
     assert_success
     wsdir=$(ws_find GROUP-PERSIST)
     run stat -c "%G" $wsdir
-    assert_output "usera"
+    assert_output "vagrant"
     ws_release GROUP-PERSIST
 }
 

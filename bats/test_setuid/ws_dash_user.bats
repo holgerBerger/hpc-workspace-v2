@@ -12,6 +12,10 @@ setup() {
 
 @test "ws_extend dash-username workspace" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
+    export WS_RESTORE=$(which ws_restore)
+    export WS_LIST=$(which ws_list)
+    
     # Create workspace as mean-user-name
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 DASHEXTEND 5
     assert_success
@@ -150,6 +154,10 @@ setup() {
 
 @test "ws_allocate writable group workspace by mean-user-name" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
+    export WS_RESTORE=$(which ws_restore)
+    export WS_LIST=$(which ws_list)
+
     # mean-user-name is in group vagrant (set in rh_create_users.sh)
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G vagrant GROUPWS-GRPPERM 5
     assert_success
@@ -167,6 +175,10 @@ setup() {
 
 @test "ws_allocate readable group workspace by mean-user-name" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
+    export WS_RESTORE=$(which ws_restore)
+    export WS_LIST=$(which ws_list)
+
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -g -- GROUPWS-READABLE 5
     assert_success
 
@@ -180,6 +192,10 @@ setup() {
 
 @test "ws_allocate writable group by userb to usera group" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
+    export WS_RESTORE=$(which ws_restore)
+    export WS_LIST=$(which ws_list)
+
     # userb is member of usera (set in rh_create_users.sh)
     run sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 -G usera GROUPWS-USERB 5
     assert_success
@@ -193,6 +209,8 @@ setup() {
 
 @test "ws_list group workspaces visible to userb from usera" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
+    export WS_RESTORE=$(which ws_restore)
     export WS_LIST=$(which ws_list)
 
     # Mean-user-name creates a group workspace for usera
@@ -212,6 +230,7 @@ setup() {
     # usera should not see vagrant's group workspace if usera is only in vagrant group
     export WS_ALLOCATE=$(which ws_allocate)
     export WS_LIST=$(which ws_list)
+    export WS_RELEASE=$(which ws_release)
 
     # vagrant creates a workspace in vagrant group
     run sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 -G vagrant GROUPWS-VAGRANT 5
@@ -231,6 +250,7 @@ setup() {
 
 @test "userb can extend vagrant's writable group workspace" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
 
     vagrant_dir=$(sudo -u vagrant --preserve-env=ASAN_OPTIONS $(which ws_allocate) -F ws1 -G vagrant CROSS-EXTEND 5)
     assert [ -n "$vagrant_dir" ]
@@ -240,11 +260,12 @@ setup() {
     assert_success
     assert_output --partial "extending workspace"
 
-    run sudo -u vagrant --preserve-env=ASAN_OPTIONS $(which ws_release) -F ws1 CROSS-EXTEND
+    run sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 CROSS-EXTEND
 }
 
 @test "userb cannot extend non-group workspace" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
 
     # vagrant creates a personal (non-group) workspace
     vagrant_dir=$(sudo -u vagrant --preserve-env=ASAN_OPTIONS $(which ws_allocate) -F ws1 NOMEMBER-WS 5)
@@ -255,11 +276,12 @@ setup() {
     assert_failure
     assert_output --partial "not owner"
 
-    run sudo -u vagrant --preserve-env=ASAN_OPTIONS $(which ws_release) -F ws1 NOMEMBER-WS
+    run sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 NOMEMBER-WS
 }
 
 @test "vagrant can extend userb's writable group workspace" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
 
     # userb creates writable workspace for vagrant group
     run sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 -G vagrant VAGRANT-EXTEND 5
@@ -270,7 +292,7 @@ setup() {
     assert_success
     assert_output --partial "extending workspace"
 
-    run sudo -u userb --preserve-env=ASAN_OPTIONS $(which ws_release) -F ws1 VAGRANT-EXTEND
+    run sudo -u userb --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 VAGRANT-EXTEND
 }
 
 # ============================================================
@@ -279,6 +301,11 @@ setup() {
 
 @test "ws_allocate -x change comment for dash-username workspace" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_LIST=$(which ws_list)
+    export WS_RELEASE=$(which ws_release)
+
+
+
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 DASHCOMMENT 5
     assert_success
 
@@ -294,6 +321,9 @@ setup() {
 
 @test "ws_allocate -x change mail for dash-username workspace" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_LIST=$(which ws_list)
+    export WS_RELEASE=$(which ws_release)
+
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 DASHMAIL 5
     assert_success
 
@@ -313,6 +343,7 @@ setup() {
 
 @test "vagrant extends mean-user-name group workspace (usera)" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
 
     # mean-user-name creates writable for usera group
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 -G usera MEAN-GROUP-WORKSPACE 5
@@ -323,7 +354,7 @@ setup() {
     assert_success
     assert_output --partial "extending workspace"
 
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $(which ws_release) -F ws1 MEAN-GROUP-WORKSPACE
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 MEAN-GROUP-WORKSPACE
 }
 
 # ============================================================
@@ -333,17 +364,21 @@ setup() {
 @test "ws_expirer handles dash-username workspace" {
     sudo rm -f /tmp/ws_expirer.log 2>/dev/null
     export WS_EXPIRER=$(which ws_expirer)
+    export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
 
-    sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $(which ws_allocate) -F ws1 EXPIRER-DASH 5
+    sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 EXPIRER-DASH 5
     run sudo --preserve-env=ASAN_OPTIONS $WS_EXPIRER -F ws1
     assert_success
     assert_output --regexp "keeping.*/tmp/ws/ws1/mean-user-name-EXPIRER-DASH"
     sudo rm -f /tmp/ws_expirer.log
-    sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $(which ws_release) -F ws1 EXPIRER-DASH
+    sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 EXPIRER-DASH
 }
 
 @test "ws_allocate -x extension count persists for dash-username" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
+
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 EXTCOUNT-DASH 5
     assert_success
 
@@ -367,11 +402,13 @@ setup() {
     assert_failure
     assert_output --partial "no more extensions!"
 
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $(which ws_release) -F ws1 EXTCOUNT-DASH
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 EXTCOUNT-DASH
 }
 
 @test "ws_allocate -x zero duration for dash-username (no extension)" {
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
+
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 ZEROEXT-DASH 5
     assert_success
 
@@ -380,5 +417,5 @@ setup() {
     assert_success
     assert_output --partial "changed comment"
 
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $(which ws_release) -F ws1 ZEROEXT-DASH
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 ZEROEXT-DASH
 }
