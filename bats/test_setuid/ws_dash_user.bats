@@ -69,7 +69,7 @@ setup() {
     assert_success
 
     # Verify workspace is no longer accessible at original path
-    refute_dir_exists "$wsdir"
+    assert_file_not_exist "$wsdir"
 
     # Find restored entry
     wsid=$($WS_RESTORE -F ws1 -l | grep "$ws_name" | head -1)
@@ -167,7 +167,7 @@ setup() {
     assert_success
 
     # Verify group ownership and sticky bit via stat
-    wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -F ws1 GROUPWS-GRPPERM)
+    wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -u mean-user-name -g -F ws1 GROUPWS-GRPPERM)
     run stat -c "%A %G" "$wsdir"
     assert_output --regexp "drwxr-s--- vagrant"
 
@@ -187,7 +187,7 @@ setup() {
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -g -- GROUPWS-READABLE 5
     assert_success
 
-    wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -F ws1 GROUPWS-READABLE)
+    wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -u mean-user-name -g -F ws1 GROUPWS-READABLE)
     run stat -c "%A %G" "$wsdir"
     # Readable group gets drwxr-s---
     assert_output --partial "drwxr-s---"
@@ -376,7 +376,7 @@ setup() {
     sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 EXPIRER-DASH 5
     run sudo --preserve-env=ASAN_OPTIONS $WS_EXPIRER -F ws1
     assert_success
-    assert_output --regexp "keeping.*/tmp/ws/ws1/mean-user-name-EXPIRER-DASH"
+    assert_output --regexp "found valid.*mean-user-name-EXPIRER-DASH"
     sudo rm -f /tmp/ws_expirer.log
     sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 EXPIRER-DASH
 }

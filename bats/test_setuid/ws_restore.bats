@@ -51,7 +51,7 @@ setup() {
 
     # Create data
     wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -F ws1 $ws_name)
-    echo "dash restore content" > "$wsdir"/restore_test.txt
+    echo "dash restore content" | sudo -u mean-user-name tee "$wsdir"/restore_test.txt >/dev/null
     assert_file_exists "$wsdir"/restore_test.txt
 
     # Release
@@ -91,7 +91,7 @@ setup() {
     assert_success
 
     wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -F ws1 $ws_name)
-    echo "will be deleted" > "$wsdir"/del_test.txt
+    echo "will be deleted" | sudo -u mean-user-name tee "$wsdir"/del_test.txt >/dev/null
     assert_file_exists "$wsdir"/del_test.txt
 
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 $ws_name
