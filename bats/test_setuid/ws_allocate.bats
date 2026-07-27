@@ -146,7 +146,7 @@ setup() {
     assert_success
     wsdir=$(ws_find WRITEGROUP)
     run stat -c "%A %G" $wsdir
-    assert_output --regexp "drwxr-s---"
+    assert_output --regexp "drwxrws---"
     ws_release WRITEGROUP
 }
 
@@ -157,7 +157,7 @@ setup() {
     run stat -c "%A" $wsdir
     refute_output --regexp "d....w"
 
-    run ws_allocate -G userb WRITEGROUP 10
+    run ws_allocate -G vagrant WRITEGROUP 10
     assert_success
     wsdir=$(ws_find WRITEGROUP)
     run stat -c "%A" $wsdir
@@ -177,7 +177,7 @@ setup() {
 
 @test "ws_allocate writable group can be extended by group member" {
     export WS_ALLOCATE=$(which ws_allocate)
-    sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G userb VEXTEND 10
+    sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G vagrant VEXTEND 10
     run ws_allocate -u vagrant -x VEXTEND 20
     assert_success
     assert_output --partial "extending workspace"

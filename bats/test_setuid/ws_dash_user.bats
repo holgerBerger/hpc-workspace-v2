@@ -35,6 +35,8 @@ setup() {
 }
 
 @test "ws_find dash-username workspace" {
+    export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
     export WS_FIND=$(which ws_find)
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 DASHFIND 5
     assert_success
@@ -51,6 +53,7 @@ setup() {
     export WS_RELEASE=$(which ws_release)
     export WS_RESTORE=$(which ws_restore)
     export WS_LIST=$(which ws_list)
+    export WS_FIND=$(which ws_find)
 
     ws_name=mean-user-dash-restore-$RANDOM
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 $ws_name 5
