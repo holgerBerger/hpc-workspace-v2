@@ -56,7 +56,7 @@ setup() {
     export WS_FIND=$(which ws_find)
 
     ws_name=mean-user-dash-restore-$RANDOM
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 $ws_name 5
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G vagrant -F ws1 $ws_name 5
     assert_success
 
     # Create some data in the workspace
@@ -160,6 +160,7 @@ setup() {
     export WS_RELEASE=$(which ws_release)
     export WS_RESTORE=$(which ws_restore)
     export WS_LIST=$(which ws_list)
+    export WS_FIND=$(which ws_find)
 
     # mean-user-name is in group vagrant (set in rh_create_users.sh)
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G vagrant GROUPWS-GRPPERM 5
@@ -181,6 +182,7 @@ setup() {
     export WS_RELEASE=$(which ws_release)
     export WS_RESTORE=$(which ws_restore)
     export WS_LIST=$(which ws_list)
+    export WS_FIND=$(which ws_find)
 
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -g -- GROUPWS-READABLE 5
     assert_success
@@ -198,6 +200,7 @@ setup() {
     export WS_RELEASE=$(which ws_release)
     export WS_RESTORE=$(which ws_restore)
     export WS_LIST=$(which ws_list)
+    export WS_FIND=$(which ws_find)
 
     # userb is member of usera (set in rh_create_users.sh)
     run sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 -G usera GROUPWS-USERB 5

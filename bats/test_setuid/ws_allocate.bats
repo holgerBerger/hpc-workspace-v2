@@ -178,7 +178,7 @@ setup() {
 @test "ws_allocate writable group can be extended by group member" {
     export WS_ALLOCATE=$(which ws_allocate)
     sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G vagrant VEXTEND 10
-    run ws_allocate -u vagrant -x VEXTEND 20
+    run ws_allocate -u userb -x VEXTEND 20
     assert_success
     assert_output --partial "extending workspace"
     ws_release VEXTEND
