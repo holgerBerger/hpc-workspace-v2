@@ -474,6 +474,7 @@ void DBEntryV1::readFromString(std::string str) {
     } else {
         creation = utils::getFileTimeAsLong(cppfs::path(workspace)); // use filesystem creation time for DB entries lacking the creation time, as V1 does
     }
+    node = dbentry["released"];
     if (node.has_val())
         node >> released;
     else
