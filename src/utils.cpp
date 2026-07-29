@@ -675,7 +675,11 @@ int mv(const char* source, const char* target) {
 
 // helper to get a file time as a long long integer, representing the number of seconds since Unix epoch
 long getFileTimeAsLong(const fs::path& p) {
-    auto ftime = fs::last_write_time(p);
+    std::error_code ec;
+    auto ftime = fs::last_write_time(p, ec);
+    if (ec) {
+        return 0;
+    }
 
     // Convert file_clock to system_clock to align with Unix epoch if needed
     auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
