@@ -402,8 +402,9 @@ void DBEntryV1::readFromString(std::string str) {
     workspace = dbentry["workspace"] ? dbentry["workspace"].as<string>() : "";
     if (dbentry["creation"]) {
         creation = dbentry["creation"].as<long>();
-    }else{
-        creation = utils::getFileTimeAsLong(cppfs::path(workspace)); // use filesystem creation time for DB entries lacking the creation time, as V1 does
+    } else {
+        creation = utils::getFileTimeAsLong(cppfs::path(
+            workspace)); // use filesystem creation time for DB entries lacking the creation time, as V1 does
     }
     released = dbentry["released"] ? dbentry["released"].as<long>() : 0;
     expiration = dbentry["expiration"] ? dbentry["expiration"].as<long>() : 0;
@@ -472,7 +473,8 @@ void DBEntryV1::readFromString(std::string str) {
     if (node.has_val()) {
         node >> creation;
     } else {
-        creation = utils::getFileTimeAsLong(cppfs::path(workspace)); // use filesystem creation time for DB entries lacking the creation time, as V1 does
+        creation = utils::getFileTimeAsLong(cppfs::path(
+            workspace)); // use filesystem creation time for DB entries lacking the creation time, as V1 does
     }
     node = dbentry["released"];
     if (node.has_val())
@@ -824,3 +826,13 @@ void DBEntryV1::writeEntry() {
 
 // return config of parent DB
 const Config* DBEntryV1::getConfig() const { return parent_db->getconfig(); }
+
+namespace utils {
+std::string getDBYamlReader() {
+#ifdef WS_RAPIDYAML_DB
+    return "RapidYAML";
+#else
+    return "yaml-cpp";
+#endif
+}
+} // namespace utils

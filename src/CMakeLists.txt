@@ -51,6 +51,15 @@ else()
     set(GSL_TARGET Microsoft.GSL::GSL CACHE STRING "" FORCE)
 endif()
 
+if(NOT BUILD_WITH_VCPKG)
+    target_include_directories(ws_common PUBLIC ${thread_pool_SOURCE_DIR}/include)
+else()
+    find_path(BSHOSHANY_THREAD_POOL_INCLUDE_DIR NAMES BS_thread_pool.hpp)
+    if(BSHOSHANY_THREAD_POOL_INCLUDE_DIR)
+        target_include_directories(ws_common PUBLIC ${BSHOSHANY_THREAD_POOL_INCLUDE_DIR})
+    endif()
+endif()
+
 target_link_libraries(ws_common
     PUBLIC
         fmt::fmt
