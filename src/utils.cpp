@@ -29,6 +29,7 @@
  */
 
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -45,7 +46,6 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <vector>
-#include <chrono>
 
 #include "user.h"
 #include "ws.h"
@@ -679,8 +679,7 @@ long getFileTimeAsLong(const fs::path& p) {
 
     // Convert file_clock to system_clock to align with Unix epoch if needed
     auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-        ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
-    );
+        ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
 
     // Extract duration as a long long integer (e.g., seconds or milliseconds)
     auto duration = sctp.time_since_epoch();

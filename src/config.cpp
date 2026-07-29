@@ -71,7 +71,7 @@ Config::Config(const std::vector<cppfs::path> configpathes) {
     global.durationdefault = 30;
     global.reminderdefault = 0;
     global.maxuserworkspaces = 0;
-    global.deldirtimeout = 300;  // 5 minutes should be enough to delete most workspaces
+    global.deldirtimeout = 300; // 5 minutes should be enough to delete most workspaces
 
     bool filefound = false;
 
