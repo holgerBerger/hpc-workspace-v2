@@ -45,6 +45,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <vector>
+#include <chrono>
 
 #include "user.h"
 #include "ws.h"
@@ -670,6 +671,20 @@ int mv(const char* source, const char* target) {
         return WEXITSTATUS(status);
     }
     return 0;
+}
+
+// helper to get a file time as a long long integer, representing the number of seconds since Unix epoch
+long getFileTimeAsLong(const fs::path& p) {
+    auto ftime = fs::last_write_time(p);
+
+    // Convert file_clock to system_clock to align with Unix epoch if needed
+    auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+        ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
+    );
+
+    // Extract duration as a long long integer (e.g., seconds or milliseconds)
+    auto duration = sctp.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::seconds>(duration).count();
 }
 
 } // end of namespace utils

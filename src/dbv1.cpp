@@ -398,13 +398,16 @@ void DBEntryV1::readFromString(std::string str) {
     }
 
     dbversion = dbentry["dbversion"] ? dbentry["dbversion"].as<int>() : 0; // 0 = legacy
-    creation = dbentry["creation"] ? dbentry["creation"].as<long>()
-                                   : 0; // FIXME: c++ tool does not write this field, but takes from stat
+    workspace = dbentry["workspace"] ? dbentry["workspace"].as<string>() : "";
+    if (dbentry["creation"]) {
+        creation = dbentry["creation"].as<long>();
+    }else{
+        creation = utils::getFileTimeAsLong(cppfs::path(workspace)); // use filesystem creation time for DB entries lacking the creation time, as V1 does
+    }
     released = dbentry["released"] ? dbentry["released"].as<long>() : 0;
     expiration = dbentry["expiration"] ? dbentry["expiration"].as<long>() : 0;
     expired = dbentry["expired"] ? dbentry["expired"].as<long>() : 0;
     reminder = dbentry["reminder"] ? dbentry["reminder"].as<long>() : 0;
-    workspace = dbentry["workspace"] ? dbentry["workspace"].as<string>() : "";
     extensions = dbentry["extensions"] ? dbentry["extensions"].as<int>() : 0;
     mailaddress = dbentry["mailaddress"] ? dbentry["mailaddress"].as<string>() : "";
     comment = dbentry["comment"] ? dbentry["comment"].as<string>() : "";
@@ -458,12 +461,17 @@ void DBEntryV1::readFromString(std::string str) {
         node >> dbversion;
     else
         dbversion = 0; // 0 = legacy
-    node = dbentry["creation"];
-    if (node.has_val())
-        node >> creation;
+    node = dbentry["workspace"];
+    if (node.has_val() && node.val() != "")
+        node >> workspace;
     else
-        creation = 0; // FIXME: c++ tool does not write this field, but takes from stat
-    node = dbentry["released"];
+        workspace = "";
+    node = dbentry["creation"];
+    if (node.has_val()) {
+        node >> creation;
+    } else {
+        creation = utils::getFileTimeAsLong(cppfs::path(workspace)); // use filesystem creation time for DB entries lacking the creation time, as V1 does
+    }
     if (node.has_val())
         node >> released;
     else
@@ -483,11 +491,6 @@ void DBEntryV1::readFromString(std::string str) {
         node >> reminder;
     else
         reminder = 0;
-    node = dbentry["workspace"];
-    if (node.has_val() && node.val() != "")
-        node >> workspace;
-    else
-        workspace = "";
     node = dbentry["extensions"];
     if (node.has_val())
         node >> extensions;

@@ -165,6 +165,9 @@ std::string permstring(std::filesystem::perms p);
 // move a file/directory to another location using /bin/mv, fallback for rename EXDEV
 int mv(const char* source, const char* target);
 
+// helper to get a file time as a long long integer, representing the number of seconds since Unix epoch
+long getFileTimeAsLong(const std::filesystem::path& p);
+
 } // namespace utils
 
 #endif
