@@ -68,6 +68,7 @@ class DBEntryV1 : public DBEntry {
     string group;       // group for whom it is visible
     string mailaddress; // address for reminder email
     string comment;     // some user defined comment
+    string acctcode;    // account code for billing, for v1 compatibility only
     string dbfilepath;  // if read from DB, this is the location to write to
 
   public:

@@ -416,6 +416,7 @@ void DBEntryV1::readFromString(std::string str) {
         groupflag = true;
     else
         groupflag = false;
+    acctcode = dbentry["acctcode"] ? dbentry["acctcode"].as<string>() : "";
 }
 
 #else
@@ -514,6 +515,11 @@ void DBEntryV1::readFromString(std::string str) {
         groupflag = false;
         group = "";
     }
+    node = dbentry["acctcode"];
+    if (node.has_val() && node.val() != "")
+        node >> acctcode;
+    else
+        acctcode = "";
 }
 
 #endif
@@ -707,7 +713,6 @@ void DBEntryV1::writeEntry() {
         entry["expired"] = expired;
     }
     entry["extensions"] = extensions;
-    entry["acctcode"] = "";
     entry["reminder"] = reminder;
     entry["mailaddress"] = mailaddress;
     if (groupflag && group.length() > 0) {
@@ -717,6 +722,7 @@ void DBEntryV1::writeEntry() {
         entry["released"] = released;
     }
     entry["comment"] = comment;
+    entry["acctcode"] = acctcode;
 #else
     ryml::Tree tree;
     ryml::NodeRef root = tree.rootref();
@@ -728,7 +734,7 @@ void DBEntryV1::writeEntry() {
         root["expired"] << expired;
     }
     root["extensions"] << extensions;
-    root["acctcode"] << "";
+    root["acctcode"] << acctcode;
     root["reminder"] << reminder;
     root["mailaddress"] << mailaddress;
     if (groupflag && group.length() > 0) {
