@@ -26,7 +26,7 @@ echo "vcpkg is ready."
 echo ""
 echo "Available build presets (vcpkg):"
 echo ""
-echo  "vcpkg-debug"          - Debug (vcpkg)
-echo  "vcpkg-debug-ninja"    - Debug (vcpkg, Ninja)
-echo  "vcpkg-release"        - Release (vcpkg)
-echo  "vcpkg-release-ninja"  - Release (vcpkg, Ninja)
+echo  "vcpkg-debug          - Debug (vcpkg)"
+echo  "vcpkg-debug-ninja    - Debug (vcpkg, Ninja)"
+echo  "vcpkg-release        - Release (vcpkg)"
+echo  "vcpkg-release-ninja  - Release (vcpkg, Ninja)"
