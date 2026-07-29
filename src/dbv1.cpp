@@ -344,6 +344,7 @@ DBEntryV1::DBEntryV1(FilesystemDBV1* pdb, const WsID _id, const string _workspac
     // init extra internals here to avoid problems in release builds
     released = 0;
     expired = 0;
+    acctcode = "";
 }
 
 // read db entry from yaml file
