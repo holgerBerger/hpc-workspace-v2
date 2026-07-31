@@ -166,7 +166,7 @@ std::string permstring(std::filesystem::perms p);
 int mv(const char* source, const char* target);
 
 // helper to get a file time as a long long integer, representing the number of seconds since Unix epoch
-long getFileTimeAsLong(const std::filesystem::path& p);
+long long getFileTimeAsLong(const std::filesystem::path& p);
 
 // get which yaml reader is used in DB
 std::string getDBYamlReader();

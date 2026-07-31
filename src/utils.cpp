@@ -674,10 +674,12 @@ int mv(const char* source, const char* target) {
 }
 
 // helper to get a file time as a long long integer, representing the number of seconds since Unix epoch
-long getFileTimeAsLong(const fs::path& p) {
+long long getFileTimeAsLong(const fs::path& p) {
     std::error_code ec;
     auto ftime = fs::last_write_time(p, ec);
     if (ec) {
+        spdlog::error("Failed to get write time for '{}': {} ({})",
+            p.string(), ec.message(), ec.value());
         return 0;
     }
 
