@@ -52,6 +52,8 @@ setup() {
 @test "ws_release group workspace by non-group-member fails" {
     # vagrant creates a private workspace for usera group
     export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
+
     vagrant_dir=$(sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 -G vagrant GRP-WS-PERM 5)
 
     # userb tries to release - should fail because it's vagrant's workspace

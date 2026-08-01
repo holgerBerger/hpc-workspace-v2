@@ -51,7 +51,7 @@ setup() {
 @test "ws_restore dash-username workspace" {
     export WS_ALLOCATE=$(which ws_allocate)
     export WS_RELEASE=$(which ws_release)
-    export WS_RESTORE=$(which ws_restore)
+    export WS_RESTORE=$(which ws_restore_notest)
     export WS_LIST=$(which ws_list)
     export WS_FIND=$(which ws_find)
 
@@ -72,24 +72,25 @@ setup() {
     assert_file_not_exist "$wsdir"
 
     # Find restored entry
-    wsid=$($WS_RESTORE -F ws1 -l | grep "$ws_name" | head -1)
-    assert [ -n "$wsid" ]
+    wsid=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RESTORE -F ws1 -l | grep "$ws_name" | head -1)
+    [ -n "$wsid" ]
 
     # Recreate workspace to restore into
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 $ws_name 5
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G vagrant -F ws1 RESTORE_TARGET 5
     assert_success
 
     # Restore the data
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RESTORE -F ws1 $wsid $ws_name
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RESTORE --debug --trace -F ws1 $wsid RESTORE_TARGET
     assert_success
 
     # Verify data was restored
+    wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -F ws1 RESTORE_TARGET)
     assert_file_exists "$wsdir/$wsid"/testfile.txt
     run cat "$wsdir/$wsid"/testfile.txt
     assert_output "dash-user data"
 
     # Clean up
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 $ws_name
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 RESTORE_TARGET
 }
 
 @test "ws_restore list dash-username works with pattern" {
@@ -167,14 +168,14 @@ setup() {
     assert_success
 
     # Verify group ownership and sticky bit via stat
-    wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -u mean-user-name -g -F ws1 GROUPWS-GRPPERM)
+    wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -g GROUPWS-GRPPERM)
     run stat -c "%A %G" "$wsdir"
-    assert_output --regexp "drwxr-s--- vagrant"
+    assert_output --regexp "drwxrws--- vagrant"
 
     # workspace should be in group workspace directory
     assert_dir_exists "$wsdir"
 
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 GROUPWS-GRPPERM
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE GROUPWS-GRPPERM
 }
 
 @test "ws_allocate readable group workspace by mean-user-name" {
@@ -187,12 +188,12 @@ setup() {
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -g -- GROUPWS-READABLE 5
     assert_success
 
-    wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -u mean-user-name -g -F ws1 GROUPWS-READABLE)
+    wsdir=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_FIND -u mean-user-name -g GROUPWS-READABLE)
     run stat -c "%A %G" "$wsdir"
     # Readable group gets drwxr-s---
     assert_output --partial "drwxr-s---"
 
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 GROUPWS-READABLE
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE GROUPWS-READABLE
 }
 
 @test "ws_allocate writable group by userb to usera group" {

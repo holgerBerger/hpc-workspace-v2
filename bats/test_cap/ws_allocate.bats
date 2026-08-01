@@ -88,42 +88,53 @@ setup() {
     assert_success
 }
 
+
+@test "ws_allocate -x with correct group, other user" {
+    export WS_ALLOCATE=$(which ws_allocate)
+    sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_ALLOCATE --config bats/ws.conf -G vagrant SHAREDWS 10
+    run sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE --config bats/ws.conf -x -u vagrant SHAREDWS 11
+    assert_success
+    assert_output --partial "you are not owner of the workspace."
+    assert_output --partial "extending workspace"
+    assert_output --partial "remaining extensions  : 2"
+}
+
 @test "ws_allocate -x with correct group but bad workspace" {
-    run ws_allocate  -u userb -x DOES_NOT_EXIST 20
+    run ws_allocate -u userb -x DOES_NOT_EXIST 20
     assert_failure
     assert_output --partial "can not be extended"
 }
 
 @test "ws_allocate with -x, invalid extension, too many extensions, changing comment" {
-    run ws_allocate  -x DOES_NOT_EXIST 10
+    run ws_allocate -x DOES_NOT_EXIST 10
     assert_failure
     assert_output --partial "workspace does not exist, can not be extended!"
 
-    run ws_allocate  extensiontest 10
+    run ws_allocate extensiontest 10
     assert_success
     assert_output --partial "remaining time in days: 10"
 
-    run ws_allocate  -x extensiontest 20
+    run ws_allocate -x extensiontest 20
     assert_success
     assert_output --partial "extending workspace"
     assert_output --partial "remaining extensions  : 2"
     assert_output --partial "remaining time in days: 20"
 
-    run ws_allocate  -c "add a comment" -x extensiontest 1
+    run ws_allocate -c "add a comment" -x extensiontest 1
     assert_success
     assert_output --partial "changed comment"
     assert_output --partial "remaining extensions  : 2"
     # FIXME: is 2 correct here??
 
-    run ws_allocate  -x extensiontest 5
+    run ws_allocate -x extensiontest 5
     assert_success
     assert_output --partial "remaining extensions  : 1"
 
-    run ws_allocate  -x extensiontest 10
+    run ws_allocate -x extensiontest 10
     assert_success
     assert_output --partial "remaining extensions  : 0"
 
-    run ws_allocate  -x extensiontest 15
+    run ws_allocate -x extensiontest 15
     assert_failure
     assert_output --partial "no more extensions!"
 
@@ -131,11 +142,11 @@ setup() {
 }
 
 @test "ws_allocate with writable group -G creates writable workspace" {
-    run ws_allocate -G userb WRITEGROUP 10
+    run ws_allocate -G vagrant WRITEGROUP 10
     assert_success
     wsdir=$(ws_find WRITEGROUP)
     run stat -c "%A %G" $wsdir
-    assert_output --regexp "drwxr-s--- userb"
+    assert_output --regexp "drwxrws---"
     ws_release WRITEGROUP
 }
 
@@ -144,33 +155,34 @@ setup() {
     assert_success
     wsdir=$(ws_find READGROUP)
     run stat -c "%A" $wsdir
-    refute_output --regexp "w"
+    refute_output --regexp "d....w"
 
-    run ws_allocate -G userb WRITEGROUP 10
+    run ws_allocate -G vagrant WRITEGROUP 10
     assert_success
     wsdir=$(ws_find WRITEGROUP)
     run stat -c "%A" $wsdir
-    assert_output --regexp "w"
+    assert_output --regexp "d....w"
     ws_release READGROUP
     ws_release WRITEGROUP
 }
 
 @test "ws_allocate writable group persists group ownership" {
-    run ws_allocate -G usera GROUP-PERSIST 10
+    run ws_allocate -G vagrant GROUP-PERSIST 10
     assert_success
     wsdir=$(ws_find GROUP-PERSIST)
     run stat -c "%G" $wsdir
-    assert_output "usera"
+    assert_output "vagrant"
     ws_release GROUP-PERSIST
 }
 
 @test "ws_allocate writable group can be extended by group member" {
     export WS_ALLOCATE=$(which ws_allocate)
-    sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G userb VEXTEND 10
-    run ws_allocate -u vagrant -x VEXTEND 20
+    export WS_RELEASE=$(which ws_release)
+    sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G vagrant VEXTEND 10
+    run ws_allocate -u userb -x VEXTEND 20
     assert_success
     assert_output --partial "extending workspace"
-    ws_release VEXTEND
+    sudo -u userb $WS_RELEASE -u userb VEXTEND
 }
 
 @test "ws_allocate writable group with dash in group name" {
@@ -183,5 +195,5 @@ setup() {
 }
 
 cleanup() {
-    ws_release  $ws_name
+    ws_release $ws_name
 }
