@@ -201,8 +201,11 @@ void restore(const string name, const string target, const string username, cons
     auto grouplist = user::getGrouplist();
 
     // split the name in username, name and timestamp
-    auto pos = name.find("-");
-    auto id_noowner = name.substr(pos + 1);
+    // remove the username prefix to get id_noowner
+    string id_noowner = name;
+    if (name.compare(0, username.length(), username) == 0 && name.length() > username.length() && name[username.length()] == '-') {
+        id_noowner = name.substr(username.length() + 1);
+    }
 
     // where to search for?
     vector<string> fslist;
