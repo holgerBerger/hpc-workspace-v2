@@ -315,7 +315,6 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             }
 
             // remove the directory
-            std::error_code ec;
             if (debugflag) {
                 spdlog::debug("rmtree_below({})", src);
             }
@@ -329,7 +328,7 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             }
             caps.lower_cap({CAP_FOWNER}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
 
-	    caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
+            caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
             // to be allowed to delete the toplevel, we need to be DB user
             if (caps.isSetuid()) {
