@@ -91,8 +91,8 @@ setup() {
 
 @test "ws_allocate -x with correct group, other user" {
     export WS_ALLOCATE=$(which ws_allocate)
-    sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_ALLOCATE --config bats/ws.conf -G vagrant SHAREDWS 10
-    run sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE --config bats/ws.conf -x -u vagrant SHAREDWS 11
+    sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_ALLOCATE --config bats/ws.conf -G vagrant SHAREDWSCAP 10
+    run sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE --config bats/ws.conf -x -u vagrant SHAREDWSCAP 11
     assert_success
     assert_output --partial "you are not owner of the workspace."
     assert_output --partial "extending workspace"

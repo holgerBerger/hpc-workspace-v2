@@ -64,7 +64,7 @@ setup() {
     assert_success
 
     # Data should be gone from deleted directory
-    refute_file_exists "$(dirname "$wsdir")/.removed/$wsid/del_test.txt"
+    assert_dir_not_exist "$(dirname "$wsdir")/.removed/$wsid/del_test.txt"
 
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 $ws_name 2>/dev/null || true
 }
