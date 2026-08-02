@@ -28,7 +28,7 @@ setup() {
         sudo rm -f /tmp/ws_expirer.log 2>/dev/null
         export WS_EXPIRER=$(which ws_expirer)
         run sudo --preserve-env=ASAN_OPTIONS $WS_EXPIRER -F ws1
-        assert_output --regexp "keeping.*mean-user-name-TEST_MEAN"
+        assert_output --regexp "keeping .*mean-user-name-TEST_MEAN"
         assert_success
-        sudo rm /tmp/ws_expirer.log
+        sudo rm -f /tmp/ws_expirer.log
 }

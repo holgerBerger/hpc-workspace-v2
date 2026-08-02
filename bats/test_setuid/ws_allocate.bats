@@ -141,6 +141,59 @@ setup() {
     ws_release extensiontest
 }
 
+@test "ws_allocate with writable group -G creates writable workspace" {
+    run ws_allocate -G vagrant WRITEGROUP 10
+    assert_success
+    wsdir=$(ws_find WRITEGROUP)
+    run stat -c "%A %G" $wsdir
+    assert_output --regexp "drwxrws---"
+    ws_release WRITEGROUP
+}
+
+@test "ws_allocate readable -g vs writable -G produce different permissions" {
+    run ws_allocate -g -- READGROUP 10
+    assert_success
+    wsdir=$(ws_find READGROUP)
+    run stat -c "%A" $wsdir
+    refute_output --regexp "d....w"
+
+    run ws_allocate -G vagrant WRITEGROUP 10
+    assert_success
+    wsdir=$(ws_find WRITEGROUP)
+    run stat -c "%A" $wsdir
+    assert_output --regexp "d....w"
+    ws_release READGROUP
+    ws_release WRITEGROUP
+}
+
+@test "ws_allocate writable group persists group ownership" {
+    run ws_allocate -G vagrant GROUP-PERSIST 10
+    assert_success
+    wsdir=$(ws_find GROUP-PERSIST)
+    run stat -c "%G" $wsdir
+    assert_output "vagrant"
+    ws_release GROUP-PERSIST
+}
+
+@test "ws_allocate writable group can be extended by group member" {
+    export WS_ALLOCATE=$(which ws_allocate)
+    export WS_RELEASE=$(which ws_release)
+    sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G vagrant VEXTEND 10
+    run ws_allocate -u userb -x VEXTEND 20
+    assert_success
+    assert_output --partial "extending workspace"
+    sudo -u userb $WS_RELEASE -u userb VEXTEND
+}
+
+@test "ws_allocate writable group with dash in group name" {
+    run ws_allocate -G vagrant DASH-GROUP 10
+    assert_success
+    wsdir=$(ws_find DASH-GROUP)
+    run stat -c "%G" $wsdir
+    assert_output "vagrant"
+    ws_release DASH-GROUP
+}
+
 cleanup() {
     ws_release $ws_name
 }

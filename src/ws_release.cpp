@@ -314,7 +314,6 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             }
 
             // remove the directory
-            std::error_code ec;
             if (debugflag) {
                 spdlog::debug("rmtree_below({})", src);
             }
