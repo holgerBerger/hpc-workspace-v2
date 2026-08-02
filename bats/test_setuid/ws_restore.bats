@@ -56,7 +56,7 @@ setup() {
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 $ws_name
     assert_success
 
-    wsid=$($WS_RESTORE -F ws1 -l | grep "$ws_name" | head -1)
+    wsid=$(sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RESTORE -F ws1 -l | grep "$ws_name" | head -1)
     [ -n "$wsid" ]
 
     # Delete data via restore
