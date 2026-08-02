@@ -86,6 +86,7 @@ class DBEntry {
     virtual string getFilesystem() const = 0;
     virtual long getReminder() const = 0;
     virtual string getGroup() const = 0;
+    virtual void setGroup(const string& group) = 0;
 
     // get config of parent DB
     virtual const Config* getConfig() const = 0;

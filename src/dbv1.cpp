@@ -584,6 +584,8 @@ long DBEntryV1::getReminder() const { return reminder; }
 
 string DBEntryV1::getGroup() const { return group; }
 
+void DBEntryV1::setGroup(const string& g) { group = g; groupflag = !g.empty(); }
+
 // change expiration time
 void DBEntryV1::setExpiration(const time_t timestamp) { expiration = timestamp; }
 

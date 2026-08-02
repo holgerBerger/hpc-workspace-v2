@@ -72,6 +72,7 @@ Config::Config(const std::vector<cppfs::path> configpathes) {
     global.reminderdefault = 0;
     global.maxuserworkspaces = 0;
     global.deldirtimeout = 300; // 5 minutes should be enough to delete most workspaces
+    global.restorenosub = false;
 
     bool filefound = false;
 
@@ -216,6 +217,7 @@ void Config::readYAML(string yamlstr) {
     readRyamlScalar(config, "maxextensions", global.maxextensions);
     readRyamlScalar(config, "dbuid", global.dbuid);
     readRyamlScalar(config, "dbgid", global.dbgid);
+    readRyamlScalar(config, "restorenosub", global.restorenosub);
 
     readRyamlSequence(config, "deldirtimeout", global.deldirtimeout);
     readRyamlSequence(config, "expirerlogpath", global.expirerlogpath);
@@ -339,6 +341,8 @@ void Config::readYAML(const string yaml) {
         global.expirerlogpath = config["expirerlogpath"].as<string>();
     if (config["maxuserworkspaces"])
         global.maxuserworkspaces = config["maxuserworkspaces"].as<int>();
+    if (config["restorenosub"])
+        global.restorenosub = config["restorenosub"].as<bool>();
 
     // SPEC:CHANGE accept filesystem as alias for workspaces to better match the -F option of the tools
     if (config["workspaces"] || config["filesystems"]) {
