@@ -44,7 +44,7 @@ including internals.
 - `ws_release` does not keep the workspace for `keeptime` but for a `releasekeeptime`, only expired workspace are kept `keeptime`
 - `ws_release` bails out if workspace name is not unique
 - `ws_allocate -x` bails out if workspace name is not unique
-- `ws_allocate -g` can take an groupname as well, -G can have no groupname
+- `ws_allocate -g` and `ws_allocate -G` have a optional groupname argument, command line parser requires `--` after the option is not is given
 - all group workspaces have group sticky bit
 - lua callout for path building is no longer supported, allocation options should fully replace its functionality
 - user needs access to default workspace (was giving a warning in v1 for some years already)
@@ -61,4 +61,5 @@ including internals.
 - compile-time and runtime detection of capability/setuid/usermode privilege handling
 - dependencies to `Catch2`, `curl`, `{fmt}`, `GSL`, `yaml-cpp`, `rapidyaml`, `spdlog`, `bshoshany/thread-pool`
 - `curl` and `boost` have to be installed from distribution, all others are compiled as part of building hpc-workspace-v2
-- Docker and Vagrant (Rocky Linux 8/9) based testing infrastructure
+- this can be avoided using `vcpkg` build which builds all dependencies from source
+- Docker and Vagrant (Rocky Linux 8/9, Almalinux 10) based testing infrastructure
