@@ -306,20 +306,10 @@ void restore(const string name, const string target, const string username, cons
         }
 
         // remove the directory
-        std::error_code ec;
         if (debugflag) {
-            spdlog::debug("remove_all({})", cppfs::path(wssourcename).string());
+            spdlog::debug("remove_below({})", cppfs::path(wssourcename).string());
         }
-
-        utils::rmtree(wssourcename);
-
-        /*
-        cppfs::remove_all(cppfs::path(wssourcename), ec); // we ignore return wert as we expect an error return anyhow
-
-        if (ec.value() != 0) {
-            spdlog::error("unexpected error {}", ec.message());
-        }
-        */
+        utils::rmtree_below(wssourcename);
 
         if (caps.isSetuid()) {
             // get root so we can drop again
@@ -329,14 +319,29 @@ void restore(const string name, const string target, const string username, cons
         }
         caps.lower_cap({CAP_FOWNER}, source_entry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
 
+        caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
+
         // FIXME: move this to deleteEntry?
         if (caps.isSetuid()) {
             // get db user to be able to unlink db entry from root_squash filesystems
             if (setegid(config.dbgid()) || seteuid(config.dbuid())) {
                 spdlog::error("can not seteuid or setgid. Bad installation?");
-                exit(-1);
             }
         }
+        // delete toplevel, not recursively, as we are not allowed to delete/look inside
+        try {
+            cppfs::remove(wssourcename);
+        } catch (const std::exception& e) {
+            spdlog::error("remove {} -> {}", wssourcename, e.what());
+        }
+
+        if (caps.isSetuid()) {
+            // get root so we can drop again
+            if (seteuid(0)) {
+                spdlog::error("can not setuid, bad installation?");
+            }
+        }
+        caps.lower_cap({CAP_DAC_OVERRIDE}, source_entry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
 
         // remove DB entry
         try {
