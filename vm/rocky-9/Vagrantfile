@@ -82,6 +82,9 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
     sudo timedatectl set-timezone Europe/Berlin
 
+    # fetch first, so we have the scripts
+    sudo -u vagrant bash -c 'cd /home/vagrant; git clone https://github.com/holgerBerger/hpc-workspace-v2; cd hpc-workspace-v2; git pull'
+
     /home/vagrant/hpc-workspace-v2/vm/scripts/rh_create_users.sh
 
     sudo dnf config-manager --enable crb
