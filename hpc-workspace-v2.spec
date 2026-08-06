@@ -22,7 +22,8 @@ A workspace is a directory created on behalf of a user, associated with an expir
 
 %prep
 %autosetup -n %{name}-%{version}
-
+# Unset the Link Time Optimization Flags (RHEL9)
+%global _lto_cflags %{nil} 
 
 %build
 
