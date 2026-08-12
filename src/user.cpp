@@ -126,7 +126,8 @@ std::vector<std::string> getUserGroupList(const std::string& username) {
     // Get user information by username
     pw = getpwnam(username.c_str());
     if (pw == nullptr) {
-        spdlog::warn("user {} not found.", username);
+        if (debugflag && debuglevel > 0)
+            spdlog::debug("user {} not found.", username);
         return groupList; // Return empty vector
     }
 

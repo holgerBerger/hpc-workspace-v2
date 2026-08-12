@@ -9,12 +9,8 @@ endif()
 
 find_package(Threads REQUIRED)
 
-# Check for C++17 thread support
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++17" COMPILER_SUPPORTS_CXX17)
-if(NOT COMPILER_SUPPORTS_CXX17)
-    message(FATAL_ERROR "Compiler does not support C++17")
-endif()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_library(ws_common
     build_info.h
@@ -53,6 +49,15 @@ if(BUILD_WITH_VCPKG)
     set(GSL_TARGET "" CACHE STRING "" FORCE)
 else()
     set(GSL_TARGET Microsoft.GSL::GSL CACHE STRING "" FORCE)
+endif()
+
+if(NOT BUILD_WITH_VCPKG)
+    target_include_directories(ws_common PUBLIC ${thread_pool_SOURCE_DIR}/include)
+else()
+    find_path(BSHOSHANY_THREAD_POOL_INCLUDE_DIR NAMES BS_thread_pool.hpp)
+    if(BSHOSHANY_THREAD_POOL_INCLUDE_DIR)
+        target_include_directories(ws_common PUBLIC ${BSHOSHANY_THREAD_POOL_INCLUDE_DIR})
+    endif()
 endif()
 
 target_link_libraries(ws_common
@@ -156,7 +161,7 @@ add_custom_command(
  TARGET ws_restore
  POST_BUILD
  COMMAND cp ${CMAKE_BINARY_DIR}/bin/ws_restore ${CMAKE_BINARY_DIR}/bin/ws_restore_notest
- COMMENT "cp ${CMAKE_BINARY_DIR}/ws_restore ${CMAKE_BINARY_DIR}/ws_restore_notest"
+ COMMENT "cp ${CMAKE_BINARY_DIR}/bin/ws_restore ${CMAKE_BINARY_DIR}/bin/ws_restore_notest"
 )
 
 add_executable(ws_prepare

@@ -63,6 +63,7 @@ struct Global_config {
     int dbgid;               // gid of DB user
     int deldirtimeout;       // timeout for directory deletion in seconds
     string expirerlogpath;   // path where ws_expirer should place logfiles
+    bool restorenosub;       // if true, restore will not create subdirectories for workspaces
 };
 
 // config of filesystem
@@ -151,6 +152,7 @@ class Config {
     vector<string> adminmail() const { return global.adminmail; };
     string expirerlogpath() const { return global.expirerlogpath; };
     int maxuserworkspaces() const { return global.maxuserworkspaces; };
+    bool restorenosub() const { return global.restorenosub; };
 
   private:
     // read config from YAML string

@@ -29,7 +29,8 @@ SCR=$(ws_allocate MyData 10)
 cd $SCR
 ```
 
-This will set you into a temporary directory that will last 10 days.
+This will set you into a temporary directory that will last 10 days, it is created
+the first time you use it like this, the 10 day argument is ignored when it is reused.
 
 You can check which **workspaces** you have using
 
@@ -59,7 +60,7 @@ filesystems.
 
 - [Admin Guide](documentation/admin-guide.md) - Installation, configuration, and administration
 - [User Guide](documentation/user-guide.md) - End-user documentation for all workspace commands
-- [What's New in v2](documenation/whats-new.md) - Overview of changes compared to v1
+- [What's New in v2](documentation/whats-new.md) - Overview of changes compared to v1
 
 ## Motivation/Goals for a V2
 
@@ -189,7 +190,7 @@ cmake --preset debug-ninja -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=mold"
 cmake --build --preset debug -j 
 ```
 
-for lld users (also fast, but slower than mold:
+for lld users (also fast, but slower than mold):
 ```
 cmake --preset debug -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
 cmake --build --preset debug -j 12
@@ -302,15 +303,16 @@ C++ language level requirement might evolve from c++17 to c++20 if there is reas
 - [x] bash completion
 - [x] Cmake fetch for Dependencies
 - [x] installation through CMake.
+- [x] manpage ws_validate_config, ws_prepare
 - [x] RPM spec file for package builds
-- [-] Add package manager like vcpkg or conan?
-- [ ] do real live tests (general behaviour, expirer and ws_stat) and fix bugs on systems with
-    - [ ] capabilities
-    - [ ] setuid
-    - [ ] root_squash
+- [x] Add package manager like vcpkg or conan?
+- [x] do real live tests (general behaviour, expirer and ws_stat) and fix bugs on systems with
+    - [x] capabilities
+    - [x] setuid
+    - [x] root_squash
 - [ ] review what gets logged for security reasons, should not leak details of other workspaces
 - [ ] bash completion testing
-- [x] manpage ws_validate_config, ws_prepare
+
 
 ### Future Development
 - [ ] define and implement new DB format

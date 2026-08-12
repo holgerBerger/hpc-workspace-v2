@@ -368,6 +368,11 @@ The maximum number of workspaces a user can create in total across all filesyste
 This is to prevent e.g. endless creation of workspaces by malformed loops.
 If this is 0, it is ignored.
 
+### `restorenosub`
+
+If set to `true`, the restore operation will not create a subdirectory for the workspace, but will instead move the data directly into the target directory.
+Default is `false`.
+
 ### Filesystem specific options
 
 In the config entry `filesystems` (alias `workspaces` for v1 compatibility), multiple workspace location entries may be

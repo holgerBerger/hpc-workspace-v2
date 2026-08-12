@@ -74,7 +74,7 @@ bool isValidEmail(const std::string& email);
 std::string getFirstLine(const std::string& multilineString);
 
 // getID returns id part of workspace id <username-id>
-std::string getID(const std::string username, const std::string wsid);
+std::string getID(const std::string wsid);
 
 // check if person behind tty is human
 // bool ruh();
@@ -96,7 +96,7 @@ void rmtree(std::string path, const std::time_t deadline);
 void rmtree(std::string path);
 
 // delete a directorys contents, but not the directory itself
-void rmtree_below(std::string path) ;
+void rmtree_below(std::string path);
 
 // split a string at delimiter and return vector
 std::vector<std::string> splitString(const std::string& str, char delimiter);
@@ -164,6 +164,12 @@ std::string permstring(std::filesystem::perms p);
 
 // move a file/directory to another location using /bin/mv, fallback for rename EXDEV
 int mv(const char* source, const char* target);
+
+// helper to get a file time as a long long integer, representing the number of seconds since Unix epoch
+long long getFileTimeAsLong(const std::filesystem::path& p);
+
+// get which yaml reader is used in DB
+std::string getDBYamlReader();
 
 } // namespace utils
 

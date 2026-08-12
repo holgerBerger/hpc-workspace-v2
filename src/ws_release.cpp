@@ -298,7 +298,6 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
         }
         // we exit this as DB user on success
 
-
         //
         // second remove data if requested
         //
@@ -315,7 +314,6 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             }
 
             // remove the directory
-            std::error_code ec;
             if (debugflag) {
                 spdlog::debug("rmtree_below({})", src);
             }
@@ -329,7 +327,7 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             }
             caps.lower_cap({CAP_FOWNER}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
 
-	    caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
+            caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
             // to be allowed to delete the toplevel, we need to be DB user
             if (caps.isSetuid()) {
@@ -350,13 +348,13 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
                     spdlog::error("can not setuid, bad installation?");
                 }
             }
-            caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+            caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
+                           utils::SrcPos(__FILE__, __LINE__, __func__));
 
             syslog(LOG_INFO, "delete-data for user <%s> from <%s>.", user::getUsername().c_str(), src.c_str());
 
             // remove DB entry
             dbentry->remove();
-
 
             spdlog::info("workspace {} and data deleted, can not be restored.", name);
 
@@ -372,7 +370,7 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
 
             auto wsconfig = dbentry->getConfig()->getFsConfig(dbentry->getFilesystem());
             cppfs::path target = cppfs::path(dbentry->getWSPath()).parent_path() / cppfs::path(wsconfig.deletedPath) /
-                                cppfs::path(fmt::format("{}-{}", dbentry->getId(), timestamp));
+                                 cppfs::path(fmt::format("{}-{}", dbentry->getId(), timestamp));
 
             caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
@@ -385,14 +383,15 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
                     spdlog::info("cross device rename, falling back to 'mv'");
                     int ret = utils::mv(dbentry->getWSPath().c_str(), target.c_str());
                     caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
-                                utils::SrcPos(__FILE__, __LINE__, __func__));
+                                   utils::SrcPos(__FILE__, __LINE__, __func__));
                     if (ret != 0) {
-                        spdlog::error("workspace directory could not be moved to deleted path via 'mv': {}", strerror(errno));
+                        spdlog::error("workspace directory could not be moved to deleted path via 'mv': {}",
+                                      strerror(errno));
                         return false;
                     }
                 } else {
                     caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
-                                utils::SrcPos(__FILE__, __LINE__, __func__));
+                                   utils::SrcPos(__FILE__, __LINE__, __func__));
                     if (debugflag)
                         spdlog::error("{}", e.what());
                     spdlog::error("workspace directory could not be moved to deleted path!");
@@ -400,7 +399,8 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
                 }
             }
 
-            caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+            caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
+                           utils::SrcPos(__FILE__, __LINE__, __func__));
 
             syslog(LOG_INFO, "release for user <%s> from <%s> to <%s> done.", user::getUsername().c_str(),
                    dbentry->getWSPath().c_str(), target.c_str());
@@ -408,14 +408,11 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             spdlog::info("workspace {} released.", name);
         }
 
-
         if (!deletedata) {
             spdlog::info("workspace is still recoverable as --delete-data was not given.");
         } else {
             spdlog::info("workspace is not recoverable as --delete-data was given.");
         }
-
-
 
         // if ws_exist
     } else {

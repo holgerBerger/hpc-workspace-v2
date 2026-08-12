@@ -29,6 +29,7 @@
  */
 
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -274,15 +275,14 @@ std::string getFirstLine(const std::string& multilineString) {
 }
 
 // getID returns id part of workspace id <username-id>
-// Updated to accept the username explicitly and correctly handle usernames that contain '-'
-std::string getID(const std::string username, const std::string wsid) {
-    const std::string prefix = username + "-";
-    // Verify that wsid actually starts with the expected "username-" prefix
-    if (wsid.rfind(prefix, 0) != 0) {
-        spdlog::error("wsid '{}' does not start with expected username- prefix '{}'", wsid, prefix);
+// Updated to handle wsid format "username-id" where username can contain '-'
+// It returns what is after the last "-" (everything from the right up to the first "-")
+std::string getID(const std::string wsid) {
+    size_t last_dash = wsid.find_last_of('-');
+    if (last_dash == std::string::npos) {
         return "";
     }
-    return wsid.substr(prefix.size());
+    return wsid.substr(last_dash + 1);
 }
 
 /*
@@ -671,6 +671,25 @@ int mv(const char* source, const char* target) {
         return WEXITSTATUS(status);
     }
     return 0;
+}
+
+// helper to get a file time as a long long integer, representing the number of seconds since Unix epoch
+long long getFileTimeAsLong(const fs::path& p) {
+    std::error_code ec;
+    auto ftime = fs::last_write_time(p, ec);
+    if (ec) {
+        spdlog::error("Failed to get write time for '{}': {} ({})",
+            p.string(), ec.message(), ec.value());
+        return 0;
+    }
+
+    // Convert file_clock to system_clock to align with Unix epoch if needed
+    auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+        ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+
+    // Extract duration as a long long integer (e.g., seconds or milliseconds)
+    auto duration = sctp.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::seconds>(duration).count();
 }
 
 } // end of namespace utils

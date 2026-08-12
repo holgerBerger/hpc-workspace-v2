@@ -82,7 +82,7 @@ static string getMaskedID(const DBEntry* entry) {
     if (entry->getConfig()->isAdmin(user::getUsername())) {
         return entry->getId();
     } else {
-        return utils::getID(user::getUsername(), entry->getId());
+        return utils::getID(entry->getId());
     }
 }
 
@@ -290,7 +290,7 @@ int main(int argc, char** argv) {
         ("help,h", "produce help message")
         ("version,V", "show version")
         ("filesystem,F", po::value<string>(&filesystem), "filesystem to list workspaces from")
-        ("groupname,g", "enable listing of group workspaces")
+        ("group,g", "enable listing of group workspaces")
         ("listfilesystems,l", "list available filesystems")
         ("listfilesystemdetails,L", "list available filesystems with details")
         ("short,s", "short listing, only workspace names")

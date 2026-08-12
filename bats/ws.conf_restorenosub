@@ -1,0 +1,25 @@
+admins: [root]
+adminmail: [root@a.com]
+clustername: bats
+dbgid: 2
+dbuid: 2
+duration: 31
+maxextensions: 3
+restorenosub: true
+smtphost: mailhost
+mail_from: root@localhost
+default: ws2
+expirerlogpath: /tmp/ws_expirer.log
+workspaces:
+  ws1:
+    database: /tmp/ws/ws1-db
+    deleted: .removed
+    keeptime: 7
+    spaces: [/tmp/ws/ws1]
+  ws2:
+    comment: "one hell of a comment"
+    database: /tmp/ws/ws2-db
+    deleted: .removed
+    duration: 32
+    keeptime: 7
+    spaces: [/tmp/ws/ws2/1, /tmp/ws/ws2/2]

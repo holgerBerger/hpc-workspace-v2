@@ -344,6 +344,7 @@ DBEntryV1::DBEntryV1(FilesystemDBV1* pdb, const WsID _id, const string _workspac
     // init extra internals here to avoid problems in release builds
     released = 0;
     expired = 0;
+    acctcode = "";
 }
 
 // read db entry from yaml file
@@ -398,13 +399,17 @@ void DBEntryV1::readFromString(std::string str) {
     }
 
     dbversion = dbentry["dbversion"] ? dbentry["dbversion"].as<int>() : 0; // 0 = legacy
-    creation = dbentry["creation"] ? dbentry["creation"].as<long>()
-                                   : 0; // FIXME: c++ tool does not write this field, but takes from stat
+    workspace = dbentry["workspace"] ? dbentry["workspace"].as<string>() : "";
+    if (dbentry["creation"]) {
+        creation = dbentry["creation"].as<long>();
+    } else {
+        creation = utils::getFileTimeAsLong(cppfs::path(
+            workspace)); // use filesystem creation time for DB entries lacking the creation time, as V1 does
+    }
     released = dbentry["released"] ? dbentry["released"].as<long>() : 0;
     expiration = dbentry["expiration"] ? dbentry["expiration"].as<long>() : 0;
     expired = dbentry["expired"] ? dbentry["expired"].as<long>() : 0;
     reminder = dbentry["reminder"] ? dbentry["reminder"].as<long>() : 0;
-    workspace = dbentry["workspace"] ? dbentry["workspace"].as<string>() : "";
     extensions = dbentry["extensions"] ? dbentry["extensions"].as<int>() : 0;
     mailaddress = dbentry["mailaddress"] ? dbentry["mailaddress"].as<string>() : "";
     comment = dbentry["comment"] ? dbentry["comment"].as<string>() : "";
@@ -413,6 +418,7 @@ void DBEntryV1::readFromString(std::string str) {
         groupflag = true;
     else
         groupflag = false;
+    acctcode = dbentry["acctcode"] ? dbentry["acctcode"].as<string>() : "";
 }
 
 #else
@@ -458,11 +464,18 @@ void DBEntryV1::readFromString(std::string str) {
         node >> dbversion;
     else
         dbversion = 0; // 0 = legacy
-    node = dbentry["creation"];
-    if (node.has_val())
-        node >> creation;
+    node = dbentry["workspace"];
+    if (node.has_val() && node.val() != "")
+        node >> workspace;
     else
-        creation = 0; // FIXME: c++ tool does not write this field, but takes from stat
+        workspace = "";
+    node = dbentry["creation"];
+    if (node.has_val()) {
+        node >> creation;
+    } else {
+        creation = utils::getFileTimeAsLong(cppfs::path(
+            workspace)); // use filesystem creation time for DB entries lacking the creation time, as V1 does
+    }
     node = dbentry["released"];
     if (node.has_val())
         node >> released;
@@ -483,11 +496,6 @@ void DBEntryV1::readFromString(std::string str) {
         node >> reminder;
     else
         reminder = 0;
-    node = dbentry["workspace"];
-    if (node.has_val() && node.val() != "")
-        node >> workspace;
-    else
-        workspace = "";
     node = dbentry["extensions"];
     if (node.has_val())
         node >> extensions;
@@ -511,6 +519,11 @@ void DBEntryV1::readFromString(std::string str) {
         groupflag = false;
         group = "";
     }
+    node = dbentry["acctcode"];
+    if (node.has_val() && node.val() != "")
+        node >> acctcode;
+    else
+        acctcode = "";
 }
 
 #endif
@@ -570,6 +583,8 @@ string DBEntryV1::getFilesystem() const { return filesystem; }
 long DBEntryV1::getReminder() const { return reminder; }
 
 string DBEntryV1::getGroup() const { return group; }
+
+void DBEntryV1::setGroup(const string& g) { group = g; groupflag = !g.empty(); }
 
 // change expiration time
 void DBEntryV1::setExpiration(const time_t timestamp) { expiration = timestamp; }
@@ -704,7 +719,6 @@ void DBEntryV1::writeEntry() {
         entry["expired"] = expired;
     }
     entry["extensions"] = extensions;
-    entry["acctcode"] = "";
     entry["reminder"] = reminder;
     entry["mailaddress"] = mailaddress;
     if (groupflag && group.length() > 0) {
@@ -714,6 +728,7 @@ void DBEntryV1::writeEntry() {
         entry["released"] = released;
     }
     entry["comment"] = comment;
+    entry["acctcode"] = acctcode;
 #else
     ryml::Tree tree;
     ryml::NodeRef root = tree.rootref();
@@ -725,7 +740,7 @@ void DBEntryV1::writeEntry() {
         root["expired"] << expired;
     }
     root["extensions"] << extensions;
-    root["acctcode"] << "";
+    root["acctcode"] << acctcode;
     root["reminder"] << reminder;
     root["mailaddress"] << mailaddress;
     if (groupflag && group.length() > 0) {
@@ -813,3 +828,13 @@ void DBEntryV1::writeEntry() {
 
 // return config of parent DB
 const Config* DBEntryV1::getConfig() const { return parent_db->getconfig(); }
+
+namespace utils {
+std::string getDBYamlReader() {
+#ifdef WS_RAPIDYAML_DB
+    return "RapidYAML";
+#else
+    return "yaml-cpp";
+#endif
+}
+} // namespace utils

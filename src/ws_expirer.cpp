@@ -914,8 +914,8 @@ int main(int argc, char** argv) {
         stray_stats.emplace_back(fs, fs_stray);
         total_stray += fs_stray;
     }
-    spdlog::info(" Stray removal summary: {} valid, {} invalid, {} valid deleted, {} invalid deleted", total_stray.valid_ws,
-                 total_stray.invalid_ws, total_stray.valid_deleted, total_stray.invalid_deleted);
+    spdlog::info(" Stray removal summary: {} valid, {} invalid, {} valid deleted, {} invalid deleted",
+                 total_stray.valid_ws, total_stray.invalid_ws, total_stray.valid_deleted, total_stray.invalid_deleted);
     spdlog::info(" End of stray removal");
     spdlog::info("");
 
