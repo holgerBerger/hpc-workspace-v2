@@ -204,9 +204,25 @@ or mix and combine all of above examples.
 
 
 ## Install commands
+### As RPM package
 
-**TODO**
+On RPM based distributions the spec file ```hpc-workspace-v2.spec``` in the top
+level directory can be used to build an installable package:
 
+```
+sudo dnf install -y rpm-build rpmdevtools
+rpmdev-setuptree
+cp hpc-workspace-v2.spec ~/rpmbuild/SPECS/
+git archive --format=tar.gz --prefix=hpc-workspace-v2-2.0.0/ \
+    -o ~/rpmbuild/SOURCES/hpc-workspace-v2-2.0.0.tar.gz HEAD
+rpmbuild -bb ~/rpmbuild/SPECS/hpc-workspace-v2.spec
+sudo dnf install ~/rpmbuild/RPMS/$(uname -m)/hpc-workspace-v2-2.0.0-1.*.rpm
+```
+
+The dependencies listed under [Distribution remarks](#distribution-remarks) 
+still have to be installed by hand for this route. The package defaults to 
+the capability build. See the[Admin Guide](documentation/admin-guide.md) 
+for details.
 
 
 ## Developer informations
@@ -286,6 +302,7 @@ C++ language level requirement might evolve from c++17 to c++20 if there is reas
 - [x] bash completion
 - [x] Cmake fetch for Dependencies
 - [x] installation through CMake.
+- [x] RPM spec file for package builds
 - [-] Add package manager like vcpkg or conan?
 - [ ] do real live tests (general behaviour, expirer and ws_stat) and fix bugs on systems with
     - [ ] capabilities

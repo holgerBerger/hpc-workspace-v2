@@ -62,3 +62,4 @@ including internals.
 - dependencies to `Catch2`, `curl`, `{fmt}`, `GSL`, `yaml-cpp`, `rapidyaml`, `spdlog`, `bshoshany/thread-pool`
 - `curl` and `boost` have to be installed from distribution, all others are compiled as part of building hpc-workspace-v2
 - Docker and Vagrant (Rocky Linux 8/9) based testing infrastructure
+- RPM packaging: a spec file `hpc-workspace-v2.spec` in the top level directory allows building an RPM
