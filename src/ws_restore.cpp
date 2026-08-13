@@ -458,7 +458,7 @@ void restore(const string name, const string target, const string username, cons
             if ((ret == -1) && (errno == EXDEV)) {
                 ret = utils::mv(wssourcename.c_str(), targetpathname.c_str());
                 if (ret != 0) {
-                    spdlog::error("mv failed with code {}", ret);
+                    spdlog::error("mv failed with code {}, errno: {} ({})", ret, errno, strerror(errno));
                 }
             }
 
