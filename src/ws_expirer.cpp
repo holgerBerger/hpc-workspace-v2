@@ -237,6 +237,44 @@ std::string generateReminderMail(const std::string& mail_from, std::vector<std::
     return mail.str();
 }
 
+// construct expiration mail for user
+std::string generateExpirationMail(const std::string& mail_from, std::vector<std::string>& mail_to,
+                                   const long expirationtime, const std::string& wsname, const std::string& fsname,
+                                   const std::string& clustername, const int keeptime) {
+
+    std::stringstream mail;
+    std::string expirationtimestr = mail::generateMailDateFormat(expirationtime);
+    std::string messageID = mail::generateMessageID("ws_expirer");
+    std::string createtimestr = mail::generateMailDateFormat(time((long*)0L));
+
+    std::string to_header = mail::generateToHeader(mail_to);
+
+    mail << "From: " << mail_from << CRLF;
+    mail << "To: " << to_header << CRLF;
+    mail << "Subject: Workspace " << wsname << " expired at " << expirationtimestr << CRLF;
+    mail << "Message-ID: <" << messageID << ">" << CRLF;
+    mail << "Date: " << createtimestr << CRLF;
+    mail << "MIME-Version: 1.0" << CRLF;
+    mail << "Content-Type: multipart/mixed; boundary=" << boundary << CRLF;
+    mail << "" << CRLF;
+
+    mail << "--" << boundary << CRLF;
+    mail << "Content-Type: text/plain; charset=UTF-8" << CRLF;
+    mail << "Content-Transfer-Encoding: 7bit" << CRLF;
+    mail << "" << CRLF;
+    mail << "Your workspace " << wsname << " on filesystem " << fsname << " at HPC System " << clustername
+         << " was expired at " << expirationtimestr << CRLF;
+    mail << "Your workspace can be restored for the next " << keeptime
+         << " days using ws_restore, to view restorable workspaces use ws_restore -l or ws_list -e" << CRLF;
+    mail << "" << CRLF;
+
+    mail << "" << CRLF;
+    mail << "--" << boundary << "--" << CRLF;
+    mail << "" << CRLF;
+
+    return mail.str();
+}
+
 // construct error mail (does not send it)
 std::string generateErrorMail(const std::string& mail_from, std::vector<std::string> mail_to,
                               const std::string& subject) {
@@ -608,6 +646,26 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                 } catch (cppfs::filesystem_error& e) {
                     spdlog::error("   failed to move workspace: {} ({})", wspath, e.what());
                 }
+                if (!dbentry->getMailaddress().empty()){
+                    std::vector<std::string> mail_to;
+                    mail_to.push_back(dbentry->getMailaddress());
+                    std::string clustername = config.clustername();
+                    int keeptime = config.getFsConfig(fs).keeptime;
+
+                    std::string completeMail =
+                        generateExpirationMail(mail_from, mail_to, expiration, id, fs, clustername, keeptime);
+                    spdlog::info("    sending expiration mail to {} for entry {}", mail_to, id);
+
+                    try {
+                        if (!mail::sendCurl(smtpUrl, mail_from, mail_to, completeMail)) {
+                            spdlog::error("Failed to send email, please check the mailaddress in the DB Entry");
+                        }
+                    } catch (const std::exception& e) {
+                        spdlog::error("Exception while sending email: {}", e.what());
+                    }
+                }
+
+
             } else {
                 spdlog::info("  would expire {} (expired {})", id, utils::ctime(&expiration));
             }
