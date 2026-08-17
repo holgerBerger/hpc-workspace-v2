@@ -402,9 +402,11 @@ void restore(const string name, const string target, const string username, cons
 
         caps.raise_cap({CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-        if (config.restorenosub()) { // restore without subdirectory, e.g. for WEKA with quota
+        if (config.restorenosub()) {
+            // SPECIAL CASE
+            // restore without subdirectory, e.g. for WEKA with quota
             // background: WEKA is very slow for mv from a directory without quotas to a
-            // directory with quotas. But it can quickly rename a directory iwhtout quotas as a directory in a directory
+            // directory with quotas. But it can quickly rename a directory without quotas as a directory in a directory
             // without quotas. So when toplevel of workspace does not have quotas but workspaces have, it is better to
             // restore to the name of the new workspace instead into thet workspace. e.g.  .../ws/new will not get
             // .../ws/new/restored-XXXXX but .../ws/new
@@ -447,7 +449,7 @@ void restore(const string name, const string target, const string username, cons
                 ;
             }
 
-        } else { // restore with subdirectory
+        } else { // restore with subdirectory, the NORMAL CASE
 
             string targetpathname = targetpath + "/" + cppfs::path(wssourcename).filename().string();
             // do the move
@@ -484,8 +486,7 @@ void restore(const string name, const string target, const string username, cons
             } else {
                 syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.",
                        username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
-                spdlog::error("moving data failed, database entry kept! {}", ret);
-                ;
+                spdlog::error("moving data failed, database entry kept! (code: {} errno:{} {})", ret, errno, strerror(errno));
             }
         } // restorenosub
 
