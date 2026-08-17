@@ -486,7 +486,8 @@ void restore(const string name, const string target, const string username, cons
             } else {
                 syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.",
                        username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
-                spdlog::error("moving data failed, database entry kept! (code: {} errno:{} {})", ret, errno, strerror(errno));
+                spdlog::error("moving data failed, database entry kept! (code: {} errno:{} {})", ret, errno,
+                              strerror(errno));
             }
         } // restorenosub
 

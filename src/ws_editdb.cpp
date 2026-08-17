@@ -29,11 +29,11 @@
  */
 
 #include <ctime>
+#include <iomanip>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <sstream>
-#include <iomanip>
 
 // Include bshoshany thread-pool
 #define BS_THREAD_POOL_NATIVE_EXTENSIONS
