@@ -681,7 +681,7 @@ int main(int argc, char** argv) {
 
     // now we have config, fix values
     if (duration == -1) {
-        duration = config.durationdefault();
+        duration = min(config.durationdefault(), config.maxduration());
     }
 
     // check if user is in debugusers list
