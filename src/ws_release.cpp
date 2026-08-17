@@ -385,8 +385,9 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
                     caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
                                    utils::SrcPos(__FILE__, __LINE__, __func__));
                     if (ret != 0) {
-                        spdlog::error("workspace directory could not be moved to deleted path via 'mv': {}",
-                                      strerror(errno));
+                        spdlog::error(
+                            "workspace directory could not be moved to deleted path via 'mv', code {}, errno: {} ({})",
+                            ret, errno, strerror(errno));
                         return false;
                     }
                 } else {
