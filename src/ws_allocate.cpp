@@ -199,8 +199,11 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
             spdlog::info("setting duration to 0");
             duration = 0;
         } else {
-            spdlog::info("reading duration from userconfig");
-            duration = userconfig.getDuration();
+            auto userduration = userconfig.getDuration();
+            if (userduration != -1) {
+                spdlog::info("read duration from userconfig");
+                duration = userduration;
+            }
         }
     }
 
