@@ -269,6 +269,8 @@ void Config::readYAML(string yamlstr) {
                         node >> fs.maxextensions;
                     else
                         fs.maxextensions = global.maxextensions;
+                    if (node = ws["expirationmail"]; node.has_val())
+                        node >> fs.expirationmail;
                     if (node = ws["allocatable"]; node.has_val())
                         node >> fs.allocatable;
                     if (node = ws["extendable"]; node.has_val())
@@ -401,6 +403,11 @@ void Config::readYAML(const string yaml) {
                         fs.maxextensions = ws["maxextensions"].as<int>();
                     else
                         fs.maxextensions = global.maxextensions;
+
+                    if (ws["expirationmail"])
+                        fs.expirationmail = ws["expirationmail"].as<bool>();
+                    else
+                        fs.expirationmail = false; 
                     if (ws["allocatable"])
                         fs.allocatable = ws["allocatable"].as<bool>();
                     else

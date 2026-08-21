@@ -78,6 +78,8 @@ UserConfig::UserConfig(std::string userconf) {
             node >> reminder;
         else
             reminder = -1;
+        if (node = config["expirationmail"]; node.has_val())
+            node >> expirationmail;
     } else {
         // get first line of userconf only that will include the mailaddress for reminder mails
         mailaddress = utils::getFirstLine(userconf);
@@ -109,6 +111,8 @@ UserConfig::UserConfig(std::string userconf) {
             duration = user_home_config["duration"].as<int>();
         if (user_home_config["reminder"])
             reminder = user_home_config["reminder"].as<int>();
+        if (user_home_config["expirationmail"])
+            expirationmail = user_home_config["expirationmail"].as<bool>();
     } else {
         // get first line of userconf only that will include the mailaddress for reminder mails
         mailaddress = utils::getFirstLine(userconf);

@@ -40,6 +40,7 @@ class UserConfig {
     std::string groupname = "";   // FIXME: TODO: does this make sense?
     int reminder = -1;            // days before expiration to send reminder email, send no mail if < 0
     int duration = -1;            // default duration for workspaces, request system default if < 0
+    bool expirationmail = true;          // overwrite expirationmail setting in fs config
 
   public:
     // read config from string, either YAML or single line
@@ -49,6 +50,7 @@ class UserConfig {
     std::string getGroupname() const { return groupname; };
     int getReminder() const { return reminder; };
     int getDuration() const { return duration; };
+    bool getExpirationMail() const {return expirationmail; }
 };
 
 #endif

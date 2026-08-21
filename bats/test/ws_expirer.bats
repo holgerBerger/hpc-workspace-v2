@@ -492,3 +492,28 @@ setup() {
     assert_output --regexp "delete DB.*KT_RELEASED_TEST"
     assert_success
 }
+
+# ========== Expiration Mail ==========
+
+@test "ws_expirer fs sets ExpirationMail" {
+    [ -f ~/.ws_user.conf ] && mv -f ~/.ws_user.conf ~/.ws_user.conf_testbackup
+    echo "mail: $USER@localhost" > ~/.ws_user.conf
+    ws_allocate --config bats/ws_mail.conf -F ws1 EXPIRATIONMAIL
+    ws_editdb --config bats/ws_mail.conf --add-time -40 -F ws1 --not-kidding
+    run ws_expirer --config bats/ws_mail.conf -c 
+    assert_output --regexp "sending expiration mail to"
+    assert_success
+    [ -f ~/.ws_user.conf_testbackup ] && mv -f ~/.ws_user.conf_testbackup ~/.ws_user.conf
+}
+
+@test "ws_expirer fs sets ExpirationMail, user revokes" {
+    [ -f ~/.ws_user.conf ] && mv -f ~/.ws_user.conf ~/.ws_user.conf_testbackup
+    echo "mail: $USER@localhost" > ~/.ws_user.conf
+    echo "expirationmail: false" >> ~/.ws_user.conf
+    ws_allocate --config bats/ws_mail.conf -F ws1 EXPIRATIONMAIL
+    ws_editdb --config bats/ws_mail.conf --add-time -40 -F ws1 --not-kidding
+    run ws_expirer --config bats/ws_mail.conf -c
+    refute_output --regexp "sending expiration mail to"
+    assert_success
+    [ -f ~/.ws_user.conf_testbackup ] && mv -f ~/.ws_user.conf_testbackup ~/.ws_user.conf
+}

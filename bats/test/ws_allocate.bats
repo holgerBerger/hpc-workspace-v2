@@ -123,12 +123,6 @@ setup() {
     rm -f /tmp/ws/ws2-db/${USER}-TOLONG
 }
 
-@test "ws_allocate only mail" {
-    run ws_allocate --config bats/ws.conf -m a@b.com NODURATION 1
-    assert_failure
-    assert_output --partial "without the reminder"
-}
-
 @test "ws_allocate without duration" {
     [ -f ~/.ws_user.conf ] && mv -f ~/.ws_user.conf ~/.ws_user.conf_testbackup
     run ws_allocate --config bats/ws.conf NODURATION

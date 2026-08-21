@@ -82,6 +82,7 @@ struct Filesystem_config {
     int releasekeeptime;   // max time in days to keep deleted workspace after release
     int maxduration;       // max duration a user can choose for this filesystem
     int maxextensions;     // max extensiones a user can do for this filesystem
+    bool expirationmail;   // send a mail to the user when their workspace expires
     // migration helpers
     bool allocatable; // is this filesystem allocatable? (or read only?)
     bool extendable;  // is this filesystem extendable? (or read only?)

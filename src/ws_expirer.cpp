@@ -52,6 +52,7 @@
 #include "mail.h"
 #include "user.h"
 #include "utils.h"
+#include "UserConfig.h"
 
 #include "spdlog/sinks/daily_file_sink.h" // IWYU pragma: keep
 #include "spdlog/sinks/stdout_color_sinks.h"
@@ -646,7 +647,19 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                 } catch (cppfs::filesystem_error& e) {
                     spdlog::error("   failed to move workspace: {} ({})", wspath, e.what());
                 }
-                if (!dbentry->getMailaddress().empty()){
+                std::string user_conf;  
+                string user_conf_filename = user::getUserhome() + "/.ws_user.conf";
+                if (!cppfs::is_symlink(user_conf_filename)) {
+                    if (cppfs::is_regular_file(user_conf_filename)) {
+                        user_conf = utils::getFileContents(user_conf_filename.c_str());
+                    }
+                    // FIXME: could be parsed here and passed as object not string
+                } else {
+                    spdlog::error("~/.ws_user.conf can not be symlink!");
+                    exit(-1);
+                }
+                UserConfig userconfig(user_conf);
+                if ((config.getFsConfig(fs).expirationmail && userconfig.getExpirationMail() && !dbentry->getMailaddress().empty()) || (dbentry->getReminder() > 0)){
                     std::vector<std::string> mail_to;
                     mail_to.push_back(dbentry->getMailaddress());
                     std::string clustername = config.clustername();
