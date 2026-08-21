@@ -663,7 +663,10 @@ int mv(const char* source, const char* target) {
     int status;
     pid = fork();
     if (pid == 0) {
-        execl("/bin/mv", "mv", source, target, NULL);
+        auto ret = execl("/bin/mv", "mv", source, target, NULL);
+        // we only get here if execl fails, so log the error and exit
+        spdlog::error("execlmv failed with code {}, errno: {} ({})", ret, errno, strerror(errno));
+        _exit(-1);
     } else if (pid < 0) {
         //
     } else {
@@ -678,8 +681,7 @@ long long getFileTimeAsLong(const fs::path& p) {
     std::error_code ec;
     auto ftime = fs::last_write_time(p, ec);
     if (ec) {
-        spdlog::error("Failed to get write time for '{}': {} ({})",
-            p.string(), ec.message(), ec.value());
+        spdlog::error("Failed to get write time for '{}': {} ({})", p.string(), ec.message(), ec.value());
         return 0;
     }
 

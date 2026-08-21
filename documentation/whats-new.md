@@ -63,3 +63,4 @@ including internals.
 - `curl` and `boost` have to be installed from distribution, all others are compiled as part of building hpc-workspace-v2
 - this can be avoided using `vcpkg` build which builds all dependencies from source
 - Docker and Vagrant (Rocky Linux 8/9, Almalinux 10) based testing infrastructure
+- RPM packaging: a spec file `hpc-workspace-v2.spec` in the top level directory allows building an RPM

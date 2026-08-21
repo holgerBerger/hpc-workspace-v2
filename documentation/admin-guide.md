@@ -68,6 +68,12 @@ to control the merge order.
 
 ## Installation
 
+There are two ways to install the tool set: as an RPM package on RPM based
+distributions, or by building and installing from source. Both use the same
+dependencies and the same privilege model, those are described first.
+
+### Dependencies
+
 The workspace tools use CMake for configuration and building, make sure it is
 installed, you will also need a C++ compiler for C++17, compiling with GCC and clang is
 tested (on Ubuntu and Redhat compatible distributions).
@@ -84,6 +90,8 @@ The complete list of dependencies is:
 - libcap2 (if using capabilities)
 - libcurl
 
+### Capabilities and setuid
+
 This version has compile-time detection of whether the capability version can be built
 and checks at runtime if capabilities are set or the setuid bit is present.
 
@@ -93,8 +101,63 @@ the capability version, and some extra settings [^1] to allow the required capab
 
 With V2, the setuid version and the capability version are both under regression testing.
 
-Run ```cmake --preset release``` and ```cmake --build --preset release -j``` to configure and compile the tool set.
+You can check ```ws_allocate -V``` to see if capability mode was compiled in.
 
+
+### Installation with rpm
+
+On RPM based distributions (RHEL 8/9/10 and compatible) the tool set can be built and
+installed as an RPM package. The spec file ```hpc-workspace-v2.spec``` is part of the
+repository, in the top level directory.
+
+#### 1. Setup
+
+Install the build tooling and the dependencies:
+
+```
+sudo dnf install -y rpm-build rpmdevtools gcc-c++ cmake make boost-devel libcurl-devel libcap-devel git
+```
+
+Create the rpmbuild tree and copy the spec file into it. ```rpmdev-setuptree``` creates
+the tree in ```~/rpmbuild```, unless ```%_topdir``` is set to something else in
+```~/.rpmmacros```, in that case adapt the paths in the following steps:
+
+```
+rpmdev-setuptree
+cp <path-to-repo>/hpc-workspace-v2.spec ~/rpmbuild/SPECS/
+```
+
+Check the following before building, and adapt the spec file if needed:
+- the capability build is the default (```-DWS_USE_CAPABILITIES=ON```), for the setuid
+  version follow the comments in the ```%files``` section of the spec file
+- the CMake build type is ```RelWithDebInfo```
+- the package installs all user tools to ```%{_bindir}```, the administrator tools
+  (```ws_expirer```, ```ws_editdb```, ```ws_prepare```) to ```%{_sbindir}```, and the man pages
+
+#### 2. Stage the source tarball
+
+The tarball's top level directory has to match ```hpc-workspace-v2-<version>```:
+
+```
+git -C <path-to-repo> archive --format=tar.gz --prefix=hpc-workspace-v2-2.0.0/ \
+    -o ~/rpmbuild/SOURCES/hpc-workspace-v2-2.0.0.tar.gz HEAD
+```
+
+#### 3. Build
+
+```
+rpmbuild -bb ~/rpmbuild/SPECS/hpc-workspace-v2.spec
+```
+
+#### 4. Install
+
+```
+sudo dnf install ~/rpmbuild/RPMS/$(uname -m)/hpc-workspace-v2-2.0.0-1.*.rpm
+```
+
+### Installation from source
+
+Run ```cmake --preset release``` and ```cmake --build --preset release -j``` to configure and compile the tool set.
 
 The build system can automatically set capabilities or setuid permissions during install:
 - By default, if libcap is found, it uses capabilities (set with setcap)
@@ -105,7 +168,7 @@ The build system can automatically set capabilities or setuid permissions during
 Execute ```cmake --install build/release --prefix <TARGET>``` to install executables
 and man pages and set file properties correctly.
 
-You can check ```ws_allocate -V``` to see if capability mode was compiled in.
+#### Manual installation
 
 If you can not use the automatic installation, e.g. as your setup is more complex do those steps by hand:
 
@@ -120,7 +183,7 @@ setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p" ws_restore
 ```
 *if* capability library was available at compile time.
 
-
+### Setting up the expirer
 
 Finally, a cron job has to be set up that calls the `ws_expirer` tool at
 regular intervals, only then will old workspaces be cleaned up. The

@@ -205,7 +205,8 @@ void restore(const string name, const string target, const string username, cons
     // split the name in username, name and timestamp
     // remove the username prefix to get id_noowner
     string id_noowner = name;
-    if (name.compare(0, username.length(), username) == 0 && name.length() > username.length() && name[username.length()] == '-') {
+    if (name.compare(0, username.length(), username) == 0 && name.length() > username.length() &&
+        name[username.length()] == '-') {
         id_noowner = name.substr(username.length() + 1);
     }
 
@@ -343,7 +344,8 @@ void restore(const string name, const string target, const string username, cons
                 spdlog::error("can not setuid, bad installation?");
             }
         }
-        caps.lower_cap({CAP_DAC_OVERRIDE}, source_entry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+        caps.lower_cap({CAP_DAC_OVERRIDE}, source_entry->getConfig()->dbuid(),
+                       utils::SrcPos(__FILE__, __LINE__, __func__));
 
         // remove DB entry
         try {
@@ -400,12 +402,14 @@ void restore(const string name, const string target, const string username, cons
 
         caps.raise_cap({CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-        if (config.restorenosub()) { // restore without subdirectory, e.g. for WEKA with quota
+        if (config.restorenosub()) {
+            // SPECIAL CASE
+            // restore without subdirectory, e.g. for WEKA with quota
             // background: WEKA is very slow for mv from a directory without quotas to a
-            // directory with quotas. But it can quickly rename a directory iwhtout quotas as a directory in a directory
-            // without quotas. So when toplevel of workspace does not have quotas but workspaces have, it is better to restore
-            // to the name of the new workspace instead into thet workspace.
-            // e.g.  .../ws/new will not get .../ws/new/restored-XXXXX but .../ws/new
+            // directory with quotas. But it can quickly rename a directory without quotas as a directory in a directory
+            // without quotas. So when toplevel of workspace does not have quotas but workspaces have, it is better to
+            // restore to the name of the new workspace instead into thet workspace. e.g.  .../ws/new will not get
+            // .../ws/new/restored-XXXXX but .../ws/new
             string targetpathname = targetpath;
             // spdlog::info("restoring {} to {}", wssourcename, targetpathname);
             int ret = renameat(AT_FDCWD, wssourcename.c_str(), AT_FDCWD, targetpathname.c_str());
@@ -433,30 +437,30 @@ void restore(const string name, const string target, const string username, cons
                 try {
                     db->deleteEntry(name, true);
                     syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> done, removed DB entry <%s>.",
-                        username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
+                           username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
                     spdlog::info("restore successful, database entry removed.");
                 } catch (DatabaseException const& ex) {
                     spdlog::error("error in DB entry removal, {}", ex.what());
                 }
             } else {
-                syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.", username.c_str(),
-                    wssourcename.c_str(), targetpathname.c_str(), name.c_str());
+                syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.",
+                       username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
                 spdlog::error("moving data failed, database entry kept! {}", ret);
                 ;
             }
 
-        } else { // restore with subdirectory
+        } else { // restore with subdirectory, the NORMAL CASE
 
             string targetpathname = targetpath + "/" + cppfs::path(wssourcename).filename().string();
             // do the move
             int ret = rename(wssourcename.c_str(), targetpathname.c_str());
-            // some filesystems can not rename across some borders, examples are lustre DNE1 and NEC ScateFS for metadata
-            // targets and WEKA for directories with quotas, for those, fall back to /bin/mv which does a copy + delete
-            // under the hood
+            // some filesystems can not rename across some borders, examples are lustre DNE1 and NEC ScateFS for
+            // metadata targets and WEKA for directories with quotas, for those, fall back to /bin/mv which does a copy
+            // + delete under the hood
             if ((ret == -1) && (errno == EXDEV)) {
                 ret = utils::mv(wssourcename.c_str(), targetpathname.c_str());
                 if (ret != 0) {
-                    spdlog::error("mv failed: {}", strerror(errno));
+                    spdlog::error("mv failed with code {}, errno: {} ({})", ret, errno, strerror(errno));
                 }
             }
 
@@ -474,16 +478,16 @@ void restore(const string name, const string target, const string username, cons
                 try {
                     db->deleteEntry(name, true);
                     syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> done, removed DB entry <%s>.",
-                        username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
+                           username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
                     spdlog::info("restore successful, database entry removed.");
                 } catch (DatabaseException const& ex) {
                     spdlog::error("error in DB entry removal, {}", ex.what());
                 }
             } else {
-                syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.", username.c_str(),
-                    wssourcename.c_str(), targetpathname.c_str(), name.c_str());
-                spdlog::error("moving data failed, database entry kept! {}", ret);
-                ;
+                syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.",
+                       username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
+                spdlog::error("moving data failed, database entry kept! (code: {} errno:{} {})", ret, errno,
+                              strerror(errno));
             }
         } // restorenosub
 

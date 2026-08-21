@@ -188,9 +188,10 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
             spdlog::info("setting duration to 0");
             duration = 0;
         } else {
-            duration = userconfig.getDuration();
-            if (duration != -1) {
-                spdlog::info("reading duration from userconfig");
+            auto userduration = userconfig.getDuration();
+            if (userduration != -1) {
+                spdlog::info("read duration from userconfig");
+                duration = userduration;
             }
         }
     }
@@ -669,7 +670,7 @@ int main(int argc, char** argv) {
 
     // now we have config, fix values
     if (duration == -1) {
-        duration = config.durationdefault();
+        duration = min(config.durationdefault(), config.maxduration());
     }
 
     if (reminder >= duration) {
