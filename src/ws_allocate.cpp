@@ -182,7 +182,6 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
         }
     }
 
-
     // fix duration if none given and there is one in user config
     if (duration == -1) {
         if (extension && (mailaddress != "" || comment != "" || reminder != 0)) {
@@ -190,7 +189,9 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
             duration = 0;
         } else {
             duration = userconfig.getDuration();
-            if (duration != -1) { spdlog::info("reading duration from userconfig"); }
+            if (duration != -1) {
+                spdlog::info("reading duration from userconfig");
+            }
         }
     }
 

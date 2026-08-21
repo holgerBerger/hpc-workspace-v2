@@ -407,7 +407,7 @@ void Config::readYAML(const string yaml) {
                     if (ws["expirationmail"])
                         fs.expirationmail = ws["expirationmail"].as<bool>();
                     else
-                        fs.expirationmail = false; 
+                        fs.expirationmail = false;
                     if (ws["allocatable"])
                         fs.allocatable = ws["allocatable"].as<bool>();
                     else

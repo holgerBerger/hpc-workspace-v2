@@ -503,7 +503,8 @@ setup() {
     run ws_expirer --config bats/ws_mail.conf -c 
     assert_output --regexp "sending expiration mail to"
     assert_success
-    [ -f ~/.ws_user.conf_testbackup ] && mv -f ~/.ws_user.conf_testbackup ~/.ws_user.conf
+    rm -f ~/.ws_user.conf
+    if [ -f ~/.ws_user.conf_testbackup ]; then mv -f ~/.ws_user.conf_testbackup ~/.ws_user.conf; fi
 }
 
 @test "ws_expirer fs sets ExpirationMail, user revokes" {
@@ -515,5 +516,6 @@ setup() {
     run ws_expirer --config bats/ws_mail.conf -c
     refute_output --regexp "sending expiration mail to"
     assert_success
-    [ -f ~/.ws_user.conf_testbackup ] && mv -f ~/.ws_user.conf_testbackup ~/.ws_user.conf
+    rm -f ~/.ws_user.conf
+    if [ -f ~/.ws_user.conf_testbackup ]; then mv -f ~/.ws_user.conf_testbackup ~/.ws_user.conf; fi
 }
