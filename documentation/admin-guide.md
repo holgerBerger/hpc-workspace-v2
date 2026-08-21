@@ -448,6 +448,21 @@ duration ends later than the current duration (in other words, you can shorten
 the lifetime even if you have no extensions left) and if the user is not root.
 Root can always extend any workspace using ```-u``` option.
 
+#### `expirationmail`
+
+Default is ```no```. If set to ```yes```, ```ws_expirer``` sends a mail to the
+owner of a workspace in this location when the workspace expires, stating how
+long it can still be restored (see `keeptime`).
+
+This requires `smtphost` and `mail_from` in the global section and a mail
+address in the DB entry (```ws_allocate -m```, or ```mail:``` in
+```~/.ws_user.conf```), workspaces without mail address are skipped. Users can
+opt out for all their workspaces with ```expirationmail: false``` in
+```~/.ws_user.conf```.
+
+Independent of this, a workspace with a reminder (```ws_allocate -r```) always
+gets an expiration mail.
+
 #### `allocatable`
 
 Default is ```yes```. If set to ```no```, the location is non-allocatable,
