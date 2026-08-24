@@ -171,6 +171,8 @@ long long getFileTimeAsLong(const std::filesystem::path& p);
 // get which yaml reader is used in DB
 std::string getDBYamlReader();
 
+std::string getOwner(const std::string& wsid);
+
 } // namespace utils
 
 #endif

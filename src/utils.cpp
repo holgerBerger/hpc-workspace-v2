@@ -277,6 +277,7 @@ std::string getFirstLine(const std::string& multilineString) {
 // getID returns id part of workspace id <username-id>
 // Updated to handle wsid format "username-id" where username can contain '-'
 // It returns what is after the last "-" (everything from the right up to the first "-")
+// FIXME: this assumes the wsid format is "username-id", and id does not contain '-'
 std::string getID(const std::string wsid) {
     size_t last_dash = wsid.find_last_of('-');
     if (last_dash == std::string::npos) {
@@ -284,6 +285,33 @@ std::string getID(const std::string wsid) {
     }
     return wsid.substr(last_dash + 1);
 }
+
+// getOwner returns the owner part of workspace id <username-id>
+// Updated to handle wsid format "username-id" where username can contain '-'
+// This can also handle id containing '-' by testing possible usernames if they exist.
+// If none exists, take the shortest one containing no '-'
+std::string getOwner(const std::string& wsid) {
+    size_t pos = wsid.find('-');
+    if (pos == std::string::npos) {
+        return "";
+    }
+
+    // Attempt to find the longest substring that corresponds to a real system user
+    // starting from the last dash and moving backwards.
+    size_t current_dash = wsid.find_last_of('-');
+    while (current_dash != std::string::npos) {
+        std::string candidate = wsid.substr(0, current_dash);
+        if (user::exists(candidate)) {
+            return candidate;
+        }
+        if (current_dash == 0) break;
+        current_dash = wsid.find_last_of('-', current_dash - 1);
+    }
+
+    // If no existing user found, fallback to the shortest part before the first '-'
+    return wsid.substr(0, pos);
+}
+
 
 /*
 // print a character r times
