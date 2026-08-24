@@ -647,9 +647,14 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                 } catch (cppfs::filesystem_error& e) {
                     spdlog::error("   failed to move workspace: {} ({})", wspath, e.what());
                 }
+
+                // send expiration mail, is opt-in from admin side per filesystem, and can be overridden by user
                 std::string user_conf;
                 if (config.getFsConfig(fs).expirationmail) {
                     auto wsuser = utils::getOwner(id);
+                    if (debugflag) {
+                        spdlog::debug("  sending expiration mail to {}", wsuser);
+                    }
                     string user_conf_filename = user::getUserhome(wsuser) + "/.ws_user.conf";
                     if (!cppfs::is_symlink(user_conf_filename)) {
                         if (cppfs::is_regular_file(user_conf_filename)) {
