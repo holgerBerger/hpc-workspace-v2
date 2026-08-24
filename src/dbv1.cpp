@@ -599,6 +599,8 @@ void DBEntryV1::setExpired(const time_t timestamp) { expired = timestamp; }
 // write DB entry
 // move DB entry to releases entries
 void DBEntryV1::release(time_t& timestamp_time) {
+    if (traceflag)
+        spdlog::trace("release({})", timestamp_time);
 
     // TODO: is this ctrl-c save? should it be ignored for all of this?
     // probably ok, even if there is some partial state, ws_expirer would deal with it
@@ -645,10 +647,11 @@ void DBEntryV1::release(time_t& timestamp_time) {
         cppfs::rename(dbfilepath, dbtarget);
         dbfilepath = dbtarget.string(); // entry knows now the new name, for remove, but is not persistent
     } catch (const std::filesystem::filesystem_error& e) {
+        auto euid = geteuid();
         caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, parent_db->getconfig()->dbuid(),
                        utils::SrcPos(__FILE__, __LINE__, __func__));
         if (debugflag)
-            spdlog::error("{}", e.what());
+            spdlog::error("{} (euid={})", e.what(), euid);
         throw DatabaseException("database entry could not be deleted!");
     }
 
@@ -660,6 +663,8 @@ void DBEntryV1::release(time_t& timestamp_time) {
 // SPEC: can be called by root only!
 // SPEC: does not work on root_squash!
 void DBEntryV1::expire(const std::string timestamp) {
+    if (traceflag)
+        spdlog::trace("expire({})", timestamp);
     auto wsconfig = parent_db->getconfig()->getFsConfig(filesystem);
     cppfs::path dbtarget = cppfs::path(wsconfig.database) / cppfs::path(wsconfig.deletedPath) /
                            cppfs::path(fmt::format("{}-{}", id, timestamp));
