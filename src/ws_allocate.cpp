@@ -170,26 +170,15 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
         }
     }
 
-    if (reminder > 0) {
-        if (!opt.count("mailaddress")) {
-            mailaddress = userconfig.getMailaddress();
+    if (!opt.count("mailaddress")) {
+        mailaddress = userconfig.getMailaddress();
 
-            if (mailaddress.length() > 0) {
-                spdlog::info("Took email address <{}> from users config.", mailaddress);
-            } else {
-                mailaddress = user::getUsername();
-                spdlog::info("could not read email from users config ~/.ws_user.conf.");
-                spdlog::info("reminder email will be sent to local user account");
-            }
-        }
-        if (reminder >= duration) {
-            spdlog::warn("reminder is only sent after workspace expiry!");
-        }
-    } else {
-        // check if mail address was set with -m but not -r
-        if (opt.count("mailaddress") && !opt.count("extension")) {
-            spdlog::error("You can't use the mailaddress (-m) without the reminder (-r) or extensions (-x) option.");
-            exit(1);
+        if (mailaddress.length() > 0) {
+            spdlog::info("Took email address <{}> from users config.", mailaddress);
+        } else {
+            mailaddress = user::getUsername();
+            spdlog::info("could not read email from users config ~/.ws_user.conf.");
+            spdlog::info("reminder email will be sent to local user account");
         }
     }
 
@@ -682,6 +671,10 @@ int main(int argc, char** argv) {
     // now we have config, fix values
     if (duration == -1) {
         duration = min(config.durationdefault(), config.maxduration());
+    }
+
+    if (reminder >= duration) {
+        spdlog::warn("reminder is only sent after workspace expiry!");
     }
 
     // check if user is in debugusers list
