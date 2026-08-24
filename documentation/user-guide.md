@@ -222,7 +222,7 @@ With ```ws_share``` you can share workspaces with users outside your group, usin
 
 Those operations are applied to all files and directories in the workspace.
 
-## User defaults with ~/.ws_user.conf file
+## User defaults and options with ~/.ws_user.conf file
 
 Some defaults can be set in ~/.ws_user.conf, so you do not have to give them on command line all the time.
 The file is in YAML syntax, and can have the following keys: ```mail```, ```duration```, ```reminder``` and ```groupname```
@@ -236,3 +236,6 @@ duration: 10
 reminder: 3
 groupname: abba
 ```
+
+Furthermore, the option ```expirationmail: false``` can be used to disable expiration mails, if you receive mails from the system each time 
+a workspace expires.
