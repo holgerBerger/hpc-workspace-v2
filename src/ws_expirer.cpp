@@ -648,38 +648,39 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                     spdlog::error("   failed to move workspace: {} ({})", wspath, e.what());
                 }
                 std::string user_conf;
-                string user_conf_filename = user::getUserhome() + "/.ws_user.conf";
-                if (!cppfs::is_symlink(user_conf_filename)) {
-                    if (cppfs::is_regular_file(user_conf_filename)) {
-                        user_conf = utils::getFileContents(user_conf_filename.c_str());
-                    }
-                    // FIXME: could be parsed here and passed as object not string
-                } else {
-                    spdlog::error("~/.ws_user.conf can not be symlink!");
-                    exit(-1);
-                }
-                UserConfig userconfig(user_conf);
-                if ((config.getFsConfig(fs).expirationmail && userconfig.getExpirationMail() &&
-                     !dbentry->getMailaddress().empty()) ||
-                    (dbentry->getReminder() > 0)) {
-                    std::vector<std::string> mail_to;
-                    mail_to.push_back(dbentry->getMailaddress());
-                    std::string clustername = config.clustername();
-                    int keeptime = config.getFsConfig(fs).keeptime;
-
-                    std::string completeMail =
-                        generateExpirationMail(mail_from, mail_to, expiration, id, fs, clustername, keeptime);
-                    spdlog::info("    sending expiration mail to {} for entry {}", mail_to, id);
-
-                    try {
-                        if (!mail::sendCurl(smtpUrl, mail_from, mail_to, completeMail)) {
-                            spdlog::error("Failed to send email, please check the mailaddress in the DB Entry");
+                if (config.getFsConfig(fs).expirationmail) {
+                    auto wsuser = utils::getOwner(id);
+                    string user_conf_filename = user::getUserhome(wsuser) + "/.ws_user.conf";
+                    if (!cppfs::is_symlink(user_conf_filename)) {
+                        if (cppfs::is_regular_file(user_conf_filename)) {
+                            user_conf = utils::getFileContents(user_conf_filename.c_str());
                         }
-                    } catch (const std::exception& e) {
-                        spdlog::error("Exception while sending email: {}", e.what());
+                        // FIXME: could be parsed here and passed as object not string
+                    } else {
+                        spdlog::error("~/.ws_user.conf can not be symlink!");
+                        exit(-1);
+                    }
+                    UserConfig userconfig(user_conf);
+                    if ((userconfig.getExpirationMail() && !dbentry->getMailaddress().empty()) ||
+                        (dbentry->getReminder() > 0)) {
+                        std::vector<std::string> mail_to;
+                        mail_to.push_back(dbentry->getMailaddress());
+                        std::string clustername = config.clustername();
+                        int keeptime = config.getFsConfig(fs).keeptime;
+
+                        std::string completeMail =
+                            generateExpirationMail(mail_from, mail_to, expiration, id, fs, clustername, keeptime);
+                        spdlog::info("    sending expiration mail to {} for entry {}", mail_to, id);
+
+                        try {
+                            if (!mail::sendCurl(smtpUrl, mail_from, mail_to, completeMail)) {
+                                spdlog::error("Failed to send email, please check the mailaddress in the DB Entry");
+                            }
+                        } catch (const std::exception& e) {
+                            spdlog::error("Exception while sending email: {}", e.what());
+                        }
                     }
                 }
-
             } else {
                 spdlog::info("  would expire {} (expired {})", id, utils::ctime(&expiration));
             }
