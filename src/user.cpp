@@ -49,6 +49,9 @@ extern int debuglevel;
 
 namespace user {
 
+// exists returns true if the given username exists in the system's passwd database
+bool exists(const std::string& username) { return getpwnam(username.c_str()) != nullptr; }
+
 // get current username via real user id and passwd
 std::string getUsername() {
     gsl::not_null<struct passwd*> pw = getpwuid(getuid());
@@ -59,6 +62,13 @@ std::string getUsername() {
 // we have this to avoid $HOME
 std::string getUserhome() {
     gsl::not_null<struct passwd*> pw = getpwuid(getuid());
+    return std::string(pw->pw_dir);
+}
+
+// get home of provided user via real user id and pwassd
+// we have this to avoid $HOME
+std::string getUserhome(const std::string& username) {
+    gsl::not_null<struct passwd*> pw = getpwnam(username.c_str());
     return std::string(pw->pw_dir);
 }
 
