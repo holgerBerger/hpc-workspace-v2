@@ -674,7 +674,7 @@ int main(int argc, char** argv) {
     }
 
     if (reminder >= duration) {
-        spdlog::warn("reminder is only sent after workspace expiry!");
+        spdlog::warn("with current settings, reminder email is sent after workspace expiry!");
     }
 
     // check if user is in debugusers list
