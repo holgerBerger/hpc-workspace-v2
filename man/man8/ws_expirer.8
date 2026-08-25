@@ -107,6 +107,13 @@ Error emails
 Sent to administrators (configured via
 .B adminmail
 ) when DB errors or other critical conditions are encountered.
+.TP
+Expiration emails
+Sent to users when their workspace has expired. Has to be enabled with
+.B expirationmail: yes
+per filesystem in configuration, and can be suppressed by user with
+.B expirationmail: no
+in their ~/.ws_user.conf file.
 
 Email sending requires
 .B smtphost

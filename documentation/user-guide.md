@@ -238,4 +238,4 @@ groupname: abba
 ```
 
 Furthermore, the option ```expirationmail: false``` can be used to disable expiration mails, if you receive mails from the system each time 
-a workspace expires.
+a workspace expires (only when enabled system wide).

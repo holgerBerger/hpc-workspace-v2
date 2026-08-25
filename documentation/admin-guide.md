@@ -189,8 +189,10 @@ Finally, a cron job has to be set up that calls the `ws_expirer` tool at
 regular intervals, only then will old workspaces be cleaned up. The
 `ws_expirer` setup is detailed below.
 
+*Restrictions*: the `ws_expirer` tool must be run as root, and can not work on root_squash mounted filesystems.
+
 [^1]: for lustre you might need for newer versions ```lctl set_param -P mdt.<fsname>-*.enable_cap_mask=+cap_dac_read_search,cap_chown,cap_dac_override,cap_fowner```
-to exclude those capabilities from being dropped in root_squash mode as well.
+to exclude those capabilities from being dropped.
 
 ## Further preparation (```ws_validate_config``` and ```ws_prepare```)
 
