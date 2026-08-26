@@ -770,11 +770,11 @@ void DBEntryV1::writeEntry() {
 
     long dbgid = 0, dbuid = 0;
 
+    dbuid = parent_db->getconfig()->dbuid();
+    dbgid = parent_db->getconfig()->dbgid();
+
     if (user::isSetuid()) {
         // for filesystem with root_squash, we need to be DB user here
-        dbuid = parent_db->getconfig()->dbuid();
-        dbgid = parent_db->getconfig()->dbgid();
-
         if (debugflag)
             spdlog::debug("isSetuid -> dbuid={}, dbgid={}", dbuid, dbgid);
 
@@ -821,7 +821,8 @@ void DBEntryV1::writeEntry() {
 
     caps.lower_cap({CAP_FOWNER, CAP_DAC_OVERRIDE}, dbuid, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-    if (caps.isSetuid()) {
+    // if we have caps, we have to change owner, in setuid mode we created it as correct user
+    if (caps.hasCaps()) {
         caps.raise_cap({CAP_CHOWN}, utils::SrcPos(__FILE__, __LINE__, __func__));
         if (chown(dbfilepath.c_str(), dbuid, dbgid)) {
             caps.lower_cap({CAP_CHOWN}, dbuid, utils::SrcPos(__FILE__, __LINE__, __func__));
