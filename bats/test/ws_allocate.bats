@@ -423,7 +423,7 @@ setup() {
 
 @test "ws_allocate reminder warning when exceeds duration" {
     run ws_allocate --config bats/ws.conf -r 10 -m test@example.com REMWARN 5
-    assert_output --partial "reminder is only sent after workspace expiry"
+    assert_output --partial "reminder email is sent after workspace expiry"
     assert_success
     rm -f /tmp/ws/ws2-db/${USER}-REMWARN
 }
