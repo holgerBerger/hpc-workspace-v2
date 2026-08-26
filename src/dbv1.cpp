@@ -30,6 +30,7 @@
 
 #include <filesystem>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 // use for speed, but needs testing // FIXME:
@@ -662,9 +663,11 @@ void DBEntryV1::release(time_t& timestamp_time) {
 // set expired (not released)
 // SPEC: can be called by root only!
 // SPEC: does not work on root_squash!
+// remarkthis can be called as root or user in user test mode
 void DBEntryV1::expire(const std::string timestamp) {
     if (traceflag)
         spdlog::trace("expire({})", timestamp);
+
     auto wsconfig = parent_db->getconfig()->getFsConfig(filesystem);
     cppfs::path dbtarget = cppfs::path(wsconfig.database) / cppfs::path(wsconfig.deletedPath) /
                            cppfs::path(fmt::format("{}-{}", id, timestamp));
@@ -676,7 +679,8 @@ void DBEntryV1::expire(const std::string timestamp) {
 
     // update expired entry so we can later see when this was expired by this method
     expired = time(0L); // insteaf of making long from string again, just get time again as in caller
-    writeEntry();
+    writeEntry(true); // the option makes sure the writeEntry does not drop privileges, this is important for ws_expirer which is run as root or user
+                    // but has to capabilities to drop
 
     // filesystem part
     try {
@@ -714,7 +718,7 @@ void DBEntryV1::remove() {
 
 // write data to file
 //  unittest: yes
-void DBEntryV1::writeEntry() {
+void DBEntryV1::writeEntry(const bool calledasroot) {
     if (traceflag)
         spdlog::trace("writeEntry()");
     int perm;
@@ -765,16 +769,17 @@ void DBEntryV1::writeEntry() {
     // suppress ctrl-c to prevent broken DB entries when FS is hanging and user gets nervous
     signal(SIGINT, SIG_IGN);
 
-    caps.raise_cap({CAP_DAC_OVERRIDE},
+    if (!calledasroot)
+        caps.raise_cap({CAP_DAC_OVERRIDE},
                    utils::SrcPos(__FILE__, __LINE__, __func__)); // === Section with raised capabuility START ====
 
     long dbgid = 0, dbuid = 0;
 
+    dbuid = parent_db->getconfig()->dbuid();
+    dbgid = parent_db->getconfig()->dbgid();
+
     if (user::isSetuid()) {
         // for filesystem with root_squash, we need to be DB user here
-        dbuid = parent_db->getconfig()->dbuid();
-        dbgid = parent_db->getconfig()->dbgid();
-
         if (debugflag)
             spdlog::debug("isSetuid -> dbuid={}, dbgid={}", dbuid, dbgid);
 
@@ -812,22 +817,27 @@ void DBEntryV1::writeEntry() {
         perm = 0644;
     }
 
-    caps.raise_cap({CAP_FOWNER}, utils::SrcPos(__FILE__, __LINE__, __func__));
+    if (!calledasroot)
+        caps.raise_cap({CAP_FOWNER}, utils::SrcPos(__FILE__, __LINE__, __func__));
     if (chmod(dbfilepath.c_str(), perm) != 0) {
         spdlog::error("could not change permissions of database entry");
         if (debugflag)
             spdlog::error("{}", std::strerror(errno));
     }
 
-    caps.lower_cap({CAP_FOWNER, CAP_DAC_OVERRIDE}, dbuid, utils::SrcPos(__FILE__, __LINE__, __func__));
+    if (!calledasroot)
+        caps.lower_cap({CAP_FOWNER, CAP_DAC_OVERRIDE}, dbuid, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-    if (caps.isSetuid()) {
-        caps.raise_cap({CAP_CHOWN}, utils::SrcPos(__FILE__, __LINE__, __func__));
+    // if we have caps, we have to change owner, in setuid mode we created it as correct user
+    if (caps.hasCaps()) {
+        if (!calledasroot)
+            caps.raise_cap({CAP_CHOWN}, utils::SrcPos(__FILE__, __LINE__, __func__));
         if (chown(dbfilepath.c_str(), dbuid, dbgid)) {
             caps.lower_cap({CAP_CHOWN}, dbuid, utils::SrcPos(__FILE__, __LINE__, __func__));
             spdlog::error("could not change owner of database entry.");
         }
-        caps.lower_cap({CAP_CHOWN}, dbuid, utils::SrcPos(__FILE__, __LINE__, __func__));
+        if (!calledasroot)
+            caps.lower_cap({CAP_CHOWN}, dbuid, utils::SrcPos(__FILE__, __LINE__, __func__));
     }
 
     // normal signal handling
