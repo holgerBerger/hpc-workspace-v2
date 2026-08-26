@@ -55,7 +55,7 @@ class DBEntry {
     virtual void readFromFile(const WsID id, const string filesystem, const string filename) = 0;
 
     // write entry to DB after update (read with readEntry)
-    virtual void writeEntry() = 0;
+    virtual void writeEntry(const bool calledasroot = false) = 0;
 
     // remove db entry
     virtual void remove() = 0;
