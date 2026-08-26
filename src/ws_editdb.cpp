@@ -261,6 +261,7 @@ int main(int argc, char** argv) {
     }
 
     vector<std::unique_ptr<DBEntry>> entrylist;
+    vector<std::unique_ptr<Database>> dblist; // keep DBs alive until entries are written
 
     // Initialize thread pool once for all filesystems
     if (debugflag) {
@@ -298,6 +299,8 @@ int main(int argc, char** argv) {
                              }
                          })
             .wait();
+
+        dblist.push_back(std::move(db)); // keep DB alive, entry->writeEntry() dereferences parent_db
 
     } // loop over fs
 
