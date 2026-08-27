@@ -268,6 +268,7 @@ std::string generateExpirationMail(const std::string& mail_from, std::vector<std
     mail << "Your workspace can be restored for the next " << keeptime
          << " days using ws_restore, to view restorable workspaces use ws_restore -l or ws_list -e" << CRLF;
     mail << "" << CRLF;
+    mail << "(you can disable this email by setting 'expirationmail: false' in your ~/.ws_user.conf)" << CRLF;
 
     mail << "" << CRLF;
     mail << "--" << boundary << "--" << CRLF;
@@ -819,7 +820,7 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                 try {
                     // timeout is now + deldirtimeout;
                     std::time_t deadline = std::time_t(std::time(nullptr)) + config.deldirtimeout();
-                    spdlog::info("   deadline: {}", deadline);
+                    spdlog::info("   deadline: {}/{} in {} seconds", deadline, utils::ctime(deadline), config.deldirtimeout());
 
                     utils::rmtree(wspath.string(), deadline);
                 } catch (cppfs::filesystem_error& e) {
