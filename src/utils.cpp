@@ -275,21 +275,30 @@ std::string getFirstLine(const std::string& multilineString) {
 }
 
 // getID returns id part of workspace id <username-id>
-// Updated to handle wsid format "username-id" where username can contain '-'
-// It returns what is after the last "-" (everything from the right up to the first "-")
-// FIXME: this assumes the wsid format is "username-id", and id does not contain '-'
+// can handle usernames and workspace IDs with "-" in it
+// cost is high if > 1 dash in wsid, as getOwner checks vs existing usernames
 std::string getID(const std::string wsid) {
-    size_t last_dash = wsid.find_last_of('-');
-    if (last_dash == std::string::npos) {
-        return "";
+    // count number of dashes in wsid
+    size_t num_dashes = std::count(wsid.begin(), wsid.end(), '-');
+
+    if (num_dashes == 1) {
+        // happy case: wsid is "username-id"
+        size_t last_dash = wsid.find_last_of('-');
+        if (last_dash == std::string::npos) {
+            return "";
+        }
+        return wsid.substr(last_dash + 1);
+    } else {
+        auto owner = getOwner(wsid);
+        return wsid.substr(owner.length() + 1);
     }
-    return wsid.substr(last_dash + 1);
 }
 
 // getOwner returns the owner part of workspace id <username-id>
 // Updated to handle wsid format "username-id" where username can contain '-'
 // This can also handle id containing '-' by testing possible usernames if they exist.
 // If none exists, take the shortest one containing no '-'
+// FIXME: this is expensive, as it calls user::exists a lot
 std::string getOwner(const std::string& wsid) {
     size_t pos = wsid.find('-');
     if (pos == std::string::npos) {
@@ -304,14 +313,14 @@ std::string getOwner(const std::string& wsid) {
         if (user::exists(candidate)) {
             return candidate;
         }
-        if (current_dash == 0) break;
+        if (current_dash == 0)
+            break;
         current_dash = wsid.find_last_of('-', current_dash - 1);
     }
 
     // If no existing user found, fallback to the shortest part before the first '-'
     return wsid.substr(0, pos);
 }
-
 
 /*
 // print a character r times

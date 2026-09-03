@@ -366,6 +366,14 @@ ws1"
     ws_release --config bats/ws.conf shortopt
 }
 
+@test "ws_list mean name" {
+    ws_allocate --config bats/ws.conf mean-name
+    run ws_list --config bats/ws.conf -s mean-name
+    assert_output "mean-name"
+    assert_success
+    ws_release --config bats/ws.conf "mean-name"
+}
+
 @test "ws_list table format with NO_COLOR" {
     ws_allocate --config bats/ws.conf colortest
     run env NO_COLOR=1 ws_list --config bats/ws.conf -T colortest

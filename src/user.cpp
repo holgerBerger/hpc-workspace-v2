@@ -50,6 +50,7 @@ extern int debuglevel;
 namespace user {
 
 // exists returns true if the given username exists in the system's passwd database
+// FIXME: this is expensive, as it calls getpwnam for each username, could cache results
 bool exists(const std::string& username) { return getpwnam(username.c_str()) != nullptr; }
 
 // get current username via real user id and passwd
