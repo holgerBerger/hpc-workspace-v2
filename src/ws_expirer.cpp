@@ -820,7 +820,8 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                 try {
                     // timeout is now + deldirtimeout;
                     std::time_t deadline = std::time_t(std::time(nullptr)) + config.deldirtimeout();
-                    spdlog::info("   deadline: {}/{} in {} seconds", deadline, utils::ctime(deadline), config.deldirtimeout());
+                    spdlog::info("   deadline: {}/{} in {} seconds", deadline, utils::ctime(deadline),
+                                 config.deldirtimeout());
 
                     utils::rmtree(wspath.string(), deadline);
                 } catch (cppfs::filesystem_error& e) {

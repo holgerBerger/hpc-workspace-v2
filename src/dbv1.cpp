@@ -679,8 +679,8 @@ void DBEntryV1::expire(const std::string timestamp) {
 
     // update expired entry so we can later see when this was expired by this method
     expired = time(0L); // insteaf of making long from string again, just get time again as in caller
-    writeEntry(true); // the option makes sure the writeEntry does not drop privileges, this is important for ws_expirer which is run as root or user
-                    // but has to capabilities to drop
+    writeEntry(true); // the option makes sure the writeEntry does not drop privileges, this is important for ws_expirer
+                      // which is run as root or user but has to capabilities to drop
 
     // filesystem part
     try {
@@ -771,7 +771,7 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
 
     if (!calledasroot)
         caps.raise_cap({CAP_DAC_OVERRIDE},
-                   utils::SrcPos(__FILE__, __LINE__, __func__)); // === Section with raised capabuility START ====
+                       utils::SrcPos(__FILE__, __LINE__, __func__)); // === Section with raised capabuility START ====
 
     long dbgid = 0, dbuid = 0;
 
