@@ -170,15 +170,51 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
         }
     }
 
-    if (!opt.count("mailaddress")) {
-        mailaddress = userconfig.getMailaddress();
 
-        if (mailaddress.length() > 0) {
-            spdlog::info("Took email address <{}> from users config.", mailaddress);
+    // if either user requested reminder or a workspace has expiration mail enabled, check if the user
+    // has a mailaddress set in their config and use it if available
+    // as we do not yet know the workspace name we check if any filesystem has expiration mail enabled
+
+    // we replicate some code from main here, to be ablte to read config here
+    //
+    // find which config files to read
+    //   user can change this if no setuid installation OR if root
+    auto configfilestoread = std::vector<cppfs::path>{"/etc/ws.d", "/etc/ws.conf"};
+    if (configfile != "") {
+        if (user::isRoot() || caps.isUserMode()) {
+            configfilestoread = {configfile};
         } else {
-            mailaddress = user::getUsername();
-            spdlog::info("could not read email from users config ~/.ws_user.conf.");
-            spdlog::info("reminder email will be sent to local user account");
+            spdlog::warn("ignored config file option!");
+        }
+    }
+
+    // read the config
+    auto config = Config(configfilestoread);
+    if (!config.isValid()) {
+        spdlog::error("No valid config file found!");
+        exit(-2);
+    }
+
+    // check if expiration mail is enabled for any filesystem
+    bool fs_expiration_mail = false;
+    for (const auto& fs : config.validFilesystems(user, user::getGrouplist(), ws::CREATE)) {
+        fs_expiration_mail = fs_expiration_mail || config.getFsConfig(fs).expirationmail;
+    }
+
+    // if reminder is set or expiration mail is enabled, check for email, unless user disabled expiration mail
+    if (reminder != 0 || fs_expiration_mail) {
+        spdlog::debug("reminder={} fs_expiration_mail={} expiration_mail={}", reminder, fs_expiration_mail, userconfig.getExpirationMail());
+        if ((!(userconfig.getExpirationMail()==false)) || reminder!=0) {
+            if (!opt.count("mailaddress")) {
+                mailaddress = userconfig.getMailaddress();
+                if (mailaddress.length() > 0) {
+                    spdlog::info("Took email address <{}> from users config.", mailaddress);
+                } else {
+                    mailaddress = user::getUsername();
+                    spdlog::info("could not read email from users config ~/.ws_user.conf.");
+                    spdlog::info("reminder email will be sent to local user account");
+                }
+            }
         }
     }
 
@@ -197,7 +233,7 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
     }
 
     // validate email
-    if (mailaddress != "" && !utils::isValidEmail(mailaddress)) {
+    if (mailaddress != "" && mailaddress.find("@") != std::string::npos && !utils::isValidEmail(mailaddress)) {
         spdlog::error("Invalid email address, ignoring and using local user account");
         mailaddress = user::getUsername();
     }
