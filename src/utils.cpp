@@ -718,7 +718,7 @@ long long getFileTimeAsLong(const fs::path& p) {
     std::error_code ec;
     auto ftime = fs::last_write_time(p, ec);
     if (ec) {
-        spdlog::error("Failed to get write time for '{}': {} ({})", p.string(), ec.message(), ec.value());
+        spdlog::info("Failed to get creation time for '{}': {} ({}) (probably old DB entry)", p.string(), ec.message(), ec.value());
         return 0;
     }
 
