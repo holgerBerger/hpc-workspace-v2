@@ -529,9 +529,16 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
             if (!dryrun) {
                 try {
                     // timeout is now + deldirtimeout
-                    std::time_t deadline = std::time_t(std::time_t(nullptr)) + config.deldirtimeout();
+                    std::time_t deadline = std::time_t(std::time(nullptr)) + config.deldirtimeout();
 
-                    utils::rmtree(cppfs::path(founddir.space) / config.deletedPath(fs) / founddir.dir, deadline);
+                    auto start = chrono::steady_clock::now();
+                    auto deleted = utils::rmtree(cppfs::path(founddir.space) / config.deletedPath(fs) / founddir.dir, deadline);
+                    auto end = chrono::steady_clock::now();
+                    auto duration = chrono::duration_cast<chrono::seconds>(end - start).count();
+
+                    if (deleted > 0) {
+                        spdlog::info("      removed {} files in {} seconds", deleted, duration);
+                    }
 
                 } catch (cppfs::filesystem_error& e) {
                     spdlog::error("      failed to remove: {} ({})",
@@ -823,7 +830,11 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                     spdlog::info("   deadline: {}/{} in {} seconds", deadline, utils::ctime(deadline),
                                  config.deldirtimeout());
 
-                    utils::rmtree(wspath.string(), deadline);
+                    auto start = chrono::steady_clock::now();
+                    auto deleted = utils::rmtree(wspath.string(), deadline);
+                    auto end = chrono::steady_clock::now();
+                    auto duration = chrono::duration_cast<chrono::seconds>(end - start).count();
+                    spdlog::info("      removed {} files in {} seconds", deleted, duration);
                 } catch (cppfs::filesystem_error& e) {
                     spdlog::error("  failed to remove: {} ({})", wspath.string(), e.what());
                 }

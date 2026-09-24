@@ -31,7 +31,10 @@ TEST_CASE("utils", "[utils]") {
         fs::create_directories("/tmp/_wsTT/a/a/a/a");
         fs::create_directories("/tmp/_wsTT/a/a/a/b");
         REQUIRE(fs::exists("/tmp/_wsTT"));
-        utils::rmtree("/tmp/_wsTT");
+        utils::writeFile("/tmp/_wsTT/file1", "file1");
+        utils::writeFile("/tmp/_wsTT/a/file2", "file2");
+        utils::writeFile("/tmp/_wsTT/a/a/a/file3", "file3");
+        REQUIRE(utils::rmtree("/tmp/_wsTT") == 3);
         REQUIRE(fs::exists("/tmp/_wsTT") == false);
     }
 

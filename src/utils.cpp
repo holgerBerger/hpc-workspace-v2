@@ -85,7 +85,7 @@ extern int debuglevel;
 extern Cap caps;
 
 // fwd
-static void rmtree_fd(int topfd, std::string path, const std::time_t deadline);
+static std::size_t rmtree_fd(int topfd, std::string path, const std::time_t deadline);
 
 namespace utils {
 
@@ -513,10 +513,13 @@ auto parseACL(const std::vector<std::string> acl) -> std::map<std::string, std::
 }
 
 // delete path be deleting contents and deleting path itself
-void rmtree(std::string path, std::time_t deadline) {
+// returns the number of files deleted
+std::size_t rmtree(std::string path, std::time_t deadline) {
     if (traceflag) {
         spdlog::trace("rmtree({}, {})", path, deadline);
     }
+
+    std::size_t deleted = 0;
 
     struct stat orig_stat, new_stat;
 
@@ -530,7 +533,7 @@ void rmtree(std::string path, std::time_t deadline) {
         int dirfd = openat(0, path.c_str(), O_RDONLY | O_CLOEXEC);
         r = fstatat(dirfd, "", &new_stat, AT_EMPTY_PATH);
         if (r == 0 && memcmp(&new_stat, &orig_stat, sizeof(struct stat)) == 0) {
-            rmtree_fd(dirfd, path, deadline);
+            deleted = rmtree_fd(dirfd, path, deadline);
             close(dirfd);
             dirfd_closed = true;
 
@@ -543,20 +546,25 @@ void rmtree(std::string path, std::time_t deadline) {
         if (!dirfd_closed)
             close(dirfd);
     }
+    return deleted;
 }
 
 // delete path be deleting contents and deleting path itself
 // without deadline
-void rmtree(std::string path) { rmtree(path, (std::time_t)0L); }
+// returns the number of files deleted
+std::size_t rmtree(std::string path) { return rmtree(path, (std::time_t)0L); }
 
 // delete path be deleting contents and NOT deleting path itself
 // with deadline
-void rmtree_below(std::string path) {
+// returns the number of files deleted
+std::size_t rmtree_below(std::string path) {
     auto deadline = (std::time_t)0L;
 
     if (traceflag) {
         spdlog::trace("rmtree_below({}, {})", path, deadline);
     }
+
+    std::size_t deleted = 0;
 
     struct stat orig_stat, new_stat;
 
@@ -570,12 +578,13 @@ void rmtree_below(std::string path) {
         int dirfd = openat(0, path.c_str(), O_RDONLY | O_CLOEXEC);
         r = fstatat(dirfd, "", &new_stat, AT_EMPTY_PATH);
         if (r == 0 && memcmp(&new_stat, &orig_stat, sizeof(struct stat)) == 0) {
-            rmtree_fd(dirfd, path, deadline);
+            deleted = rmtree_fd(dirfd, path, deadline);
             close(dirfd);
         }
         if (!dirfd_closed)
             close(dirfd);
     }
+    return deleted;
 }
 
 // pretty print a size in bytes
@@ -718,7 +727,8 @@ long long getFileTimeAsLong(const fs::path& p) {
     std::error_code ec;
     auto ftime = fs::last_write_time(p, ec);
     if (ec) {
-        spdlog::info("Failed to get creation time for '{}': {} ({}) (probably old DB entry)", p.string(), ec.message(), ec.value());
+        spdlog::info("Failed to get creation time for '{}': {} ({}) (probably old DB entry)", p.string(), ec.message(),
+                     ec.value());
         return 0;
     }
 
@@ -738,7 +748,10 @@ long long getFileTimeAsLong(const fs::path& p) {
 // after the deadline is passed, no new recursion will be started,
 // so the deadline is not hard but soft and can be missed significantly
 // deadline==0 disables the deadline
-static void rmtree_fd(int topfd, std::string path, const std::time_t deadline) {
+// returns the number of files deleted
+static std::size_t rmtree_fd(int topfd, std::string path, const std::time_t deadline) {
+    std::size_t deleted = 0;
+
     if (traceflag) {
         spdlog::trace("rmtree_fd({}, {}, {})", topfd, path, deadline);
     }
@@ -746,7 +759,10 @@ static void rmtree_fd(int topfd, std::string path, const std::time_t deadline) {
     // check for deadline
     if (deadline != 0 && std::time((long*)0L) >= deadline) {
         spdlog::info("rmtree_fd deadline passed, exiting.");
-        return;
+        if (debugflag) {
+            spdlog::debug("deadline={} time={}", deadline, std::time((long*)0L));
+        }
+        return deleted;
     }
 
     auto dir = fdopendir(topfd);
@@ -780,7 +796,7 @@ static void rmtree_fd(int topfd, std::string path, const std::time_t deadline) {
                         bool dirfd_closed = false;
                         r = fstatat(dirfd, "", &new_stat, AT_EMPTY_PATH);
                         if (r == 0 && memcmp(&new_stat, &orig_stat, sizeof(struct stat)) == 0) {
-                            rmtree_fd(dirfd, fs::path(path) / (const char*)&ent->d_name[0], deadline);
+                            deleted += rmtree_fd(dirfd, fs::path(path) / (const char*)&ent->d_name[0], deadline);
                             close(dirfd);
                             dirfd_closed = true;
 
@@ -800,6 +816,8 @@ static void rmtree_fd(int topfd, std::string path, const std::time_t deadline) {
                 int r = unlinkat(topfd, (const char*)&ent->d_name[0], 0);
                 if (r) {
                     spdlog::error("unlinkat {}/{} -> {}", path, (const char*)&ent->d_name[0], strerror(errno));
+                } else {
+                    deleted++;
                 }
             }
         }
@@ -807,4 +825,5 @@ static void rmtree_fd(int topfd, std::string path, const std::time_t deadline) {
     } else {
         spdlog::error("fdopendir {} -> {}", topfd, errno);
     }
+    return deleted;
 }

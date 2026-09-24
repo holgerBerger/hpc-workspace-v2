@@ -31,6 +31,7 @@
  */
 
 #include <algorithm>
+#include <cstddef>
 #include <ctime>
 #include <filesystem>
 #include <map>
@@ -90,13 +91,16 @@ auto parseACL(const std::vector<std::string> acl) -> std::map<std::string, std::
 // after the deadline is passed, no new recursion will be started,
 // so the deadline is not hard but soft and can be missed significantly
 // deadline==0 disables the deadline
-void rmtree(std::string path, const std::time_t deadline);
+// returns the number of files deleted
+std::size_t rmtree(std::string path, const std::time_t deadline);
 
 // delete a directory and its contents, should be temper safe
-void rmtree(std::string path);
+// returns the number of files deleted
+std::size_t rmtree(std::string path);
 
 // delete a directorys contents, but not the directory itself
-void rmtree_below(std::string path);
+// returns the number of files deleted
+std::size_t rmtree_below(std::string path);
 
 // split a string at delimiter and return vector
 std::vector<std::string> splitString(const std::string& str, char delimiter);
