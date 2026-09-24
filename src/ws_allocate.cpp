@@ -170,7 +170,6 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
         }
     }
 
-
     // if either user requested reminder or a workspace has expiration mail enabled, check if the user
     // has a mailaddress set in their config and use it if available
     // as we do not yet know the workspace name we check if any filesystem has expiration mail enabled
@@ -203,8 +202,9 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
 
     // if reminder is set or expiration mail is enabled, check for email, unless user disabled expiration mail
     if (reminder != 0 || fs_expiration_mail) {
-        spdlog::debug("reminder={} fs_expiration_mail={} expiration_mail={}", reminder, fs_expiration_mail, userconfig.getExpirationMail());
-        if ((!(userconfig.getExpirationMail()==false)) || reminder!=0) {
+        spdlog::debug("reminder={} fs_expiration_mail={} expiration_mail={}", reminder, fs_expiration_mail,
+                      userconfig.getExpirationMail());
+        if ((!(userconfig.getExpirationMail() == false)) || reminder != 0) {
             if (!opt.count("mailaddress")) {
                 mailaddress = userconfig.getMailaddress();
                 if (mailaddress.length() > 0) {
