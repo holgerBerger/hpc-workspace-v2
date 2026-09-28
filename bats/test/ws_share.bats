@@ -697,6 +697,52 @@ setup() {
     ws_release --config bats/ws.conf ${ws_name}_check
 }
 
+@test "ws_share check reports unshared workspace" {
+    run ws_allocate --config bats/ws.conf ${ws_name}_check_unshared
+    assert_success
+
+    run ws_share --config bats/ws.conf check ${ws_name}_check_unshared
+    assert_success
+    assert_output --partial "not shared"
+
+    # Cleanup
+    ws_release --config bats/ws.conf ${ws_name}_check_unshared
+}
+
+@test "ws_share check reports shared users" {
+    run ws_allocate --config bats/ws.conf ${ws_name}_check_shared
+    assert_success
+
+    run ws_share --config bats/ws.conf share ${ws_name}_check_shared $USER
+    assert_success
+
+    run ws_share --config bats/ws.conf check ${ws_name}_check_shared
+    assert_success
+    assert_output --partial "Share state"
+    assert_output --partial "user $USER"
+
+    # Cleanup
+    ws_release --config bats/ws.conf ${ws_name}_check_shared
+}
+
+@test "ws_share check detects missing default ACL entry" {
+    run ws_allocate --config bats/ws.conf ${ws_name}_check_bad
+    assert_success
+
+    local wsdir
+    wsdir=$(ws_find --config bats/ws.conf ${ws_name}_check_bad)
+
+    # Simulate a broken share state: access entry without matching default entry
+    setfacl -m user:$USER:r-x "$wsdir"
+
+    run ws_share --config bats/ws.conf check ${ws_name}_check_bad
+    assert_failure
+    assert_output --partial "no matching default ACL entry"
+
+    # Cleanup
+    ws_release --config bats/ws.conf ${ws_name}_check_bad
+}
+
 @test "ws_share unshare with config option" {
     run ws_allocate --config bats/ws.conf ${ws_name}_unshare_config
     assert_success

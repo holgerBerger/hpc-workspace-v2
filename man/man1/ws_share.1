@@ -104,6 +104,19 @@ List all users and groups that have ACL entries for WORKSPACE.
 ws_share list WORKSPACE
 .RE
 
+.PP
+.B check
+.RS 4
+Show which users and groups the WORKSPACE is shared with and verify that the
+ACLs are consistent: every named access ACL entry must have a matching default
+ACL entry and vice versa. Exits with an error if the share state is
+inconsistent, which can happen after permissions were modified with tools like
+.BR chmod .
+A workaround for inconsistent ACLs is to unshare and re-share the workspace.
+.sp
+ws_share check [\-F FILESYSTEM] WORKSPACE
+.RE
+
 .SH EXAMPLES
 .TP
 grant read-only access to alice and bob:
@@ -129,6 +142,11 @@ $ ws_share unshare my_workspace bob
 remove all ACL entries from a workspace:
 .RS 4
 $ ws_share unshare-all my_workspace
+.RE
+.TP
+verify the share state of a workspace:
+.RS 4
+$ ws_share check my_workspace
 .RE
 
 

@@ -51,6 +51,9 @@ Remove all ACLs from a workspace:
 List users/groups with ACL entries:
  $progname list [--config CONFIG] WS_NAME
 
+Check share state (ACL consistency) of a workspace:
+ $progname check [--config CONFIG] [-F FILESYSTEM] WS_NAME
+
 options:
    -F, --filesystem  ws filesystem
    -h, --help        show this help
@@ -304,6 +307,47 @@ case $ACTION in
         fi
         ;;
     check)
+        ACL=$(getfacl -p "$WS_PATH" 2>/dev/null)
+        if [[ $? -ne 0 ]]; then
+            echo "Error: Failed to read ACLs of $WS_PATH"
+            exit 1
+        fi
+        # Named entries (those with a user/group name) are the actual share grants.
+        ACCESS_ENTRIES=$(grep -E '^(user|group):[^:]+:' <<<"$ACL")
+        DEFAULT_ENTRIES=$(grep -E '^default:(user|group):[^:]+:' <<<"$ACL")
+        if [[ -z "$ACCESS_ENTRIES" && -z "$DEFAULT_ENTRIES" ]]; then
+            echo "Workspace $WS_NAME is not shared with any users or groups."
+            exit 0
+        fi
+        RC=0
+        echo "Share state of workspace $WS_NAME:"
+        while IFS= read -r entry; do
+            [[ -z "$entry" ]] && continue
+            kind=${entry%%:*}
+            rest=${entry#*:}
+            name=${rest%%:*}
+            perm=${rest#*:}
+            if [[ "$perm" == *w* ]]; then pstr="readwrite"; else pstr="read"; fi
+            echo "  $kind $name: $pstr"
+            # ws_share always sets access and default entries together; a missing
+            # default entry means new files will not inherit the grant (e.g. after chmod).
+            if ! grep -qxF "default:$entry" <<<"$DEFAULT_ENTRIES"; then
+                echo "Warning: no matching default ACL entry for '$entry'; new files will not inherit this access"
+                RC=1
+            fi
+        done <<<"$ACCESS_ENTRIES"
+        while IFS= read -r entry; do
+            [[ -z "$entry" ]] && continue
+            # Orphaned default entry: grants access to new files but not existing ones.
+            if ! grep -qxF "${entry#default:}" <<<"$ACCESS_ENTRIES"; then
+                echo "Warning: default ACL entry '$entry' has no matching access ACL entry; existing files are not shared"
+                RC=1
+            fi
+        done <<<"$DEFAULT_ENTRIES"
+        if [[ $RC -ne 0 ]]; then
+            echo "Error: Inconsistent ACLs detected. A workaround is to unshare and re-share the workspace."
+            exit 1
+        fi
         ;;
     *)
         echo "Error: Invalid action $ACTION"
