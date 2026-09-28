@@ -160,7 +160,15 @@ fi
 
 case $ACTION in
     list)
-        getfacl -apt "$WS_PATH" | awk '/user|group|USER|GROUP/&&!/---/{gsub("rw.","readwrite");gsub("r-.","read");print}'
+        # Parse ACL lines by fields. Do NOT substitute on the whole line:
+        # usernames/paths may contain substrings like "r-x" (e.g. mean-user-name),
+        # and the #-prefixed header lines must not be reported as grants.
+        # Note: no -t here; getfacl's test mode emits space-separated entries.
+        getfacl -ap "$WS_PATH" | awk -F: \
+            '/^(user|group):[^:]+:/ {
+                access = (substr($3, 2, 1) == "w") ? "readwrite" : "read"
+                printf "%-7s %-20s %s\n", $1, $2, access
+            }'
         ;;
     share)
         USERS="$@"
@@ -184,7 +192,7 @@ case $ACTION in
         setfacl -R -m "${MACL%,}" "$WS_PATH"
         if [[ $? -eq 0 ]]; then
             for user in $USERS; do
-                logger -t ws_share -p user.info "Granted $ACCESS_STR access to user <$user> for workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>"
+                logger -t ws_share -p user.info "Granted $ACCESS_STR access to user <$user> for workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>" || true
             done
         else
             echo "Error: Failed to set ACLs"
@@ -213,7 +221,7 @@ case $ACTION in
         setfacl -R -x "${XACL%,}" "$WS_PATH"
         if [[ $? -eq 0 ]]; then
             for user in $USERS; do
-                logger -t ws_share -p user.info "Removed access for user <$user> from workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>"
+                logger -t ws_share -p user.info "Removed access for user <$user> from workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>" || true
             done
         else
             echo "Error: Failed to remove ACLs"
@@ -257,7 +265,7 @@ case $ACTION in
           setfacl -R -m "${MACL%,}" "$WS_PATH"
           if [[ $? -eq 0 ]]; then
               for group in $GROUPARG; do
-                  logger -t ws_share -p user.info "Granted $ACCESS_STR access to group <$group> for workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>"
+                  logger -t ws_share -p user.info "Granted $ACCESS_STR access to group <$group> for workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>" || true
               done
           else
               echo "Error: Failed to set ACLs"
@@ -287,7 +295,7 @@ case $ACTION in
             setfacl -R -x "${XACL%,}" "$WS_PATH"
             if [[ $? -eq 0 ]]; then
                 for group in $GROUPARG; do
-                    logger -t ws_share -p user.info "Removed access for group <$group> from workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>"
+                    logger -t ws_share -p user.info "Removed access for group <$group> from workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>" || true
                 done
             else
                 echo "Error: Failed to remove ACLs"
@@ -300,7 +308,7 @@ case $ACTION in
         sleep 3;
         setfacl -R -b "$WS_PATH"
         if [[ $? -eq 0 ]]; then
-            logger -t ws_share -p user.info "Removed all shared access from workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>"
+            logger -t ws_share -p user.info "Removed all shared access from workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>" || true
         else
             echo "Error: Failed to remove all ACLs"
             exit 1
@@ -313,8 +321,10 @@ case $ACTION in
             exit 1
         fi
         # Named entries (those with a user/group name) are the actual share grants.
-        ACCESS_ENTRIES=$(grep -E '^(user|group):[^:]+:' <<<"$ACL")
-        DEFAULT_ENTRIES=$(grep -E '^default:(user|group):[^:]+:' <<<"$ACL")
+        # Strip trailing comments (e.g. "#effective:...") so access/default entries
+        # can be compared by exact string match.
+        ACCESS_ENTRIES=$(grep -E '^(user|group):[^:]+:' <<<"$ACL" | awk '{print $1}')
+        DEFAULT_ENTRIES=$(grep -E '^default:(user|group):[^:]+:' <<<"$ACL" | awk '{print $1}')
         if [[ -z "$ACCESS_ENTRIES" && -z "$DEFAULT_ENTRIES" ]]; then
             echo "Workspace $WS_NAME is not shared with any users or groups."
             exit 0

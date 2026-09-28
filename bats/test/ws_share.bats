@@ -582,9 +582,6 @@ setup() {
     run ws_allocate --config bats/ws.conf ${ws_name}_list_config
     assert_success
 
-    local wsdir
-    wsdir=$(ws_find --config bats/ws.conf ${ws_name}_list_config)
-
     # Share with read-only
     run ws_share --config bats/ws.conf share ${ws_name}_list_config $USER
     assert_success
@@ -593,10 +590,35 @@ setup() {
     run ws_share --config bats/ws.conf list ${ws_name}_list_config
     assert_success
     assert_output --regexp "read"
-    assert_output --regexp "$USER"
 
     # Cleanup
     ws_release --config bats/ws.conf ${ws_name}_list_config
+}
+
+@test "ws_share list handles names containing user/group substrings" {
+    # The workspace path embeds the username (e.g. mean-user-name-WS), so with
+    # such names the old line-based awk filter matched the "# file:" header and
+    # gsub'd "r-x"-like substrings inside names/paths (mean-user-name ->
+    # mean-usereadame). The field-based parser must print grants verbatim.
+    run ws_allocate --config bats/ws.conf ${ws_name}_list_user
+    assert_success
+
+    # Unshared workspace: no headers and no unnamed owner entries in output
+    run ws_share --config bats/ws.conf list ${ws_name}_list_user
+    assert_success
+    refute_output --partial "# file:"
+    refute_output --partial "user::"
+    refute_output --partial "group::"
+
+    # Shared: grant name must appear un-mangled
+    run ws_share --config bats/ws.conf share ${ws_name}_list_user $USER
+    assert_success
+    run ws_share --config bats/ws.conf list ${ws_name}_list_user
+    assert_success
+    assert_output --regexp "user[[:space:]]+$USER[[:space:]]+read"
+
+    # Cleanup
+    ws_release --config bats/ws.conf ${ws_name}_list_user
 }
 
 @test "ws_share unshare with multiple users" {
