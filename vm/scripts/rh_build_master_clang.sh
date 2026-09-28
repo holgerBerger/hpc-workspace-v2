@@ -1,5 +1,7 @@
 #!/bin/bash
 
+sudo dnf install -y clang
+
 cd /home/vagrant
 git clone https://github.com/holgerBerger/hpc-workspace-v2
 cd hpc-workspace-v2
