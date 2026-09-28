@@ -128,12 +128,26 @@ fi
 
 if [[ -z "$ACTION" ]]; then
     echo "Error: no action specified"
+    usage
     exit 1
 fi
 if [[ -z "$WS_NAME" ]]; then
     echo "Error: workspace name missing"
+    usage
     exit 1
 fi
+
+# Validate the action before resolving the workspace so that mistakes like
+#   ws_share -F gpfs WS usera   (the action was forgotten)
+# report the real problem instead of a misleading "Invalid workspace name".
+case $ACTION in
+    list | share | unshare | sharegroup | unsharegroup | unshare-all | check) ;;
+    *)
+        echo "Error: Invalid action '$ACTION'. Did you forget to specify an action?"
+        usage
+        exit 1
+        ;;
+esac
 
 WS_PATH=$(ws_find ${CONFIG:+--config $CONFIG} ${CONFIG_FILE:+--config $CONFIG_FILE} ${FILESYSTEM:+-F $FILESYSTEM} $WS_NAME)
 if [[ $? -ne 0 || -z "$WS_PATH" ]]; then
