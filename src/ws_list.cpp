@@ -199,7 +199,9 @@ void print_entry_tableformat(const DBEntry* entry, const Config config, [[maybe_
     }
 
 #pragma GCC diagnostic push                            // save the actual diag context
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized" // disable maybe warnings
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized" // disable maybe warnings (GCC-only warning group)
+#endif
     fmt::color remaincolor;
 
     if (color_output) {

@@ -62,7 +62,9 @@ template <typename T = std::filesystem::path> class PathWorkStealingQueue {
     static constexpr size_t getAlignSize() {
 #ifdef __cpp_lib_hardware_interference_size
 #pragma GCC diagnostic push                            // save the actual diag context
-#pragma GCC diagnostic ignored "-Winterference-size" // disable maybe warnings
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Winterference-size" // disable maybe warnings (GCC-only warning group)
+#endif
         return std::hardware_destructive_interference_size;
 #pragma GCC diagnostic pop                             // restore the actual diag context
 #else
