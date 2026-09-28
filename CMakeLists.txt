@@ -28,6 +28,9 @@ endif()
 add_compile_definitions(WS_VERSION="${workspace_VERSION}")
 add_compile_options(-Wno-deprecated-declarations)
 
+# GCC 12+ only: suppress std::hardware_destructive_interference_size warning (unknown to clang)
+add_compile_options($<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,12>>:-Wno-interference-size>)
+
 # Git commit hash if in repository
 if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/.git")
     add_compile_definitions(IS_GIT_REPOSITORY=1)
