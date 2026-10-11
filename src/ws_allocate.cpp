@@ -338,7 +338,7 @@ int countWorkspaces(const Config& config, const std::string username, const std:
             continue;
         }
 
-        auto matchlist = db->matchPattern("*", "*", grouplist, false, false);
+        auto matchlist = db->matchPattern("*", username, grouplist, false, false);
         counter += matchlist.size();
     }
 
@@ -401,7 +401,8 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
     if (config.maxuserworkspaces() > 0) {
         auto grouplist = user::getGrouplist();
         if (countWorkspaces(config, username, grouplist) > config.maxuserworkspaces()) {
-            spdlog::error("too many workspaces, exceeding global user limit, failing.");
+            spdlog::error("too many workspaces for user <{}>, exceeding per-user limit of {}, failing.", username,
+                          config.maxuserworkspaces());
             syslog(LOG_ERR, "user <%s> exceeding workspace number limit", username.c_str());
             return false;
         }
