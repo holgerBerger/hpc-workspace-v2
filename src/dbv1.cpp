@@ -596,6 +596,71 @@ void DBEntryV1::setExpiration(const time_t timestamp) { expiration = timestamp; 
 // change expired time
 void DBEntryV1::setExpired(const time_t timestamp) { expired = timestamp; }
 
+// rename DB entry file and ID of an entry from the deleted area, so that the trailing
+// timestamp reflects the new retention boundary ("<base>-<old_ts>" -> "<base>-<new_ts>").
+// The workspace directory itself has to be moved by the caller (as ws_expirer does it:
+// DB entry first, workspace second).
+void DBEntryV1::renameAsExpired(const time_t new_boundary) {
+    if (traceflag)
+        spdlog::trace("renameAsExpired({})", new_boundary);
+
+    // released entries carry the release time in their name, not an expired time
+    if (released > 1000000000L) {
+        throw DatabaseException(fmt::format("entry {} was released by user, name carries release time", id));
+    }
+    auto dash = id.rfind('-');
+    if (dash == string::npos) {
+        throw DatabaseException(fmt::format("id {} has no timestamp suffix to replace", id));
+    }
+    if (new_boundary <= 0) {
+        throw DatabaseException(
+            fmt::format("refusing to rename entry {} to implausible timestamp {}", id, new_boundary));
+    }
+
+    string new_id = id.substr(0, dash) + "-" + fmt::format("{}", new_boundary);
+
+    auto wsconfig = parent_db->getconfig()->getFsConfig(filesystem);
+    cppfs::path dbtarget = cppfs::path(wsconfig.database) / cppfs::path(wsconfig.deletedPath) / cppfs::path(new_id);
+
+    // check if target exists, as std::filesystem::rename does delete target if it exists
+    // in case of collision, delay and wait for 1s resolution (but increment to avoid glitches)
+    if (cppfs::exists(dbtarget)) {
+        spdlog::info("delaying to avoid name collision");
+        sleep(1);
+        new_id = id.substr(0, dash) + "-" + fmt::format("{}", new_boundary + 1);
+        dbtarget = cppfs::path(wsconfig.database) / cppfs::path(wsconfig.deletedPath) / cppfs::path(new_id);
+    }
+
+    caps.raise_cap({CAP_FOWNER, CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
+
+    if (caps.isSetuid()) {
+        // for filesystems with root_squash, we need to be DB user here
+        if (setegid(parent_db->getconfig()->dbgid()) || seteuid(parent_db->getconfig()->dbuid())) {
+            caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, parent_db->getconfig()->dbuid(),
+                           utils::SrcPos(__FILE__, __LINE__, __func__));
+            throw DatabaseException("can not seteuid or setgid. Bad installation?");
+        }
+    }
+
+    try {
+        if (debugflag)
+            spdlog::debug("rename({}, {})", dbfilepath, dbtarget.string());
+        cppfs::rename(dbfilepath, dbtarget);
+        dbfilepath = dbtarget.string(); // entry knows now the new name, for remove and writeEntry
+        id = new_id;                    // the ID changed with the filename
+    } catch (const std::filesystem::filesystem_error& e) {
+        auto euid = geteuid();
+        caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, parent_db->getconfig()->dbuid(),
+                       utils::SrcPos(__FILE__, __LINE__, __func__));
+        if (debugflag)
+            spdlog::error("{} (euid={})", e.what(), euid);
+        throw DatabaseException("database entry could not be renamed!");
+    }
+
+    caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, parent_db->getconfig()->dbuid(),
+                   utils::SrcPos(__FILE__, __LINE__, __func__));
+}
+
 // change release date (mark as released and not expired)
 // write DB entry
 // move DB entry to releases entries

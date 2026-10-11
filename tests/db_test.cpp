@@ -216,6 +216,60 @@ comment: ""
         std::unique_ptr<DBEntry> entry2(db1->readEntry("user1-TEST1", false));
         REQUIRE(entry->getMailaddress() == "mail@box.com");
     }
+
+    SECTION("rename deleted entry") {
+
+        auto removedir = ws2dbname / fs::path(".removed");
+
+        // normal expired entry: "<base>-<old_ts>" -> "<base>-<new_ts>"
+        std::unique_ptr<DBEntry> entry(db2->readEntry("user2-TEST5-111111", true));
+        REQUIRE(entry->getId() == "user2-TEST5-111111");
+        REQUIRE_NOTHROW(entry->renameAsExpired(111222333));
+        REQUIRE(entry->getId() == "user2-TEST5-111222333");
+        REQUIRE(fs::exists(removedir / "user2-TEST5-111222333"));
+        REQUIRE_FALSE(fs::exists(removedir / "user2-TEST5-111111"));
+
+        // new name is a valid entry, content unchanged
+        std::unique_ptr<DBEntry> entry2(db2->readEntry("user2-TEST5-111222333", true));
+        REQUIRE(entry2->getExpiration() == 1734701876);
+
+        // implausible boundary: throw, leave entry alone
+        REQUIRE_THROWS(entry2->renameAsExpired(-5));
+        REQUIRE(fs::exists(removedir / "user2-TEST5-111222333"));
+
+        // released entries carry the release time in their name, renaming is refused
+        std::ofstream wsentry9(removedir / "user2-TEST6-222222");
+        fmt::println(wsentry9,
+                     R"yaml(
+workspace: /a/path23
+expiration: 1734701876
+extensions: 3
+reminder: 0
+mailaddress: ""
+comment: ""
+released: 1600000000
+)yaml");
+        wsentry9.close();
+        std::unique_ptr<DBEntry> entry3(db2->readEntry("user2-TEST6-222222", true));
+        REQUIRE_THROWS(entry3->renameAsExpired(111333444));
+        REQUIRE(fs::exists(removedir / "user2-TEST6-222222"));
+
+        // id without a dash has no timestamp suffix to replace
+        std::ofstream wsentry10(removedir / "user2broken");
+        fmt::println(wsentry10,
+                     R"yaml(
+workspace: /a/path24
+expiration: 1734701876
+extensions: 3
+reminder: 0
+mailaddress: ""
+comment: ""
+)yaml");
+        wsentry10.close();
+        std::unique_ptr<DBEntry> entry4(db2->readEntry("user2broken", true));
+        REQUIRE_THROWS(entry4->renameAsExpired(111444555));
+        REQUIRE(fs::exists(removedir / "user2broken"));
+    }
 }
 
 TEST_CASE("workspace creation test", "[db]") {

@@ -69,6 +69,14 @@ add the specified number of days to the expiration time of workspaces in the rec
 Use together with
 .B \-e
 to select expired workspaces.
+Since the DB entry and the workspace directory in the recovery area carry the expired time as a
+trailing
+.I \-timestamp
+in their name (and tools like
+.B ws_restore
+show the "restorable until" date based on that), both are renamed to the new time.
+Workspaces released by the user are never renamed, their trailing timestamp records the release
+time.
 .TP
 \-\-ensure\-until DATE
 extend workspaces that would expire before DATE so that they expire not earlier
@@ -94,6 +102,22 @@ Only one modification option
 .BR \-\-ensure\-until ,
 .BR \-\-expire\-by )
 can be used at a time.
+
+When run with
+.B \-e
+and an option that changes the effective retention boundary of an expired workspace (computed as
+the later of the expiration and expired time, like
+.BR ws_expirer
+does), the DB entry file and the workspace directory in the recovery area are renamed so their
+trailing timestamp stays in sync. This applies to
+.BR \-\-add\-time\-expired ,
+and to
+.B \-\-add\-time
+or
+.B \-\-ensure\-until
+if the resulting expiration time exceeds the expired time.
+.B \-\-expire\-by
+normally has no effect on expired entries and therefore renames nothing.
 
 .SH EXAMPLES
 .TP

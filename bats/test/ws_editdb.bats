@@ -296,3 +296,90 @@ setup() {
     assert_success
     ws_release --config bats/ws.conf PASTEXPIRE
 }
+
+# Test renaming of deleted entries when --add-time-expired changes the expired time
+@test "ws_editdb add-time-expired shows rename in dryrun" {
+    ts=$(date +%s)
+    new_ts=$((ts + 5 * 86400))
+    entry="/tmp/ws/ws2-db/.removed/${USER}-MANUALDRY-${ts}"
+    wsdir="/tmp/ws/ws2/1/.removed/${USER}-MANUALDRY-${ts}"
+    mkdir -p /tmp/ws/ws2/1/.removed
+    cat > "$entry" <<EOF
+workspace: /tmp/ws/ws2/1/${USER}-MANUALDRY
+creation: $((ts - 200000))
+expiration: $((ts - 86400))
+expired: ${ts}
+extensions: 0
+reminder: 0
+mailaddress: ""
+comment: ""
+EOF
+    mkdir -p "$wsdir"
+
+    run ws_editdb --config bats/ws.conf -e --add-time-expired 5 "MANUALDRY*"
+    assert_output --partial "rename db entry"
+    assert_output --partial "${USER}-MANUALDRY-${new_ts}"
+    assert_output --partial "move workspace"
+    assert_success
+    # dry-run must not change anything
+    [ -e "$entry" ]
+    [ -d "$wsdir" ]
+    rm -rf "$entry" "$wsdir"
+}
+
+@test "ws_editdb add-time-expired renames deleted entry and workspace" {
+    ts=$(date +%s)
+    new_ts=$((ts + 5 * 86400))
+    entry="/tmp/ws/ws2-db/.removed/${USER}-MANUALDEL-${ts}"
+    wsdir="/tmp/ws/ws2/1/.removed/${USER}-MANUALDEL-${ts}"
+    mkdir -p /tmp/ws/ws2/1/.removed
+    cat > "$entry" <<EOF
+workspace: /tmp/ws/ws2/1/${USER}-MANUALDEL
+creation: $((ts - 200000))
+expiration: $((ts - 86400))
+expired: ${ts}
+extensions: 0
+reminder: 0
+mailaddress: ""
+comment: ""
+EOF
+    mkdir -p "$wsdir"
+
+    run ws_editdb --config bats/ws.conf -e --not-kidding --add-time-expired 5 "MANUALDEL*"
+    assert_output --partial "rename db entry"
+    assert_success
+    [ ! -e "$entry" ]
+    [ ! -d "$wsdir" ]
+    [ -e "/tmp/ws/ws2-db/.removed/${USER}-MANUALDEL-${new_ts}" ]
+    [ -d "/tmp/ws/ws2/1/.removed/${USER}-MANUALDEL-${new_ts}" ]
+    # content holds the new expired time
+    run cat "/tmp/ws/ws2-db/.removed/${USER}-MANUALDEL-${new_ts}"
+    assert_output --partial "expired: ${new_ts}"
+    rm -rf "/tmp/ws/ws2-db/.removed/${USER}-MANUALDEL-${new_ts}" "/tmp/ws/ws2/1/.removed/${USER}-MANUALDEL-${new_ts}"
+}
+
+# released workspaces carry the release time in their name, they must not be renamed
+@test "ws_editdb does not rename released workspaces" {
+    ts=$(date +%s)
+    entry="/tmp/ws/ws2-db/.removed/${USER}-RELNOREN-${ts}"
+    wsdir="/tmp/ws/ws2/1/.removed/${USER}-RELNOREN-${ts}"
+    mkdir -p /tmp/ws/ws2/1/.removed
+    cat > "$entry" <<EOF
+workspace: /tmp/ws/ws2/1/${USER}-RELNOREN
+creation: $((ts - 200000))
+expiration: $((ts - 100000))
+released: ${ts}
+extensions: 0
+reminder: 0
+mailaddress: ""
+comment: ""
+EOF
+    mkdir -p "$wsdir"
+
+    run ws_editdb --config bats/ws.conf -e --not-kidding --add-time-expired 5 "RELNOREN*"
+    assert_output --partial "NOT renamed"
+    assert_success
+    [ -e "$entry" ]
+    [ -d "$wsdir" ]
+    rm -rf "$entry" "$wsdir"
+}

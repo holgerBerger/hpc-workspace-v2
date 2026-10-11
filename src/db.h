@@ -64,6 +64,12 @@ class DBEntry {
     virtual void setExpiration(const time_t timestamp) = 0;
     // change expired time
     virtual void setExpired(const time_t timestamp) = 0;
+    // rename the DB entry of an entry from the deleted area so that the trailing timestamp
+    // of its ID ("<base>-<old_ts>" -> "<base>-<new_ts>") reflects the new retention boundary.
+    // The workspace directory itself has to be moved by the caller (DB entry first, workspace
+    // second, same order as ws_expirer). Throws DatabaseException for user-released entries
+    // (their name carries the release time) and unparsable IDs.
+    virtual void renameAsExpired(const time_t new_boundary) = 0;
     // change release date (mark as released and not expired) and write updated entry and move entry
     virtual void release(time_t& timestamp) = 0;
     // set expired (not released) can be called by root only

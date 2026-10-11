@@ -28,6 +28,7 @@
  *
  */
 
+#include <algorithm>
 #include <ctime>
 #include <iomanip>
 #include <memory>
@@ -113,7 +114,9 @@ int main(int argc, char** argv) {
         ("pattern,p", po::value<string>(&pattern), "pattern matching name (glob syntax)")
         ("dry-run", "dry-run (default), do nothing, just show what would be done")
         ("add-time", po::value<int>(&addtime), "add time to selected workspace expiration time, in days")
-        ("add-time-expired", po::value<int>(&addtimeexpired), "add time to selected workspace expired time, in days")
+        ("add-time-expired", po::value<int>(&addtimeexpired),
+         "add time to selected workspace expired time, in days, renames DB entry and workspace directory of expired "
+         "entries")
         ("ensure-until", po::value<string>(&ensureuntil), "extend workspaces so that they expire not earlier than specified date (YYYY-MM-DD)")
         ("expire-by", po::value<string>(&expireby), "limit workspaces so that they expire no later than the specified date (YYYY-MM-DD)")
         ("not-kidding", "execute the actions")
@@ -360,6 +363,56 @@ int main(int argc, char** argv) {
                 }
                 entry->setExpired(new_exp_value);
                 entry->writeEntry();
+            }
+        }
+
+        // Entries from the deleted area (selected via -e) carry the retention start time as trailing
+        // "-<timestamp>" in the DB entry name AND the workspace directory name. ws_expirer correlates
+        // DB entries and workspace directories by these names (stray detection), and ws_restore shows
+        // the name as the user-visible "restorable until" date. If the edits above moved the
+        // effective retention boundary, keep name and reality in sync by renaming both.
+        if (listexpired) {
+            if (entry->getReleaseTime() > 1000000000L) {
+                if (new_expiration.has_value() || new_expired.has_value()) {
+                    fmt::println("Id: {} ({})", entry->getId(), entry->getWSPath());
+                    fmt::println("    NOT renamed: workspace was released by user, name carries release time");
+                }
+            } else {
+                // boundary as computed by the ws_expirer delete phase: max(expiration, expired)
+                time_t boundary = std::max(new_expiration.value_or(expiration), new_expired.value_or(expired));
+                auto dash = entry->getId().rfind('-');
+                std::optional<time_t> name_time;
+                if (dash != string::npos) {
+                    try {
+                        name_time = std::stoll(entry->getId().substr(dash + 1));
+                    } catch (const std::exception&) { // id has no parsable timestamp suffix
+                    }
+                }
+                if (name_time.has_value() && *name_time != boundary) {
+                    string old_id = entry->getId();
+                    string new_id = old_id.substr(0, dash) + "-" + fmt::format("{}", boundary);
+                    cppfs::path deleted_dir =
+                        cppfs::path(entry->getWSPath()).remove_filename() / config.deletedPath(entry->getFilesystem());
+
+                    fmt::println("Id: {} ({})", old_id, entry->getWSPath());
+                    fmt::println("    rename db entry: {} -> {}", old_id, new_id);
+                    fmt::println("    move workspace: {} -> {}", (deleted_dir / old_id).string(),
+                                 (deleted_dir / new_id).string());
+                    if (!dryrun) {
+                        try {
+                            entry->renameAsExpired(boundary); // DB entry first, workspace second
+                            // renameAsExpired may have incremented the timestamp on name collision
+                            cppfs::rename(deleted_dir / old_id, deleted_dir / entry->getId());
+                        } catch (const DatabaseException& e) {
+                            spdlog::error("failed to rename db entry {}: {}", old_id, e.what());
+                        } catch (const cppfs::filesystem_error& e) {
+                            spdlog::error("renamed db entry {} but failed to move workspace to {}: {} -- "
+                                          "workspace directory would look like a stray dir to ws_expirer, repair "
+                                          "manually!",
+                                          old_id, entry->getId(), e.what());
+                        }
+                    }
+                }
             }
         }
     }
