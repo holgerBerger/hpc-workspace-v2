@@ -72,7 +72,9 @@
 
 #include <syslog.h>
 
-#include <fstream>
+#ifndef WS_RAPIDYAML_DB
+    #include <sstream>
+#endif
 
 #include "caps.h"
 
@@ -88,6 +90,17 @@ extern bool traceflag;
 extern Cap caps;
 
 namespace cppfs = std::filesystem;
+
+// validate a workspace ID before it is used as a DB entry filename (single path component).
+// Rejects empty, ".", ".." and any ID containing '/': otherwise a crafted ID
+// (e.g. via -u ../something in ws_allocate) escapes the database directory and lets a
+// user direct privileged reads/writes at arbitrary paths. The rest of the charset is
+// intentionally lenient: existing sites have non-POSIX (LDAP/AD) usernames in entry names.
+static void checkID(const string& id) {
+    if (id.empty() || id == "." || id == ".." || id.find('/') != string::npos) {
+        throw DatabaseException(fmt::format("invalid workspace id <{}>", id));
+    }
+}
 
 // create the workspace directory with the structure of this DB
 string FilesystemDBV1::createWorkspace(const string name, const string user_option, const bool groupflag,
@@ -309,6 +322,7 @@ vector<WsID> FilesystemDBV1::matchPattern(const string pattern, const string use
 std::unique_ptr<DBEntry> FilesystemDBV1::readEntry(const WsID id, const bool deleted) {
     if (traceflag)
         spdlog::trace("readEntry({},{})", id, deleted);
+    checkID(id);
     std::unique_ptr<DBEntry> entry(new DBEntryV1(this));
     string filename;
     if (deleted)
@@ -323,6 +337,8 @@ std::unique_ptr<DBEntry> FilesystemDBV1::readEntry(const WsID id, const bool del
 // delete entry, ID can include timestamp of deleted workspace
 void FilesystemDBV1::deleteEntry(const string wsid, const bool deleted) {
     cppfs::path dbentrypath;
+
+    checkID(wsid);
 
     if (deleted) {
         dbentrypath = cppfs::path(config->getFsConfig(fs).database) / config->getFsConfig(fs).deletedPath / wsid;
@@ -345,6 +361,7 @@ DBEntryV1::DBEntryV1(FilesystemDBV1* pdb, const WsID _id, const string _workspac
                      const string _group, const string _mailaddress, const string _comment)
     : parent_db(pdb), id(_id), workspace(_workspace), creation(_creation), expiration(_expiration), reminder(_reminder),
       extensions(_extensions), groupflag(_groupflag), group(_group), mailaddress(_mailaddress), comment(_comment) {
+    checkID(id);
     dbfilepath = pdb->getconfig()->getFsConfig(pdb->getfs()).database + "/" + id;
     // init extra internals here to avoid problems in release builds
     released = 0;
@@ -942,6 +959,15 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
     std::string entry = ryml::emitrs_yaml<std::string>(tree);
 #endif
 
+    // serialize the entry to a plain string so the write below can go through a raw fd
+#ifndef WS_RAPIDYAML_DB
+    std::ostringstream entrystream;
+    entrystream << entry;
+    const std::string entrytext = entrystream.str();
+#else
+    const std::string& entrytext = entry;
+#endif
+
     // suppress ctrl-c to prevent broken DB entries when FS is hanging and user gets nervous
     signal(SIGINT, SIG_IGN);
 
@@ -977,15 +1003,6 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
     //       - under which circumstances should we rename the old file back if the write fails?
     //         there is not even always a file at the first place.
     //       - what is a good name/location for the backup file/or the temp file? risk of collisions?
-    ofstream fout(dbfilepath.c_str());
-    if (!(fout << entry)) {
-        spdlog::error("could not write DB file! Please check if the outcome is as expected, "
-                      "you might have to make a backup of the workspace to prevent loss of data!");
-        if (debugflag)
-            spdlog::debug("{}", std::strerror(errno));
-    }
-    fout.close();
-
     if (group.length() > 0) {
         // for group workspaces, we set the x-bit
         perm = 0744;
@@ -993,9 +1010,40 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
         perm = 0644;
     }
 
+    // Open the entry file directly instead of via ofstream: O_NOFOLLOW refuses to follow a
+    // symlink planted at the entry path (a privileged process would otherwise truncate and
+    // overwrite an arbitrary target file), and fchmod/fchown below act on this fd, so the
+    // path is never re-resolved after the open. mode&~umask applies at creation, fchmod
+    // corrects it on the fd regardless of umask before the fd becomes visible as final.
+    int fd = open(dbfilepath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, perm);
+    bool writeok = fd != -1;
+    if (!writeok) {
+        spdlog::error("could not open DB file <{}>: {}! Database entry not saved!", dbfilepath, std::strerror(errno));
+    } else {
+        const char* buf = entrytext.data();
+        size_t left = entrytext.size();
+        while (left > 0) {
+            ssize_t written = write(fd, buf, left);
+            if (written == -1) {
+                if (errno == EINTR)
+                    continue;
+                break;
+            }
+            buf += written;
+            left -= static_cast<size_t>(written);
+        }
+        writeok = left == 0;
+        if (!writeok) {
+            spdlog::error("could not write DB file! Please check if the outcome is as expected, "
+                          "you might have to make a backup of the workspace to prevent loss of data!");
+            if (debugflag)
+                spdlog::debug("{}", std::strerror(errno));
+        }
+    }
+
     if (!calledasroot)
         caps.raise_cap({CAP_FOWNER}, utils::SrcPos(__FILE__, __LINE__, __func__));
-    if (chmod(dbfilepath.c_str(), perm) != 0) {
+    if (writeok && fchmod(fd, perm) != 0) {
         spdlog::error("could not change permissions of database entry");
         if (debugflag)
             spdlog::error("{}", std::strerror(errno));
@@ -1008,13 +1056,16 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
     if (caps.hasCaps()) {
         if (!calledasroot)
             caps.raise_cap({CAP_CHOWN}, utils::SrcPos(__FILE__, __LINE__, __func__));
-        if (chown(dbfilepath.c_str(), dbuid, dbgid)) {
+        if (writeok && fchown(fd, dbuid, dbgid)) {
             caps.lower_cap({CAP_CHOWN}, dbuid, utils::SrcPos(__FILE__, __LINE__, __func__));
             spdlog::error("could not change owner of database entry.");
         }
         if (!calledasroot)
             caps.lower_cap({CAP_CHOWN}, dbuid, utils::SrcPos(__FILE__, __LINE__, __func__));
     }
+
+    if (fd != -1)
+        close(fd);
 
     // normal signal handling
     signal(SIGINT, SIG_DFL);
