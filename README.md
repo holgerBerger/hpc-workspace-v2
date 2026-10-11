@@ -2,7 +2,7 @@
 
 This is the new home of the hpc-workspace++ tool, which supercedes the old hpc-workspace v1 tool.
 
-** this version is now considered stable and ready for testing**
+**this version is now considered stable and ready for testing**
 
 This is the next major version of the hpc-workspace tool set for managing temporary workspace directories
 on HPC systems.
