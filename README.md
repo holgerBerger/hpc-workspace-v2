@@ -297,12 +297,12 @@ C++ language level requirement might evolve from c++17 to c++20 if there is reas
 
 ### Versioning
 
-The versioning scheme is based on [Semantic Versioning](https://semver.org/).
+The versioning scheme is loosely based on [Semantic Versioning](https://semver.org/).
 Shape is `X.Y.Z` where `X` is the major version, `Y` is the minor version, and `Z` is the patch version,
 the version number is incremented according to the following rules:
-- X is incremented for major changes, Y is reset to 0, and Z is reset to 0
-- Y is incremented for minor changes, Z is reset to 0. This could be new features or breaking changes, might need to be reviewed carefully if it needs e.g. configuration changes.
-- Z is incremented for patch changes, this could be bug fixes, documentation updates or minor changes that are expeceted to break nothing and needs no further attention.
+- `X` is incremented for major changes, `Y` is reset to 0, and `Z` is reset to 0
+- `Y` is incremented for minor changes, `Z` is reset to 0. This could be new features or breaking changes, might need to be reviewed carefully if it needs e.g. configuration changes.
+- `Z` is incremented for patch changes, this could be bug fixes, documentation updates or minor changes that are expeceted to break nothing and needs no further attention.
 
 #### Source Code Formatting
 
@@ -401,6 +401,7 @@ cd vm/alma-10
 vagrant up
 vagrant provision
 ```
+(this is the most recent, running tests with a summary)
 
 It turned out that NFS root_squash and Lustre root_sqash do not behave the same way,
 what works on Lustre does not on NFS, so NFS is not suitable for testing.
@@ -412,3 +413,9 @@ lctl set_param -P mdt.<fsname>-*.enable_cap_mask=+cap_dac_read_search,cap_chown,
 is used.
 
 At the moment there is no solution to test root_squash behaviour with this setup.
+
+### AI policy
+
+This project contains code created with AI assistance.
+Contributions should be reviewed by a human, and commit messages should contain a note indicating that the code was written with AI assistance,
+and the AI model used should be specified (just for curiosity).
