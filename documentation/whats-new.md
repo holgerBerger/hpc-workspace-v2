@@ -15,7 +15,7 @@ including internals.
 
 ## new functionality
 
-- `ws_list` is a lot faster due to no python startup and faster listing and reading of DB
+- `ws_list` is a lot faster due to avoidance of python startup and faster listing and reading of DB
 - `ws_list -g` is a lot faster as it does only read DB entries of owners sharing a group
 - `ws_list -L` shows information about available filesystems, including permissions, max duration, extensions, keeptime and a comment given by administrator
 - `ws_list -T` shows a color-coded table format (red for <3 days remaining, orange for <7 days)

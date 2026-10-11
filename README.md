@@ -1,8 +1,8 @@
 # hpc-workspace-v2
 
-This is the construction site of next major version of hpc-workspace++ tool.
+This is the new home of the hpc-workspace++ tool, which supercedes the old hpc-workspace v1 tool.
 
-**DO NOT YET USE IN PRODUCTION - unless you know what you do and want to test**
+** this version is now considered stable and ready for testing**
 
 This is the next major version of the hpc-workspace tool set for managing temporary workspace directories
 on HPC systems.
@@ -51,10 +51,8 @@ $ ws_release MyData
 ```
 
 For the administrator, the **workspace** is a way to make sure users do not store their data
-forever on your fast storage, but have to stage it to slower and cheaper storage.
+forever on their fast storage, but have to stage it to slower and cheaper storage.
 It also allows migration to new filesystems over time as well as load balancing over several filesystems.
-It also allows migration to new filesystems over time as well as load balancing over several
-filesystems.
 
 ## Documentation
 
@@ -78,7 +76,7 @@ is the first goal.
 
 - some tools have slightly different options, when it adds functionality or makes usage clearer.
 
-Functional extension and change of DB format is possible after this is achieved.
+Functional extension and change of DB format for new installations is possible after this is achieved.
 
 
 ## Howto Build
@@ -282,39 +280,13 @@ C++ language level requirement might evolve from c++17 to c++20 if there is reas
 - [x] ws_prepare (new in C++)
 
 
-### Todo before release candidate
+### Todo 
 
-- [x] move from single file ws.conf to multifile ws.d
-- [x] migrate config from yaml-cpp to ryaml and remove yaml-cpp dependency (on hold for the moment, uses both)
-- [x] move to compiletime+runtime detected capability/setuid/usermode switch (usermode is for testing mainly, does not elevate privileges)
-- [x] add more unit tests to existing code
-- [x] build/select a better test framework for the tools
-- [x] debug what is there
-- [x] check debug logic and data leaks
-- [x] migrate more tools: migrate ws_expirer, ws_validate_config
-- [x] add tests for new tools
-- [x] create tests for ws_expire
-- [x] debug what is there
-- [x] get CMake setup in better shape
-- [x] remove tbb dependency
-- [x] migrate and check/correct/add documentation, guides and man pages
-- [x] test with more compilers and distributions
-- [x] ws_editdb manpage
-- [x] bash completion
-- [x] Cmake fetch for Dependencies
-- [x] installation through CMake.
-- [x] manpage ws_validate_config, ws_prepare
-- [x] RPM spec file for package builds
-- [x] Add package manager like vcpkg or conan?
-- [x] do real live tests (general behaviour, expirer and ws_stat) and fix bugs on systems with
-    - [x] capabilities
-    - [x] setuid
-    - [x] root_squash
-- [ ] review what gets logged for security reasons, should not leak details of other workspaces
+- [ ] review what gets logged for security reasons, should not leak details of other workspaces anymore (v1.x version did)
 - [ ] bash completion testing
 
-
 ### Future Development
+
 - [ ] define and implement new DB format
 - [ ] archiving?
 
@@ -323,6 +295,14 @@ C++ language level requirement might evolve from c++17 to c++20 if there is reas
 - how to automate testing further? 
 - missing features in current version?
 
+### Versioning
+
+The versioning scheme is based on [Semantic Versioning](https://semver.org/).
+Shape is `X.Y.Z` where `X` is the major version, `Y` is the minor version, and `Z` is the patch version,
+the version number is incremented according to the following rules:
+- X is incremented for major changes, Y is reset to 0, and Z is reset to 0
+- Y is incremented for minor changes, Z is reset to 0. This could be new features or breaking changes, might need to be reviewed carefully if it needs e.g. configuration changes.
+- Z is incremented for patch changes, this could be bug fixes, documentation updates or minor changes that are expeceted to break nothing and needs no further attention.
 
 #### Source Code Formatting
 
@@ -376,7 +356,7 @@ bats bats/test
 ```
 
 ### testing with docker
-
+(docker testing has limitations, VM testing is better)
 
 ```
 cd docker
@@ -431,4 +411,4 @@ lctl set_param -P mdt.<fsname>-*.enable_cap_mask=+cap_dac_read_search,cap_chown,
 ```
 is used.
 
-At the moment there is no solution to test root_squash baviour with this setup.
+At the moment there is no solution to test root_squash behaviour with this setup.
