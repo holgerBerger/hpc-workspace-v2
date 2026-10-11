@@ -457,6 +457,7 @@ EOF
 
     run ws_editdb --config bats/ws.conf -e --not-kidding --add-time 1 "RENV1ADD*"
     assert_output --partial "change expiration"
+    assert_output --partial "note: retention unchanged, still determined by time encoded in name"
     refute_output --partial "rename db entry"
     assert_success
 
@@ -476,6 +477,8 @@ EOF
     run ws_editdb --config bats/ws.conf -e --not-kidding --add-time-expired 5 "RENV1EXP*"
     assert_output --partial "change expired"
     assert_output --partial "(${new_ts})"
+    assert_output --partial "restorable until:"
+    refute_output --partial "retention unchanged"
     assert_output --partial "rename db entry: ${USER}-RENV1EXP-${ts} -> ${USER}-RENV1EXP-${new_ts}"
     assert_success
 
@@ -525,6 +528,22 @@ EOF
     refute_output --partial "rename db entry"
     assert_success
     _rm_deleted RENCOL
+}
+
+# lowering expired below expiration does not change deletion time, the admin gets told so
+@test "ws_editdb -e reports unchanged retention" {
+    ts=$(date +%s)
+    _rm_deleted RENNOTE
+    # expiration later than expired, e.g. after an earlier ensure-until
+    _mk_deleted RENNOTE "$ts" "$ts" "$((ts - 86400))"
+
+    run ws_editdb --config bats/ws.conf -e --not-kidding --add-time-expired -10 "RENNOTE*"
+    assert_output --partial "change expired"
+    assert_output --partial "note: retention unchanged, still determined by expiration"
+    refute_output --partial "rename db entry"
+    assert_success
+    _check_pair RENNOTE "$ts"
+    _rm_deleted RENNOTE
 }
 
 # a workspace directory without DB entry blocks the target name, it must not be overwritten

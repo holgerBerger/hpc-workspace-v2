@@ -418,9 +418,24 @@ int main(int argc, char** argv) {
             } else if (!name_time.has_value()) {
                 fmt::println("    NOT renamed: name has no timestamp suffix");
             } else {
+                time_t final_expiration = new_expiration.value_or(expiration);
+                time_t final_expired = new_expired.value_or(expired);
                 time_t old_boundary = boundary_of(expiration, expired);
-                time_t new_boundary = boundary_of(new_expiration.value_or(expiration), new_expired.value_or(expired));
-                if (new_boundary != old_boundary) {
+                time_t new_boundary = boundary_of(final_expiration, final_expired);
+                long keeptime = config.getFsConfig(entry->getFilesystem()).keeptime * DAYS;
+
+                if (new_boundary == old_boundary) {
+                    // the edit has no effect on deletion, tell the admin why
+                    string determined_by;
+                    if (final_expired != 0)
+                        determined_by = (final_expiration >= final_expired) ? "expiration" : "expired";
+                    else
+                        determined_by = (final_expiration >= *name_time) ? "expiration" : "time encoded in name";
+                    fmt::println("    note: retention unchanged, still determined by {} ({}), restorable until {}",
+                                 determined_by, utils::ctime(new_boundary), utils::ctime(new_boundary + keeptime));
+                } else {
+                    fmt::println("    restorable until: {} (was {})", utils::ctime(new_boundary + keeptime),
+                                 utils::ctime(old_boundary + keeptime));
                     try {
                         WsID old_id = entry->getId();
                         WsID new_id = entry->expiredIdFor(new_boundary, reserved);

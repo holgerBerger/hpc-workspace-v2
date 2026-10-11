@@ -121,6 +121,9 @@ if the resulting expiration time exceeds that boundary.
 .B \-\-expire\-by
 normally has no effect on expired entries and therefore renames nothing.
 Entries that are not modified are never renamed.
+For each modified expired entry the resulting "restorable until" date is shown; if the
+modification does not change it (e.g. lowering the expired time below the expiration time),
+a note tells which time still determines the deletion.
 
 Renaming never overwrites anything: if a DB entry or a directory with the target name already
 exists (e.g. when several expired workspaces of the same name get the same date with
