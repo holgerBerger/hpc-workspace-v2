@@ -523,28 +523,30 @@ std::size_t rmtree(std::string path, std::time_t deadline) {
 
     struct stat orig_stat, new_stat;
 
-    int r = fstatat(0, path.c_str(), &orig_stat, AT_SYMLINK_NOFOLLOW);
+    int r = fstatat(AT_FDCWD, path.c_str(), &orig_stat, AT_SYMLINK_NOFOLLOW);
     if (r) {
         spdlog::error("fstatat {} -> {}", path, errno);
+        return 0;
     }
 
     if (S_ISDIR(orig_stat.st_mode)) {
-        bool dirfd_closed = false;
-        int dirfd = openat(0, path.c_str(), O_RDONLY | O_CLOEXEC);
+        int dirfd = openat(AT_FDCWD, path.c_str(), O_RDONLY | O_CLOEXEC);
+        if (dirfd == -1) {
+            spdlog::error("openat {} -> {}", path, errno);
+            return 0;
+        }
         r = fstatat(dirfd, "", &new_stat, AT_EMPTY_PATH);
         if (r == 0 && memcmp(&new_stat, &orig_stat, sizeof(struct stat)) == 0) {
+            // rmtree_fd() takes ownership of dirfd and closes it
             deleted = rmtree_fd(dirfd, path, deadline);
-            close(dirfd);
-            dirfd_closed = true;
 
-            // FIXME: this is strange and may be wrong, why 0? why unlinkat? parent is not open...
-            r = unlinkat(0, path.c_str(), AT_REMOVEDIR);
+            r = unlinkat(AT_FDCWD, path.c_str(), AT_REMOVEDIR);
             if (r) {
                 spdlog::error("unlinkat {} -> {}", path, strerror(errno));
             }
-        }
-        if (!dirfd_closed)
+        } else {
             close(dirfd);
+        }
     }
     return deleted;
 }
@@ -568,21 +570,25 @@ std::size_t rmtree_below(std::string path) {
 
     struct stat orig_stat, new_stat;
 
-    int r = fstatat(0, path.c_str(), &orig_stat, AT_SYMLINK_NOFOLLOW);
+    int r = fstatat(AT_FDCWD, path.c_str(), &orig_stat, AT_SYMLINK_NOFOLLOW);
     if (r) {
         spdlog::error("fstatat {} -> {}", path, errno);
+        return 0;
     }
 
     if (S_ISDIR(orig_stat.st_mode)) {
-        bool dirfd_closed = false;
-        int dirfd = openat(0, path.c_str(), O_RDONLY | O_CLOEXEC);
+        int dirfd = openat(AT_FDCWD, path.c_str(), O_RDONLY | O_CLOEXEC);
+        if (dirfd == -1) {
+            spdlog::error("openat {} -> {}", path, errno);
+            return 0;
+        }
         r = fstatat(dirfd, "", &new_stat, AT_EMPTY_PATH);
         if (r == 0 && memcmp(&new_stat, &orig_stat, sizeof(struct stat)) == 0) {
+            // rmtree_fd() takes ownership of dirfd and closes it
             deleted = rmtree_fd(dirfd, path, deadline);
+        } else {
             close(dirfd);
         }
-        if (!dirfd_closed)
-            close(dirfd);
     }
     return deleted;
 }
@@ -749,6 +755,9 @@ long long getFileTimeAsLong(const fs::path& p) {
 // so the deadline is not hard but soft and can be missed significantly
 // deadline==0 disables the deadline
 // returns the number of files deleted
+// delete the contents of the directory referenced by topfd, and topfd itself.
+// rmtree_fd() takes ownership of topfd: it is always closed before returning,
+// and callers must not close it again.
 static std::size_t rmtree_fd(int topfd, std::string path, const std::time_t deadline) {
     std::size_t deleted = 0;
 
@@ -762,68 +771,85 @@ static std::size_t rmtree_fd(int topfd, std::string path, const std::time_t dead
         if (debugflag) {
             spdlog::debug("deadline={} time={}", deadline, std::time((long*)0L));
         }
+        close(topfd);
         return deleted;
     }
 
     auto dir = fdopendir(topfd);
-    if (dir != nullptr) {
-        std::vector<struct dirent*> entries;
+    if (dir == nullptr) {
+        spdlog::error("fdopendir {} -> {}", topfd, errno);
+        close(topfd);
+        return deleted;
+    }
 
+    // collect entry names by value: readdir() returns pointers into the DIR stream's
+    // internal buffer, which is refilled when the stream advances past it (directories
+    // larger than the read buffer), so dirent pointers must not be kept across
+    // subsequent readdir() calls.
+    std::vector<std::pair<std::string, unsigned char>> entries;
+    while (true) {
+        errno = 0;
         auto entry = readdir(dir);
-        while (entry) {
-            entries.push_back(entry);
-            errno = 0;
-            entry = readdir(dir);
-            if (entry == nullptr && errno != 0) {
+        if (entry == nullptr) {
+            if (errno != 0) {
                 spdlog::error("errno={}", errno);
             }
+            break;
+        }
+        entries.emplace_back(entry->d_name, entry->d_type);
+    }
+
+    for (const auto& ent : entries) {
+        const char* name = ent.first.c_str();
+
+        bool isdir = ent.second == DT_DIR;
+        if (ent.second == DT_UNKNOWN) {
+            // some filesystems (e.g. NFS) do not provide d_type, resolve it by stat
+            struct stat st;
+            isdir = (fstatat(topfd, name, &st, AT_SYMLINK_NOFOLLOW) == 0) && S_ISDIR(st.st_mode);
         }
 
-        for (auto& ent : entries) {
-            if (ent->d_type == DT_DIR) {
-                // ignore . and .. !!!!!!!
-                if (strcmp((const char*)&ent->d_name[0], ".") && strcmp((const char*)&ent->d_name[0], "..")) {
-                    struct stat orig_stat, new_stat;
+        if (isdir) {
+            // ignore . and ..
+            if (strcmp(name, ".") && strcmp(name, "..")) {
+                struct stat orig_stat, new_stat;
 
-                    int r = fstatat(topfd, (const char*)&ent->d_name[0], &orig_stat, AT_SYMLINK_NOFOLLOW);
-                    if (r) {
-                        spdlog::error("fstatat {} {}/{} -> {}", topfd, path, (const char*)&ent->d_name[0], errno);
+                int r = fstatat(topfd, name, &orig_stat, AT_SYMLINK_NOFOLLOW);
+                if (r) {
+                    spdlog::error("fstatat {} {}/{} -> {}", topfd, path, name, errno);
+                    continue;
+                }
+
+                if (S_ISDIR(orig_stat.st_mode)) {
+                    int dirfd = openat(topfd, name, O_RDONLY | O_CLOEXEC);
+                    if (dirfd == -1) {
+                        spdlog::error("openat {}/{} -> {}", path, name, errno);
                         continue;
                     }
+                    r = fstatat(dirfd, "", &new_stat, AT_EMPTY_PATH);
+                    if (r == 0 && memcmp(&new_stat, &orig_stat, sizeof(struct stat)) == 0) {
+                        deleted += rmtree_fd(dirfd, fs::path(path) / name, deadline);
 
-                    if (S_ISDIR(orig_stat.st_mode)) {
-                        int dirfd = openat(topfd, (const char*)&ent->d_name[0], O_RDONLY | O_CLOEXEC);
-                        bool dirfd_closed = false;
-                        r = fstatat(dirfd, "", &new_stat, AT_EMPTY_PATH);
-                        if (r == 0 && memcmp(&new_stat, &orig_stat, sizeof(struct stat)) == 0) {
-                            deleted += rmtree_fd(dirfd, fs::path(path) / (const char*)&ent->d_name[0], deadline);
-                            close(dirfd);
-                            dirfd_closed = true;
-
-                            r = unlinkat(topfd, (const char*)&ent->d_name[0], AT_REMOVEDIR);
-                            if (r) {
-                                spdlog::error("unlinkat {}/{} -> {}", path, (const char*)&ent->d_name[0],
-                                              strerror(errno));
-                            }
-                        } else {
-                            spdlog::error("rmtree hit a symbolic link!");
+                        r = unlinkat(topfd, name, AT_REMOVEDIR);
+                        if (r) {
+                            spdlog::error("unlinkat {}/{} -> {}", path, name, strerror(errno));
                         }
-                        if (!dirfd_closed)
-                            close(dirfd);
+                    } else {
+                        spdlog::error("rmtree hit a symbolic link!");
+                        close(dirfd);
                     }
                 }
+            }
+        } else {
+            int r = unlinkat(topfd, name, 0);
+            if (r) {
+                spdlog::error("unlinkat {}/{} -> {}", path, name, strerror(errno));
             } else {
-                int r = unlinkat(topfd, (const char*)&ent->d_name[0], 0);
-                if (r) {
-                    spdlog::error("unlinkat {}/{} -> {}", path, (const char*)&ent->d_name[0], strerror(errno));
-                } else {
-                    deleted++;
-                }
+                deleted++;
             }
         }
-        closedir(dir);
-    } else {
-        spdlog::error("fdopendir {} -> {}", topfd, errno);
     }
+    // closes topfd
+    closedir(dir);
     return deleted;
 }
