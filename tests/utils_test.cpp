@@ -38,6 +38,28 @@ TEST_CASE("utils", "[utils]") {
         REQUIRE(fs::exists("/tmp/_wsTT") == false);
     }
 
+    SECTION("readFileNoFollow") {
+        auto dir = fs::temp_directory_path() / "_wsRNF";
+        fs::remove_all(dir);
+        fs::create_directories(dir);
+        utils::writeFile((dir / "conf").string(), "mail: a@b.c\n");
+
+        // regular file: returns content
+        REQUIRE(utils::readFileNoFollow((dir / "conf").string()) == "mail: a@b.c\n");
+
+        // symlink at last component must not be followed
+        fs::create_symlink("conf", dir / "link");
+        REQUIRE_THROWS_AS(utils::readFileNoFollow((dir / "link").string()), std::exception);
+
+        // oversize file is rejected
+        REQUIRE_THROWS_AS(utils::readFileNoFollow((dir / "conf").string(), 4), std::exception);
+
+        // missing file throws, does not hang or crash
+        REQUIRE_THROWS_AS(utils::readFileNoFollow((dir / "nothere").string()), std::exception);
+
+        fs::remove_all(dir);
+    }
+
     SECTION("prettySize") {
         REQUIRE(utils::prettyBytes(100) == "100 B");
         REQUIRE(utils::prettyBytes(1000) == "1 KB");

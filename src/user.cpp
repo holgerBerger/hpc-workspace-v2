@@ -68,8 +68,15 @@ std::string getUserhome() {
 
 // get home of provided user via real user id and pwassd
 // we have this to avoid $HOME
+// returns "" if the user does not exist (e.g. deleted account with expiring workspaces),
+// must not abort: called by ws_expirer with names taken from user-owned DB entries
 std::string getUserhome(const std::string& username) {
-    gsl::not_null<struct passwd*> pw = getpwnam(username.c_str());
+    struct passwd* pw = getpwnam(username.c_str());
+    if (pw == nullptr) {
+        if (debugflag)
+            spdlog::debug("user {} not found in passwd database", username);
+        return "";
+    }
     return std::string(pw->pw_dir);
 }
 

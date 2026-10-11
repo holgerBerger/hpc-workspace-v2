@@ -662,39 +662,50 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                 // send expiration mail, is opt-in from admin side per filesystem, and can be overridden by user
                 std::string user_conf;
                 if (config.getFsConfig(fs).expirationmail) {
+                    // ~/.ws_user.conf is user-owned and read here while privileged: never follow
+                    // symlinks, bound the size, and on any problem continue with filesystem
+                    // defaults instead of aborting the whole run (a single bad entry must not
+                    // stop expiration of all remaining workspaces).
                     auto wsuser = utils::getOwner(id);
                     if (debugflag) {
                         spdlog::debug("  sending expiration mail to {}", wsuser);
                     }
-                    string user_conf_filename = user::getUserhome(wsuser) + "/.ws_user.conf";
-                    if (!cppfs::is_symlink(user_conf_filename)) {
-                        if (cppfs::is_regular_file(user_conf_filename)) {
-                            user_conf = utils::getFileContents(user_conf_filename.c_str());
-                        }
-                        // FIXME: could be parsed here and passed as object not string
-                    } else {
-                        spdlog::error("~/.ws_user.conf can not be symlink!");
-                        exit(-1);
-                    }
-                    UserConfig userconfig(user_conf);
-                    if ((userconfig.getExpirationMail() && !dbentry->getMailaddress().empty()) ||
-                        (dbentry->getReminder() > 0)) {
-                        std::vector<std::string> mail_to;
-                        mail_to.push_back(dbentry->getMailaddress());
-                        std::string clustername = config.clustername();
-                        int keeptime = config.getFsConfig(fs).keeptime;
-
-                        std::string completeMail =
-                            generateExpirationMail(mail_from, mail_to, expiration, id, fs, clustername, keeptime);
-                        spdlog::info("    sending expiration mail to {} for entry {}", mail_to, id);
-
-                        try {
-                            if (!mail::sendCurl(smtpUrl, mail_from, mail_to, completeMail)) {
-                                spdlog::error("Failed to send email, please check the mailaddress in the DB Entry");
+                    try {
+                        auto wshome = user::getUserhome(wsuser);
+                        if (wshome.empty()) {
+                            spdlog::error("  no home directory for {} (workspace {}), using filesystem defaults", wsuser, id);
+                        } else {
+                            string user_conf_filename = wshome + "/.ws_user.conf";
+                            if (cppfs::is_symlink(user_conf_filename)) {
+                                spdlog::error("  {} ~/.ws_user.conf can not be symlink, using filesystem defaults", id);
+                            } else if (cppfs::is_regular_file(user_conf_filename)) {
+                                user_conf = utils::readFileNoFollow(user_conf_filename);
                             }
-                        } catch (const std::exception& e) {
-                            spdlog::error("Exception while sending email: {}", e.what());
+                            // FIXME: could be parsed here and passed as object not string
                         }
+                        UserConfig userconfig(user_conf);
+                        if ((userconfig.getExpirationMail() && !dbentry->getMailaddress().empty()) ||
+                            (dbentry->getReminder() > 0)) {
+                            std::vector<std::string> mail_to;
+                            mail_to.push_back(dbentry->getMailaddress());
+                            std::string clustername = config.clustername();
+                            int keeptime = config.getFsConfig(fs).keeptime;
+
+                            std::string completeMail =
+                                generateExpirationMail(mail_from, mail_to, expiration, id, fs, clustername, keeptime);
+                            spdlog::info("    sending expiration mail to {} for entry {}", mail_to, id);
+
+                            try {
+                                if (!mail::sendCurl(smtpUrl, mail_from, mail_to, completeMail)) {
+                                    spdlog::error("Failed to send email, please check the mailaddress in the DB Entry");
+                                }
+                            } catch (const std::exception& e) {
+                                spdlog::error("Exception while sending email: {}", e.what());
+                            }
+                        }
+                    } catch (const std::exception& e) {
+                        spdlog::error("  could not process ~/.ws_user.conf of {} ({}): {}, skipping expiration mail", wsuser, id,
+                                      e.what());
                     }
                 }
             } else {

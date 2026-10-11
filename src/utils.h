@@ -59,6 +59,11 @@ class SrcPos {
 std::string getFileContents(const char* filename);
 inline std::string getFileContents(const std::string filename) { return getFileContents(filename.c_str()); }
 
+// read a (small) user-controlled file safely: does not follow a symlink at the last path
+// component, only accepts regular files, and aborts (DatabaseException) if larger than maxSize.
+// Use this instead of getFileContents() for files owned by normal users.
+std::string readFileNoFollow(const std::string& filename, std::size_t maxSize = 1024 * 1024);
+
 // write a (small) string to a file
 void writeFile(const std::string filename, const std::string content);
 

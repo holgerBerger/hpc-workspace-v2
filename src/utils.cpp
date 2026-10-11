@@ -103,6 +103,59 @@ std::string getFileContents(const char* filename) {
     return contents.str();
 }
 
+// read a (small) user-controlled file into a string, safely:
+//  - does not follow a symlink at the last path component (O_NOFOLLOW)
+//  - refuses anything but regular files (checked after open, no TOCTOU)
+//  - O_NONBLOCK so a fifo can never hang the reader (typical DoS vs. a privileged process)
+//  - bounds the read to maxSize bytes
+// throws DatabaseException on any problem
+std::string readFileNoFollow(const std::string& filename, std::size_t maxSize) {
+    int fd = ::open(filename.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd == -1) {
+        throw DatabaseException(fmt::format("could not open file {} ({})", filename, strerror(errno)));
+    }
+
+    struct stat st;
+    if (fstat(fd, &st) != 0) {
+        int e = errno;
+        close(fd);
+        throw DatabaseException(fmt::format("could not stat file {} ({})", filename, strerror(e)));
+    }
+    if (!S_ISREG(st.st_mode)) {
+        close(fd);
+        throw DatabaseException(fmt::format("{} is not a regular file", filename));
+    }
+    if (static_cast<size_t>(st.st_size) > maxSize) {
+        close(fd);
+        throw DatabaseException(fmt::format("file {} is larger than {} bytes", filename, maxSize));
+    }
+
+    std::string content;
+    char buf[65536];
+    while (true) {
+        ssize_t n = ::read(fd, buf, sizeof(buf));
+        if (n == 0) {
+            break;
+        }
+        if (n < 0) {
+            int e = errno;
+            if (e == EINTR) {
+                continue;
+            }
+            close(fd);
+            throw DatabaseException(fmt::format("error reading {} ({})", filename, strerror(e)));
+        }
+        content.append(buf, static_cast<size_t>(n));
+        if (content.size() > maxSize) {
+            // file grew past the limit after our stat()
+            close(fd);
+            throw DatabaseException(fmt::format("file {} is larger than {} bytes", filename, maxSize));
+        }
+    }
+    close(fd);
+    return content;
+}
+
 // write a (small) string to a file
 void writeFile(const std::string filename, const std::string content) {
     std::ofstream out(filename);
