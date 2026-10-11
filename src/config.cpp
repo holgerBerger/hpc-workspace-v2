@@ -385,15 +385,12 @@ void Config::readYAML(const string yaml) {
                         fs.releasekeeptime = ws["releasekeeptime"].as<int>();
                     else
                         fs.releasekeeptime = fs.keeptime; // SPEC: releasekeeptime defaults to keeptime
+                    fs.maxduration = 0;
                     if (ws["maxduration"])
                         fs.maxduration = ws["maxduration"].as<int>();
-                    else
-                        fs.maxduration = 0;
-                    // SPEC:CHANGE alias
+                    // SPEC:CHANGE alias: duration is an alias for maxduration, must not clobber it when absent
                     if (ws["duration"])
                         fs.maxduration = ws["duration"].as<int>();
-                    else
-                        fs.maxduration = 0;
 
                     if (fs.maxduration == 0 && global.maxduration != 0) {
                         fs.maxduration = global.maxduration;

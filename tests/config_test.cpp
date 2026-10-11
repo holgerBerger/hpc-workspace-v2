@@ -399,3 +399,45 @@ workspaces:                     # now the list of the workspaces
         REQUIRE(config.isValid());
     }
 }
+
+TEST_CASE("config: per-filesystem maxduration and duration alias", "[config]") {
+    // regression test for SECREVIEW M3: a filesystem setting maxduration but not
+    // duration must keep it, not fall back to the global value
+    auto config = Config(std::string(R"(
+clustername: aName
+smtphost: localhost
+mail_from: noreply@mydomain.de
+default: fs1
+duration: 10
+durationdefault: 1
+maxextensions: 1
+dbuid: 9999
+dbgid: 9999
+workspaces:
+  fs1:
+    keeptime: 1
+    spaces: [/tmp]
+    database: /tmp
+    deleted: .del
+    maxduration: 5
+  fs2:
+    keeptime: 1
+    spaces: [/tmp]
+    database: /tmp
+    deleted: .del
+    duration: 7
+    maxduration: 5
+  fs3:
+    keeptime: 1
+    spaces: [/tmp]
+    database: /tmp
+    deleted: .del
+)"));
+
+    // maxduration without duration: must NOT be clobbered (M3)
+    REQUIRE(config.getFsConfig("fs1").maxduration == 5);
+    // duration is an alias for maxduration and takes precedence when both are present
+    REQUIRE(config.getFsConfig("fs2").maxduration == 7);
+    // neither present: falls back to global duration/maxduration
+    REQUIRE(config.getFsConfig("fs3").maxduration == 10);
+}
