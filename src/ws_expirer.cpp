@@ -534,10 +534,13 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
                     auto start = chrono::steady_clock::now();
                     auto deleted = utils::rmtree(cppfs::path(founddir.space) / config.deletedPath(fs) / founddir.dir, deadline);
                     auto end = chrono::steady_clock::now();
-                    auto duration = chrono::duration_cast<chrono::seconds>(end - start).count();
+                    auto elapsed = end - start;
+                    auto duration = chrono::duration_cast<chrono::milliseconds>(elapsed).count();
+                    double secs = chrono::duration<double>(elapsed).count();
 
                     if (deleted > 0) {
-                        spdlog::info("      removed {} files in {} seconds", deleted, duration);
+                        spdlog::info("      removed {} files in {} ms ({:.1f} files/sec)", deleted, duration,
+                                     secs > 0.0 ? double(deleted) / secs : 0.0);
                     }
 
                 } catch (cppfs::filesystem_error& e) {
@@ -833,8 +836,11 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                     auto start = chrono::steady_clock::now();
                     auto deleted = utils::rmtree(wspath.string(), deadline);
                     auto end = chrono::steady_clock::now();
-                    auto duration = chrono::duration_cast<chrono::seconds>(end - start).count();
-                    spdlog::info("      removed {} files in {} seconds", deleted, duration);
+                    auto elapsed = end - start;
+                    auto duration = chrono::duration_cast<chrono::milliseconds>(elapsed).count();
+                    double secs = chrono::duration<double>(elapsed).count();
+                    spdlog::info("      removed {} files in {} ms ({:.1f} files/sec)", deleted, duration,
+                                 secs > 0.0 ? double(deleted) / secs : 0.0);
                 } catch (cppfs::filesystem_error& e) {
                     spdlog::error("  failed to remove: {} ({})", wspath.string(), e.what());
                 }
