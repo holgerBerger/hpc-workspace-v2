@@ -216,60 +216,201 @@ comment: ""
         std::unique_ptr<DBEntry> entry2(db1->readEntry("user1-TEST1", false));
         REQUIRE(entry->getMailaddress() == "mail@box.com");
     }
+}
 
-    SECTION("rename deleted entry") {
+TEST_CASE("rename entries in deleted area", "[db]") {
 
-        auto removedir = ws2dbname / fs::path(".removed");
+    // own directory tree, so renames do not interfere with the other test cases
+    auto basedirname = fs::temp_directory_path() / fs::path(fmt::format("wsrename{}", getpid()));
+    fs::remove_all(basedirname);
 
-        // normal expired entry: "<base>-<old_ts>" -> "<base>-<new_ts>"
-        std::unique_ptr<DBEntry> entry(db2->readEntry("user2-TEST5-111111", true));
-        REQUIRE(entry->getId() == "user2-TEST5-111111");
-        REQUIRE_NOTHROW(entry->renameAsExpired(111222333));
-        REQUIRE(entry->getId() == "user2-TEST5-111222333");
-        REQUIRE(fs::exists(removedir / "user2-TEST5-111222333"));
-        REQUIRE_FALSE(fs::exists(removedir / "user2-TEST5-111111"));
+    auto dbdir = basedirname / "db";
+    auto spacedir = basedirname / "space";
+    auto db_removed = dbdir / ".removed";
+    auto ws_removed = spacedir / ".removed";
+    fs::create_directories(db_removed);
+    fs::create_directories(ws_removed);
+    utils::writeFile(dbdir / ".ws_db_magic", "ws1");
 
-        // new name is a valid entry, content unchanged
-        std::unique_ptr<DBEntry> entry2(db2->readEntry("user2-TEST5-111222333", true));
-        REQUIRE(entry2->getExpiration() == 1734701876);
+    std::ofstream wsconf(basedirname / "ws.conf");
+    fmt::println(wsconf,
+                 R"yaml(
+admins: [root]
+clustername: rename_test
+adminmail: [root]
+dbgid: 2
+dbuid: 2
+duration: 10
+maxextensions: 1
+smtphost: mailhost
+default: ws1
+workspaces:
+    ws1:
+        database: {}
+        deleted: .removed
+        spaces: [{}]
+)yaml",
+                 dbdir.string(), spacedir.string());
+    wsconf.close();
 
-        // implausible boundary: throw, leave entry alone
-        REQUIRE_THROWS(entry2->renameAsExpired(-5));
-        REQUIRE(fs::exists(removedir / "user2-TEST5-111222333"));
-
-        // released entries carry the release time in their name, renaming is refused
-        std::ofstream wsentry9(removedir / "user2-TEST6-222222");
-        fmt::println(wsentry9,
+    // DB entry "<base>-<ts>" in deleted area, workspace path points into spacedir
+    auto make_entry = [&](const std::string& base, const std::string& ts, const std::string& extra) {
+        std::ofstream e(db_removed / (base + "-" + ts));
+        fmt::println(e,
                      R"yaml(
-workspace: /a/path23
+workspace: {}
 expiration: 1734701876
 extensions: 3
 reminder: 0
 mailaddress: ""
-comment: ""
-released: 1600000000
-)yaml");
-        wsentry9.close();
-        std::unique_ptr<DBEntry> entry3(db2->readEntry("user2-TEST6-222222", true));
-        REQUIRE_THROWS(entry3->renameAsExpired(111333444));
-        REQUIRE(fs::exists(removedir / "user2-TEST6-222222"));
+comment: "{}"
+{}
+)yaml",
+                     (spacedir / base).string(), ts, extra);
+        e.close();
+    };
+    // workspace directory in deleted area with a marker file
+    auto make_wsdir = [&](const std::string& name) {
+        fs::create_directories(ws_removed / name);
+        utils::writeFile(ws_removed / name / "marker", name);
+    };
 
-        // id without a dash has no timestamp suffix to replace
-        std::ofstream wsentry10(removedir / "user2broken");
-        fmt::println(wsentry10,
-                     R"yaml(
-workspace: /a/path24
-expiration: 1734701876
-extensions: 3
-reminder: 0
-mailaddress: ""
-comment: ""
-)yaml");
-        wsentry10.close();
-        std::unique_ptr<DBEntry> entry4(db2->readEntry("user2broken", true));
-        REQUIRE_THROWS(entry4->renameAsExpired(111444555));
-        REQUIRE(fs::exists(removedir / "user2broken"));
+    auto config = Config(std::vector<fs::path>{basedirname / "ws.conf"});
+    std::unique_ptr<Database> db(config.openDB("ws1"));
+
+    SECTION("expiredIdFor finds collision free names") {
+        make_entry("u-A", "100", "");
+        make_wsdir("u-A-100");
+        std::unique_ptr<DBEntry> entry(db->readEntry("u-A-100", true));
+
+        REQUIRE(entry->expiredIdFor(5000, {}) == "u-A-5000");
+
+        // DB entry with target name exists
+        utils::writeFile(db_removed / "u-A-5000", "x");
+        REQUIRE(entry->expiredIdFor(5000, {}) == "u-A-5001");
+
+        // only workspace directory with target name exists
+        make_wsdir("u-A-5001");
+        REQUIRE(entry->expiredIdFor(5000, {}) == "u-A-5002");
+
+        // name reserved by caller (planned in same run)
+        REQUIRE(entry->expiredIdFor(5000, {"u-A-5002"}) == "u-A-5003");
+
+        // own name reached first: no rename needed
+        utils::writeFile(db_removed / "u-A-99", "x");
+        REQUIRE(entry->expiredIdFor(99, {}) == "u-A-100");
+        REQUIRE(entry->expiredIdFor(100, {}) == "u-A-100");
+
+        // implausible boundary
+        REQUIRE_THROWS(entry->expiredIdFor(-5, {}));
     }
+
+    SECTION("renameAsExpired moves DB entry and workspace") {
+        make_entry("u-B", "100", "");
+        make_wsdir("u-B-100");
+        std::unique_ptr<DBEntry> entry(db->readEntry("u-B-100", true));
+
+        REQUIRE_NOTHROW(entry->renameAsExpired("u-B-200"));
+        REQUIRE(entry->getId() == "u-B-200");
+        REQUIRE(fs::exists(db_removed / "u-B-200"));
+        REQUIRE_FALSE(fs::exists(db_removed / "u-B-100"));
+        REQUIRE(fs::exists(ws_removed / "u-B-200" / "marker"));
+        REQUIRE(utils::getFileContents((ws_removed / "u-B-200" / "marker").c_str()) == "u-B-100");
+        REQUIRE_FALSE(fs::exists(ws_removed / "u-B-100"));
+
+        // new name is a valid entry
+        std::unique_ptr<DBEntry> entry2(db->readEntry("u-B-200", true));
+        REQUIRE(entry2->getComment() == "100");
+
+        // same name: no-op
+        REQUIRE_NOTHROW(entry2->renameAsExpired("u-B-200"));
+        REQUIRE(fs::exists(db_removed / "u-B-200"));
+    }
+
+    SECTION("renameAsExpired never overwrites") {
+        // DB entry target exists
+        make_entry("u-C", "100", "");
+        make_wsdir("u-C-100");
+        make_entry("u-C", "200", "");
+        std::unique_ptr<DBEntry> entry(db->readEntry("u-C-100", true));
+        REQUIRE_THROWS(entry->renameAsExpired("u-C-200"));
+        REQUIRE(entry->getId() == "u-C-100");
+        REQUIRE(fs::exists(db_removed / "u-C-100"));
+        REQUIRE(fs::exists(ws_removed / "u-C-100" / "marker"));
+        std::unique_ptr<DBEntry> other(db->readEntry("u-C-200", true));
+        REQUIRE(other->getComment() == "200");
+
+        // workspace target exists, even an empty directory (rename would replace it)
+        make_entry("u-D", "100", "");
+        make_wsdir("u-D-100");
+        fs::create_directories(ws_removed / "u-D-200");
+        std::unique_ptr<DBEntry> entry2(db->readEntry("u-D-100", true));
+        REQUIRE_THROWS(entry2->renameAsExpired("u-D-200"));
+        REQUIRE(entry2->getId() == "u-D-100");
+        REQUIRE(fs::exists(db_removed / "u-D-100"));
+        REQUIRE_FALSE(fs::exists(db_removed / "u-D-200"));
+        REQUIRE(fs::exists(ws_removed / "u-D-100" / "marker"));
+    }
+
+    SECTION("renameAsExpired rolls back DB rename if workspace can not be moved") {
+        // root ignores directory permissions, so this can only be provoked as normal user
+        if (geteuid() != 0) {
+            make_entry("u-G", "100", "");
+            make_wsdir("u-G-100");
+            std::unique_ptr<DBEntry> entry(db->readEntry("u-G-100", true));
+
+            fs::permissions(ws_removed, fs::perms::owner_read | fs::perms::owner_exec);
+            // CHECK instead of REQUIRE, to always restore permissions
+            CHECK_THROWS(entry->renameAsExpired("u-G-200"));
+            fs::permissions(ws_removed, fs::perms::owner_all);
+
+            REQUIRE(entry->getId() == "u-G-100");
+            REQUIRE(fs::exists(db_removed / "u-G-100"));
+            REQUIRE_FALSE(fs::exists(db_removed / "u-G-200"));
+            REQUIRE(fs::exists(ws_removed / "u-G-100" / "marker"));
+
+            // entry is still usable with its old name after rollback
+            REQUIRE_NOTHROW(entry->renameAsExpired("u-G-200"));
+            REQUIRE(fs::exists(db_removed / "u-G-200"));
+            REQUIRE(fs::exists(ws_removed / "u-G-200" / "marker"));
+        }
+    }
+
+    SECTION("renameAsExpired with missing workspace directory renames DB entry only") {
+        make_entry("u-F", "100", "");
+        std::unique_ptr<DBEntry> entry(db->readEntry("u-F-100", true));
+        REQUIRE_NOTHROW(entry->renameAsExpired("u-F-200"));
+        REQUIRE(fs::exists(db_removed / "u-F-200"));
+        REQUIRE_FALSE(fs::exists(db_removed / "u-F-100"));
+    }
+
+    SECTION("renameAsExpired refuses invalid requests") {
+        // released entries carry the release time in their name
+        make_entry("u-E", "100", "released: 1600000000");
+        make_wsdir("u-E-100");
+        std::unique_ptr<DBEntry> entry(db->readEntry("u-E-100", true));
+        REQUIRE_THROWS(entry->renameAsExpired("u-E-200"));
+        REQUIRE(fs::exists(db_removed / "u-E-100"));
+        REQUIRE(fs::exists(ws_removed / "u-E-100"));
+
+        // new id must keep the base and have a numeric timestamp
+        make_entry("u-H", "100", "");
+        std::unique_ptr<DBEntry> entry2(db->readEntry("u-H-100", true));
+        REQUIRE_THROWS(entry2->renameAsExpired("u-X-200"));
+        REQUIRE_THROWS(entry2->renameAsExpired("u-H-200x"));
+        REQUIRE_THROWS(entry2->renameAsExpired("u-H-"));
+        REQUIRE(fs::exists(db_removed / "u-H-100"));
+
+        // id without timestamp suffix
+        utils::writeFile(db_removed / "ubroken", "workspace: /x\nexpiration: 1734701876\n");
+        std::unique_ptr<DBEntry> entry3(db->readEntry("ubroken", true));
+        REQUIRE_THROWS(entry3->expiredIdFor(5000, {}));
+        REQUIRE_THROWS(entry3->renameAsExpired("ubroken-5000"));
+        REQUIRE(fs::exists(db_removed / "ubroken"));
+    }
+
+    fs::permissions(ws_removed, fs::perms::owner_all);
+    fs::remove_all(basedirname);
 }
 
 TEST_CASE("workspace creation test", "[db]") {

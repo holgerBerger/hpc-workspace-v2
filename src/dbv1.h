@@ -90,8 +90,10 @@ class DBEntryV1 : public DBEntry {
     void setExpiration(const time_t timestamp);
     // change expired time
     void setExpired(const time_t timestamp);
-    // rename entry in the deleted area to a new trailing timestamp, see db.h
-    void renameAsExpired(const time_t new_boundary);
+    // collision free ID for an entry in the deleted area, see db.h
+    WsID expiredIdFor(const time_t boundary, const std::set<WsID>& reserved) const;
+    // rename DB entry and workspace directory in the deleted area, see db.h
+    void renameAsExpired(const WsID& new_id);
     // change release date (mark as released and not expired) and write updated entry and move entry
     void release(time_t& timestamp);
     // set expired (not released) can be called by root only

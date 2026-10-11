@@ -77,6 +77,7 @@ in their name (and tools like
 show the "restorable until" date based on that), both are renamed to the new time.
 Workspaces released by the user are never renamed, their trailing timestamp records the release
 time.
+For old entries without an expired time, the days are added to the time encoded in the name.
 .TP
 \-\-ensure\-until DATE
 extend workspaces that would expire before DATE so that they expire not earlier
@@ -108,16 +109,27 @@ When run with
 and an option that changes the effective retention boundary of an expired workspace (computed as
 the later of the expiration and expired time, like
 .BR ws_expirer
-does), the DB entry file and the workspace directory in the recovery area are renamed so their
+does; for old entries without expired time the time encoded in the name is used instead),
+the DB entry file and the workspace directory in the recovery area are renamed so their
 trailing timestamp stays in sync. This applies to
 .BR \-\-add\-time\-expired ,
 and to
 .B \-\-add\-time
 or
 .B \-\-ensure\-until
-if the resulting expiration time exceeds the expired time.
+if the resulting expiration time exceeds that boundary.
 .B \-\-expire\-by
 normally has no effect on expired entries and therefore renames nothing.
+Entries that are not modified are never renamed.
+
+Renaming never overwrites anything: if a DB entry or a directory with the target name already
+exists (e.g. when several expired workspaces of the same name get the same date with
+.BR \-\-ensure\-until ),
+the timestamp is increased by one second until a free name is found; the dry-run output shows
+the resulting names. If the workspace directory can not be moved, the rename of the DB entry is
+reverted, so the directory is never left without a DB entry (which would make
+.B ws_expirer
+remove it as stray directory).
 
 .SH EXAMPLES
 .TP

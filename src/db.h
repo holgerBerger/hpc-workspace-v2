@@ -34,6 +34,7 @@
 
 #include <exception>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -64,12 +65,18 @@ class DBEntry {
     virtual void setExpiration(const time_t timestamp) = 0;
     // change expired time
     virtual void setExpired(const time_t timestamp) = 0;
-    // rename the DB entry of an entry from the deleted area so that the trailing timestamp
-    // of its ID ("<base>-<old_ts>" -> "<base>-<new_ts>") reflects the new retention boundary.
-    // The workspace directory itself has to be moved by the caller (DB entry first, workspace
-    // second, same order as ws_expirer). Throws DatabaseException for user-released entries
-    // (their name carries the release time) and unparsable IDs.
-    virtual void renameAsExpired(const time_t new_boundary) = 0;
+    // for an entry from the deleted area (ID "<base>-<ts>"), return the ID "<base>-<ts'>" with the
+    // smallest ts' >= boundary that is free: neither a DB entry nor a workspace directory of that
+    // name exists in the deleted area, and it is not in reserved (names planned by the caller but
+    // not yet created, e.g. in a dry-run). Returns the current ID if that is reached first.
+    // Throws DatabaseException for IDs not of that shape or if no free name is found.
+    virtual WsID expiredIdFor(const time_t boundary, const std::set<WsID>& reserved) const = 0;
+    // rename DB entry and workspace directory of an entry from the deleted area to new_id
+    // (as returned by expiredIdFor). DB entry first, workspace second, like ws_expirer.
+    // Never overwrites an existing target, rolls back the DB rename if the workspace directory
+    // can not be moved. Throws DatabaseException on failure, for user-released entries
+    // (their name carries the release time) and for IDs not of the shape "<base>-<ts>".
+    virtual void renameAsExpired(const WsID& new_id) = 0;
     // change release date (mark as released and not expired) and write updated entry and move entry
     virtual void release(time_t& timestamp) = 0;
     // set expired (not released) can be called by root only

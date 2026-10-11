@@ -29,11 +29,13 @@
  */
 
 #include <algorithm>
+#include <cctype>
 #include <ctime>
 #include <iomanip>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <sstream>
 
 // Include bshoshany thread-pool
@@ -310,15 +312,50 @@ int main(int argc, char** argv) {
     if (dryrun)
         fmt::println("Actions that would be performed on the workspaces selected:");
 
+    // names of deleted entries planned as rename targets in this run, so collisions between
+    // entries of this run are detected in dry-run mode as well
+    std::set<WsID> reserved;
+
     for (const auto& entry : entrylist) {
         if (debugflag) {
             spdlog::debug("Id: {} ({})", entry->getId(), entry->getWSPath());
         }
 
+        // print the entry header only once, even if several actions are shown
+        bool header_printed = false;
+        auto print_header = [&]() {
+            if (!header_printed) {
+                fmt::println("Id: {} ({})", entry->getId(), entry->getWSPath());
+                header_printed = true;
+            }
+        };
+
         auto expiration = entry->getExpiration();
         std::optional<time_t> new_expiration;
         auto expired = entry->getExpired();
         std::optional<time_t> new_expired;
+
+        // entries from the deleted area (-e) carry a timestamp in their name "<base>-<ts>"
+        std::optional<time_t> name_time;
+        if (listexpired) {
+            auto id = entry->getId();
+            auto dash = id.rfind('-');
+            if (dash != string::npos && dash + 1 < id.size() &&
+                std::all_of(id.begin() + dash + 1, id.end(), [](unsigned char c) { return std::isdigit(c); })) {
+                try {
+                    name_time = std::stoll(id.substr(dash + 1));
+                } catch (const std::exception&) { // out of range
+                }
+            }
+        }
+
+        // retention boundary of an expired (not released) entry, as ws_expirer computes it:
+        // max(expiration, expired), for v1 entries (expired == 0) the name timestamp replaces expired
+        auto boundary_of = [&name_time](time_t exp, time_t exd) -> time_t {
+            if (exd != 0)
+                return std::max(exp, exd);
+            return std::max(exp, name_time.value_or(0));
+        };
 
         if (addtime != 0) {
             new_expiration = expiration + (addtime * DAYS);
@@ -333,11 +370,14 @@ int main(int argc, char** argv) {
         }
 
         if (addtimeexpired != 0) {
-            new_expired = expired + (addtimeexpired * DAYS);
+            // deleted v1 entries have no expired time (0), it is encoded in the name, start from the
+            // effective boundary instead of 0 (which would result in a date in 1970)
+            time_t base = (listexpired && expired == 0) ? boundary_of(expiration, expired) : expired;
+            new_expired = base + (addtimeexpired * DAYS);
         }
 
         if (new_expiration.has_value()) {
-            fmt::println("Id: {} ({})", entry->getId(), entry->getWSPath());
+            print_header();
             time_t new_exp_value = new_expiration.value();
             auto olddate = utils::ctime(&expiration);
             auto newdate = utils::ctime(&new_exp_value);
@@ -352,7 +392,7 @@ int main(int argc, char** argv) {
         }
 
         if (new_expired.has_value()) {
-            fmt::println("Id: {} ({})", entry->getId(), entry->getWSPath());
+            print_header();
             time_t new_exp_value = new_expired.value();
             auto olddate = utils::ctime(&expired);
             auto newdate = utils::ctime(&new_exp_value);
@@ -371,46 +411,32 @@ int main(int argc, char** argv) {
         // DB entries and workspace directories by these names (stray detection), and ws_restore shows
         // the name as the user-visible "restorable until" date. If the edits above moved the
         // effective retention boundary, keep name and reality in sync by renaming both.
-        if (listexpired) {
+        // Entries are only renamed if they were edited, and only if the boundary changed.
+        if (listexpired && (new_expiration.has_value() || new_expired.has_value())) {
             if (entry->getReleaseTime() > 1000000000L) {
-                if (new_expiration.has_value() || new_expired.has_value()) {
-                    fmt::println("Id: {} ({})", entry->getId(), entry->getWSPath());
-                    fmt::println("    NOT renamed: workspace was released by user, name carries release time");
-                }
+                fmt::println("    NOT renamed: workspace was released by user, name carries release time");
+            } else if (!name_time.has_value()) {
+                fmt::println("    NOT renamed: name has no timestamp suffix");
             } else {
-                // boundary as computed by the ws_expirer delete phase: max(expiration, expired)
-                time_t boundary = std::max(new_expiration.value_or(expiration), new_expired.value_or(expired));
-                auto dash = entry->getId().rfind('-');
-                std::optional<time_t> name_time;
-                if (dash != string::npos) {
+                time_t old_boundary = boundary_of(expiration, expired);
+                time_t new_boundary = boundary_of(new_expiration.value_or(expiration), new_expired.value_or(expired));
+                if (new_boundary != old_boundary) {
                     try {
-                        name_time = std::stoll(entry->getId().substr(dash + 1));
-                    } catch (const std::exception&) { // id has no parsable timestamp suffix
-                    }
-                }
-                if (name_time.has_value() && *name_time != boundary) {
-                    string old_id = entry->getId();
-                    string new_id = old_id.substr(0, dash) + "-" + fmt::format("{}", boundary);
-                    cppfs::path deleted_dir =
-                        cppfs::path(entry->getWSPath()).remove_filename() / config.deletedPath(entry->getFilesystem());
-
-                    fmt::println("Id: {} ({})", old_id, entry->getWSPath());
-                    fmt::println("    rename db entry: {} -> {}", old_id, new_id);
-                    fmt::println("    move workspace: {} -> {}", (deleted_dir / old_id).string(),
-                                 (deleted_dir / new_id).string());
-                    if (!dryrun) {
-                        try {
-                            entry->renameAsExpired(boundary); // DB entry first, workspace second
-                            // renameAsExpired may have incremented the timestamp on name collision
-                            cppfs::rename(deleted_dir / old_id, deleted_dir / entry->getId());
-                        } catch (const DatabaseException& e) {
-                            spdlog::error("failed to rename db entry {}: {}", old_id, e.what());
-                        } catch (const cppfs::filesystem_error& e) {
-                            spdlog::error("renamed db entry {} but failed to move workspace to {}: {} -- "
-                                          "workspace directory would look like a stray dir to ws_expirer, repair "
-                                          "manually!",
-                                          old_id, entry->getId(), e.what());
+                        WsID old_id = entry->getId();
+                        WsID new_id = entry->expiredIdFor(new_boundary, reserved);
+                        if (new_id != old_id) {
+                            cppfs::path deleted_dir = cppfs::path(entry->getWSPath()).remove_filename() /
+                                                      config.deletedPath(entry->getFilesystem());
+                            fmt::println("    rename db entry: {} -> {}", old_id, new_id);
+                            fmt::println("    move workspace: {} -> {}", (deleted_dir / old_id).string(),
+                                         (deleted_dir / new_id).string());
+                            reserved.insert(new_id);
+                            if (!dryrun) {
+                                entry->renameAsExpired(new_id); // DB entry first, workspace second
+                            }
                         }
+                    } catch (const DatabaseException& e) {
+                        spdlog::error("{}: {}", entry->getId(), e.what());
                     }
                 }
             }

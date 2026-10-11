@@ -3,6 +3,46 @@ setup() {
     _common_setup
 }
 
+# create a DB entry in the recovery area of ws2 and its workspace directory,
+# the comment of the DB entry and a marker file in the directory hold the original timestamp,
+# to verify that DB entry and directory still belong together after renames
+# usage: _mk_deleted NAME TS EXPIRATION [EXPIRED]   (without EXPIRED: v1 style entry)
+_mk_deleted() {
+    local name="$1" ts="$2" expiration="$3" expired="$4"
+    mkdir -p /tmp/ws/ws2/1/.removed
+    {
+        echo "workspace: /tmp/ws/ws2/1/${USER}-${name}"
+        echo "creation: $((ts - 200000))"
+        echo "expiration: ${expiration}"
+        if [ -n "$expired" ]; then
+            echo "expired: ${expired}"
+        fi
+        echo "extensions: 0"
+        echo "reminder: 0"
+        echo 'mailaddress: ""'
+        echo "comment: \"${ts}\""
+    } > "/tmp/ws/ws2-db/.removed/${USER}-${name}-${ts}"
+    mkdir -p "/tmp/ws/ws2/1/.removed/${USER}-${name}-${ts}"
+    echo "${ts}" > "/tmp/ws/ws2/1/.removed/${USER}-${name}-${ts}/marker"
+}
+
+# remove all DB entries and workspace directories of NAME from the recovery area of ws2
+_rm_deleted() {
+    rm -rf "/tmp/ws/ws2-db/.removed/${USER}-$1-"* "/tmp/ws/ws2/1/.removed/${USER}-$1-"*
+}
+
+# check that DB entry and workspace directory NAME-TS exist and belong together
+_check_pair() {
+    local name="$1" ts="$2"
+    local entry="/tmp/ws/ws2-db/.removed/${USER}-${name}-${ts}"
+    local wsdir="/tmp/ws/ws2/1/.removed/${USER}-${name}-${ts}"
+    [ -f "$entry" ]
+    [ -f "$wsdir/marker" ]
+    local orig
+    orig=$(cat "$wsdir/marker")
+    grep -E "^comment: [\"']?${orig}[\"']?$" "$entry"
+}
+
 @test "ws_editdb present" {
     which ws_editdb
 }
@@ -382,4 +422,127 @@ EOF
     [ -e "$entry" ]
     [ -d "$wsdir" ]
     rm -rf "$entry" "$wsdir"
+}
+
+# without an actual modification nothing must be renamed, especially not v1 entries (no expired
+# field, expiration earlier than name timestamp) and entries where expired and name timestamp
+# differ slightly (as ws_expirer takes the time twice)
+@test "ws_editdb -e without modification does not rename" {
+    ts=$(date +%s)
+    _rm_deleted RENNOOP1
+    _rm_deleted RENNOOP2
+    _mk_deleted RENNOOP1 "$ts" "$((ts - 3 * 86400))"
+    _mk_deleted RENNOOP2 "$ts" "$((ts - 86400))" "$((ts + 1))"
+
+    run ws_editdb --config bats/ws.conf -e --not-kidding "RENNOOP*"
+    refute_output --partial "rename db entry"
+    assert_success
+
+    # expire-by in the far future changes nothing either
+    run ws_editdb --config bats/ws.conf -e --not-kidding --expire-by 2060-12-31 "RENNOOP*"
+    refute_output --partial "rename db entry"
+    assert_success
+
+    _check_pair RENNOOP1 "$ts"
+    _check_pair RENNOOP2 "$ts"
+    _rm_deleted RENNOOP1
+    _rm_deleted RENNOOP2
+}
+
+# v1 entry: extending expiration, but not beyond the name timestamp, does not move the boundary
+@test "ws_editdb -e add-time on v1 entry within boundary does not rename" {
+    ts=$(date +%s)
+    _rm_deleted RENV1ADD
+    _mk_deleted RENV1ADD "$ts" "$((ts - 3 * 86400))"
+
+    run ws_editdb --config bats/ws.conf -e --not-kidding --add-time 1 "RENV1ADD*"
+    assert_output --partial "change expiration"
+    refute_output --partial "rename db entry"
+    assert_success
+
+    _check_pair RENV1ADD "$ts"
+    run cat "/tmp/ws/ws2-db/.removed/${USER}-RENV1ADD-${ts}"
+    assert_output --partial "expiration: $((ts - 2 * 86400))"
+    _rm_deleted RENV1ADD
+}
+
+# v1 entry has no expired field, add-time-expired has to start from the name timestamp, not from 0
+@test "ws_editdb -e add-time-expired on v1 entry starts from name timestamp" {
+    ts=$(date +%s)
+    new_ts=$((ts + 5 * 86400))
+    _rm_deleted RENV1EXP
+    _mk_deleted RENV1EXP "$ts" "$((ts - 3 * 86400))"
+
+    run ws_editdb --config bats/ws.conf -e --not-kidding --add-time-expired 5 "RENV1EXP*"
+    assert_output --partial "change expired"
+    assert_output --partial "(${new_ts})"
+    assert_output --partial "rename db entry: ${USER}-RENV1EXP-${ts} -> ${USER}-RENV1EXP-${new_ts}"
+    assert_success
+
+    [ ! -e "/tmp/ws/ws2-db/.removed/${USER}-RENV1EXP-${ts}" ]
+    [ ! -e "/tmp/ws/ws2/1/.removed/${USER}-RENV1EXP-${ts}" ]
+    _check_pair RENV1EXP "$new_ts"
+    run cat "/tmp/ws/ws2-db/.removed/${USER}-RENV1EXP-${new_ts}"
+    assert_output --partial "expired: ${new_ts}"
+    _rm_deleted RENV1EXP
+}
+
+# ensure-until gives several entries of the same workspace name the same boundary,
+# names have to be made unique without overwriting anything, also in dry-run output
+@test "ws_editdb -e ensure-until resolves name collisions" {
+    ts=$(date +%s)
+    d=$(date -d "2050-12-31 23:59:59" +%s)
+    _rm_deleted RENCOL
+    _mk_deleted RENCOL "$((ts - 30))" "$((ts - 86400))" "$((ts - 30))"
+    _mk_deleted RENCOL "$((ts - 20))" "$((ts - 86400))" "$((ts - 20))"
+    _mk_deleted RENCOL "$((ts - 10))" "$((ts - 86400))" "$((ts - 10))"
+
+    run ws_editdb --config bats/ws.conf -e --ensure-until 2050-12-31 "RENCOL*"
+    assert_output --partial "-> ${USER}-RENCOL-${d}"
+    assert_output --partial "-> ${USER}-RENCOL-$((d + 1))"
+    assert_output --partial "-> ${USER}-RENCOL-$((d + 2))"
+    assert_success
+    # dry-run changed nothing
+    _check_pair RENCOL "$((ts - 30))"
+    _check_pair RENCOL "$((ts - 20))"
+    _check_pair RENCOL "$((ts - 10))"
+
+    run ws_editdb --config bats/ws.conf -e --not-kidding --ensure-until 2050-12-31 "RENCOL*"
+    refute_output --partial "error"
+    assert_success
+    _check_pair RENCOL "$d"
+    _check_pair RENCOL "$((d + 1))"
+    _check_pair RENCOL "$((d + 2))"
+    [ ! -e "/tmp/ws/ws2-db/.removed/${USER}-RENCOL-$((ts - 30))" ]
+    [ ! -e "/tmp/ws/ws2-db/.removed/${USER}-RENCOL-$((ts - 20))" ]
+    [ ! -e "/tmp/ws/ws2-db/.removed/${USER}-RENCOL-$((ts - 10))" ]
+    [ ! -e "/tmp/ws/ws2/1/.removed/${USER}-RENCOL-$((ts - 30))" ]
+    [ ! -e "/tmp/ws/ws2/1/.removed/${USER}-RENCOL-$((ts - 20))" ]
+    [ ! -e "/tmp/ws/ws2/1/.removed/${USER}-RENCOL-$((ts - 10))" ]
+
+    # running again is a no-op
+    run ws_editdb --config bats/ws.conf -e --not-kidding --ensure-until 2050-12-31 "RENCOL*"
+    refute_output --partial "rename db entry"
+    assert_success
+    _rm_deleted RENCOL
+}
+
+# a workspace directory without DB entry blocks the target name, it must not be overwritten
+@test "ws_editdb -e does not overwrite existing workspace directory" {
+    ts=$(date +%s)
+    new_ts=$((ts + 5 * 86400))
+    _rm_deleted RENBLK
+    _mk_deleted RENBLK "$ts" "$((ts - 86400))" "$ts"
+    mkdir -p "/tmp/ws/ws2/1/.removed/${USER}-RENBLK-${new_ts}"
+    echo blocker > "/tmp/ws/ws2/1/.removed/${USER}-RENBLK-${new_ts}/blocker"
+
+    run ws_editdb --config bats/ws.conf -e --not-kidding --add-time-expired 5 "RENBLK*"
+    assert_output --partial "-> ${USER}-RENBLK-$((new_ts + 1))"
+    assert_success
+
+    _check_pair RENBLK "$((new_ts + 1))"
+    [ ! -e "/tmp/ws/ws2-db/.removed/${USER}-RENBLK-${new_ts}" ]
+    run cat "/tmp/ws/ws2/1/.removed/${USER}-RENBLK-${new_ts}/blocker"
+    assert_output "blocker"
+    _rm_deleted RENBLK
 }

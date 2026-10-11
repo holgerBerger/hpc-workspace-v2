@@ -28,8 +28,12 @@
  *
  */
 
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
+#include <set>
 #include <string>
+#include <system_error>
 #include <unistd.h>
 #include <vector>
 
@@ -596,69 +600,176 @@ void DBEntryV1::setExpiration(const time_t timestamp) { expiration = timestamp; 
 // change expired time
 void DBEntryV1::setExpired(const time_t timestamp) { expired = timestamp; }
 
-// rename DB entry file and ID of an entry from the deleted area, so that the trailing
-// timestamp reflects the new retention boundary ("<base>-<old_ts>" -> "<base>-<new_ts>").
-// The workspace directory itself has to be moved by the caller (as ws_expirer does it:
-// DB entry first, workspace second).
-void DBEntryV1::renameAsExpired(const time_t new_boundary) {
-    if (traceflag)
-        spdlog::trace("renameAsExpired({})", new_boundary);
-
-    // released entries carry the release time in their name, not an expired time
-    if (released > 1000000000L) {
-        throw DatabaseException(fmt::format("entry {} was released by user, name carries release time", id));
-    }
+// split an ID of an entry in the deleted area "<base>-<ts>" into base and ts
+// returns false if the ID does not have that shape
+static bool splitExpiredId(const string& id, string& base, time_t& ts) {
     auto dash = id.rfind('-');
-    if (dash == string::npos) {
-        throw DatabaseException(fmt::format("id {} has no timestamp suffix to replace", id));
+    if (dash == string::npos || dash == 0 || dash + 1 >= id.size())
+        return false;
+    auto suffix = id.substr(dash + 1);
+    if (!std::all_of(suffix.begin(), suffix.end(), [](unsigned char c) { return std::isdigit(c); }))
+        return false;
+    try {
+        ts = std::stoll(suffix);
+    } catch (const std::exception&) {
+        return false;
     }
-    if (new_boundary <= 0) {
-        throw DatabaseException(
-            fmt::format("refusing to rename entry {} to implausible timestamp {}", id, new_boundary));
+    base = id.substr(0, dash);
+    return true;
+}
+
+// check if something (file, directory, dangling symlink) exists under that name
+// throws if this can not be determined, to never overwrite something by accident
+static bool nameTaken(const cppfs::path& p) {
+    std::error_code ec;
+    auto st = cppfs::symlink_status(p, ec);
+    if (ec && st.type() != cppfs::file_type::not_found) {
+        throw DatabaseException(fmt::format("can not check existence of {}: {}", p.string(), ec.message()));
     }
+    return st.type() != cppfs::file_type::not_found;
+}
 
-    string new_id = id.substr(0, dash) + "-" + fmt::format("{}", new_boundary);
-
-    auto wsconfig = parent_db->getconfig()->getFsConfig(filesystem);
-    cppfs::path dbtarget = cppfs::path(wsconfig.database) / cppfs::path(wsconfig.deletedPath) / cppfs::path(new_id);
-
-    // check if target exists, as std::filesystem::rename does delete target if it exists
-    // in case of collision, delay and wait for 1s resolution (but increment to avoid glitches)
-    if (cppfs::exists(dbtarget)) {
-        spdlog::info("delaying to avoid name collision");
-        sleep(1);
-        new_id = id.substr(0, dash) + "-" + fmt::format("{}", new_boundary + 1);
-        dbtarget = cppfs::path(wsconfig.database) / cppfs::path(wsconfig.deletedPath) / cppfs::path(new_id);
-    }
-
+// rename a DB entry file as DB user (as release() does), throws DatabaseException on failure
+static void renameDBFile(const Config* config, const cppfs::path& from, const cppfs::path& to) {
     caps.raise_cap({CAP_FOWNER, CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
     if (caps.isSetuid()) {
         // for filesystems with root_squash, we need to be DB user here
-        if (setegid(parent_db->getconfig()->dbgid()) || seteuid(parent_db->getconfig()->dbuid())) {
-            caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, parent_db->getconfig()->dbuid(),
+        if (setegid(config->dbgid()) || seteuid(config->dbuid())) {
+            caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, config->dbuid(),
                            utils::SrcPos(__FILE__, __LINE__, __func__));
             throw DatabaseException("can not seteuid or setgid. Bad installation?");
         }
     }
 
-    try {
-        if (debugflag)
-            spdlog::debug("rename({}, {})", dbfilepath, dbtarget.string());
-        cppfs::rename(dbfilepath, dbtarget);
-        dbfilepath = dbtarget.string(); // entry knows now the new name, for remove and writeEntry
-        id = new_id;                    // the ID changed with the filename
-    } catch (const std::filesystem::filesystem_error& e) {
-        auto euid = geteuid();
-        caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, parent_db->getconfig()->dbuid(),
-                       utils::SrcPos(__FILE__, __LINE__, __func__));
-        if (debugflag)
-            spdlog::error("{} (euid={})", e.what(), euid);
-        throw DatabaseException("database entry could not be renamed!");
+    if (debugflag)
+        spdlog::debug("rename({}, {})", from.string(), to.string());
+    std::error_code ec;
+    cppfs::rename(from, to, ec);
+
+    caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, config->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+
+    if (ec) {
+        throw DatabaseException(
+            fmt::format("could not rename DB entry {} -> {}: {}", from.string(), to.string(), ec.message()));
+    }
+}
+
+// rename a workspace directory (as ws_release does), returns error code
+static std::error_code renameWorkspaceDir(const Config* config, const cppfs::path& from, const cppfs::path& to) {
+    caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
+    if (debugflag)
+        spdlog::debug("rename({}, {})", from.string(), to.string());
+    std::error_code ec;
+    cppfs::rename(from, to, ec); // same directory, can not be cross device
+    caps.lower_cap({CAP_DAC_OVERRIDE}, config->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+    return ec;
+}
+
+// collision free ID "<base>-<ts>" with smallest ts >= boundary for an entry in the deleted area,
+// checks DB entries and workspace directories in the deleted area and names reserved by the caller
+WsID DBEntryV1::expiredIdFor(const time_t boundary, const std::set<WsID>& reserved) const {
+    if (traceflag)
+        spdlog::trace("expiredIdFor({})", boundary);
+
+    string base;
+    time_t ts;
+    if (!splitExpiredId(id, base, ts)) {
+        throw DatabaseException(fmt::format("id {} has no timestamp suffix to replace", id));
+    }
+    if (boundary <= 0) {
+        throw DatabaseException(fmt::format("refusing to rename entry {} to implausible timestamp {}", id, boundary));
     }
 
-    caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, parent_db->getconfig()->dbuid(),
-                   utils::SrcPos(__FILE__, __LINE__, __func__));
+    auto wsconfig = parent_db->getconfig()->getFsConfig(filesystem);
+    auto db_deleted_dir = cppfs::path(wsconfig.database) / wsconfig.deletedPath;
+    auto ws_deleted_dir = cppfs::path(workspace).remove_filename() / wsconfig.deletedPath;
+
+    // the timestamp is a computed date, not "now", so waiting would not help: count up instead
+    const int maxtries = 1000;
+    for (int i = 0; i < maxtries; i++) {
+        WsID candidate = fmt::format("{}-{}", base, boundary + i);
+        if (candidate == id)
+            return id; // already carries the right (or a sufficiently close) name
+        if (reserved.count(candidate))
+            continue;
+        if (nameTaken(db_deleted_dir / candidate) || nameTaken(ws_deleted_dir / candidate))
+            continue;
+        return candidate;
+    }
+    throw DatabaseException(fmt::format("no free name found for {} after {} tries", id, maxtries));
+}
+
+// rename DB entry and workspace directory of an entry from the deleted area to new_id.
+// DB entry first, workspace second (as ws_expirer does it). Never overwrites, and rolls back the
+// DB rename if the workspace can not be moved, as a DB entry without workspace directory is
+// harmless, but a workspace directory without DB entry is removed as stray by ws_expirer.
+void DBEntryV1::renameAsExpired(const WsID& new_id) {
+    if (traceflag)
+        spdlog::trace("renameAsExpired({})", new_id);
+
+    // released entries carry the release time in their name, not an expired time
+    if (released > 1000000000L) {
+        throw DatabaseException(fmt::format("entry {} was released by user, name carries release time", id));
+    }
+    string base, new_base;
+    time_t ts, new_ts;
+    if (!splitExpiredId(id, base, ts)) {
+        throw DatabaseException(fmt::format("id {} has no timestamp suffix to replace", id));
+    }
+    if (!splitExpiredId(new_id, new_base, new_ts) || new_base != base || new_ts <= 0) {
+        throw DatabaseException(fmt::format("invalid new id {} for entry {}", new_id, id));
+    }
+    if (new_id == id)
+        return;
+
+    const Config* config = parent_db->getconfig();
+    auto wsconfig = config->getFsConfig(filesystem);
+    auto ws_deleted_dir = cppfs::path(workspace).remove_filename() / wsconfig.deletedPath;
+
+    cppfs::path db_from = dbfilepath;
+    cppfs::path db_to = cppfs::path(wsconfig.database) / wsconfig.deletedPath / new_id;
+    cppfs::path ws_from = ws_deleted_dir / id;
+    cppfs::path ws_to = ws_deleted_dir / new_id;
+
+    // std::filesystem::rename replaces existing files and empty directories, never do that
+    if (nameTaken(db_to)) {
+        throw DatabaseException(fmt::format("DB entry {} exists already, not overwriting", db_to.string()));
+    }
+    if (nameTaken(ws_to)) {
+        throw DatabaseException(fmt::format("{} exists already, not overwriting", ws_to.string()));
+    }
+
+    bool ws_present = nameTaken(ws_from);
+    if (!ws_present) {
+        spdlog::warn("workspace directory {} not found, renaming DB entry {} only", ws_from.string(), id);
+    }
+
+    // DB entry first
+    renameDBFile(config, db_from, db_to);
+    WsID old_id = id;
+    dbfilepath = db_to.string(); // entry knows now the new name, for remove and writeEntry
+    id = new_id;
+
+    // workspace second
+    if (ws_present) {
+        auto ec = renameWorkspaceDir(config, ws_from, ws_to);
+        if (ec) {
+            // roll back, otherwise the workspace directory would be removed as stray by ws_expirer
+            try {
+                renameDBFile(config, db_to, db_from);
+            } catch (const DatabaseException& e) {
+                throw DatabaseException(fmt::format(
+                    "could not move workspace {} -> {} ({}), and rollback of DB entry failed ({}). "
+                    "REPAIR MANUALLY: rename {} to {}, otherwise ws_expirer removes the workspace as stray!",
+                    ws_from.string(), ws_to.string(), ec.message(), e.what(), db_to.string(), db_from.string()));
+            }
+            dbfilepath = db_from.string();
+            id = old_id;
+            throw DatabaseException(fmt::format("could not move workspace {} -> {} ({}), DB entry rename rolled back",
+                                                ws_from.string(), ws_to.string(), ec.message()));
+        }
+    }
 }
 
 // change release date (mark as released and not expired)
