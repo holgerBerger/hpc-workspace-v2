@@ -31,10 +31,13 @@
  */
 
 #include <algorithm>
+#include <cctype>
+#include <ctime>
 #include <exception>
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 
 #include "config.h"
@@ -342,6 +345,37 @@ std::string generateSummaryMail(const std::string& mail_from, std::vector<std::s
     return mail.str();
 }
 
+// SECREVIEW H4: ws_allocate creates the workspace directory *before* writing its DB
+// entry. Between the expirer's directory scan and its DB snapshot such a workspace has
+// a directory but no entry yet and looks like a stray. Directories whose mtime is newer
+// than this grace period are left alone until the next run. The mtime is set by the
+// kernel on the storage server; within the short allocation window a user cannot forge
+// it to look older, and a truly orphaned directory (crashed ws_allocate) is cleaned one
+// cycle later.
+static constexpr std::time_t STRAY_GRACETIME = 3600; // seconds
+
+// extract the trailing '-<timestamp>' that every move into deleted/ appends to the
+// directory name; returns false when the name has no digit-only timestamp suffix
+// (legacy entries, directories placed there by hand)
+static bool trailing_timestamp(const string& name, std::time_t& ts) {
+    auto dash = name.rfind('-');
+    if (dash == string::npos || dash == 0 || dash + 1 >= name.size())
+        return false;
+    auto suffix = name.substr(dash + 1);
+    if (!std::all_of(suffix.begin(), suffix.end(), [](unsigned char c) { return std::isdigit(c); }))
+        return false;
+    long long val;
+    try {
+        val = std::stoll(suffix);
+    } catch (const std::exception&) {
+        return false;
+    }
+    if (val <= 0 || val > 4102444800LL) // implausible (before 1970 or after ~2100)
+        return false;
+    ts = static_cast<std::time_t>(val);
+    return true;
+}
+
 // clean_stray_directories
 //  finds directories that are not in DB and removes them,
 //  returns numbers of valid and invalid directories
@@ -350,6 +384,10 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
                                                     const std::string single_space, const bool dryrun) {
 
     clean_stray_result_t result = {0, 0, 0, 0};
+
+    // start of this run: directories in deleted/ whose embedded move timestamp is at or
+    // after this point were moved by the current run and must not be removed in it (H4)
+    const std::time_t run_start = std::time(nullptr);
 
     // helper to store space and found dir together
     struct dir_t {
@@ -467,9 +505,23 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
             })) {
             spdlog::warn("    stray workspace {}", founddir.dir);
 
-            // FIXME: a stray workspace will be moved to deleted here, and will be deleted in
-            // the same run in (3). Is this intended? dangerous with datarace #87
+            // H4 guard 1: never touch a directory that is younger than the grace time: it
+            // may be a workspace whose allocation is still in flight (directory created,
+            // DB entry not yet written)
+            struct stat st;
+            if (lstat((cppfs::path(founddir.space) / founddir.dir).string().c_str(), &st) != 0) {
+                spdlog::info("      {} vanished before cleanup, skipping", founddir.dir);
+                continue;
+            }
+            if (st.st_mtime > (time(nullptr) - STRAY_GRACETIME)) {
+                spdlog::warn("      {} is younger than the stray grace time of {} s, assuming allocation race, "
+                             "leaving it for the next run",
+                             founddir.dir, STRAY_GRACETIME);
+                continue;
+            }
 
+            // Note (fixes the old FIXME for datarace #87): a stray moved to deleted here
+            // is no longer removed in the same run, see the grace guard in phase (3).
             string timestamp = fmt::format("{}", time(NULL));
             spdlog::info("         {}move {} to {}", cleanermode ? "" : "would ",
                          (cppfs::path(founddir.space) / founddir.dir).string(),
@@ -524,6 +576,16 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
     for (auto const& founddir : dirs) {
         if (!canFind(workspacesInDeletedDB, founddir.dir)) {
             spdlog::warn("    stray removed workspace {}", founddir.dir);
+
+            // H4 guard 2: a directory moved into deleted/ during this very run may belong
+            // to a workspace whose DB entry was written after our snapshot; defer removal
+            // to the next run, where a present DB entry protects it and a true stray is removed
+            std::time_t movets;
+            if (trailing_timestamp(founddir.dir, movets) && movets >= run_start) {
+                spdlog::warn("      moved to deleted during this run, deferring removal to next run");
+                continue;
+            }
+
             spdlog::info("      {}remove {}", cleanermode ? "" : "would ",
                          (cppfs::path(founddir.space) / config.deletedPath(fs) / founddir.dir).string());
             if (!dryrun) {

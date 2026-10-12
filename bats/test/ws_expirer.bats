@@ -113,6 +113,9 @@ setup() {
 
 @test "ws_expirer clean stray directories" {
     mkdir -p /tmp/ws/ws1/stray-dir
+    # backdate past the stray grace time (SECREVIEW H4), otherwise the expirer
+    # assumes an allocation race and leaves the young directory for the next run
+    touch -m -d "2000-01-01" /tmp/ws/ws1/stray-dir
     run ws_expirer --config bats/ws.conf -c
     assert_output --regexp "move .*stray-dir"
     assert_success
@@ -275,6 +278,9 @@ setup() {
 
 @test "ws_expirer dryrun shows what would be moved" {
     mkdir -p /tmp/ws/ws1/test-dryrun-move
+    # backdate past the stray grace time (SECREVIEW H4), otherwise the expirer
+    # assumes an allocation race and never reports the move
+    touch -m -d "2000-01-01" /tmp/ws/ws1/test-dryrun-move
     run ws_expirer --config bats/ws.conf
     assert_output --regexp "would move.*test-dryrun-move"
     # Directory should still exist after dryrun
