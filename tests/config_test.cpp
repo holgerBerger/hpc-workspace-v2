@@ -287,6 +287,60 @@ filesystems:
         REQUIRE(config.hasAccess("y", std::vector<string>{"cg", "dg"}, "testacl", ws::CREATE) == true);
     }
 
+    SECTION("hasAccess ACL conflict resolution") {
+        // regression test for M4: matching ACL entries combine as deny-wins, independent of
+        // entry order in the config and of the order the system reports the user's groups in
+        auto config = Config(std::string(R"(
+admins: [admin]
+dbuid: 2
+dbgid: 2
+adminmail: [root]
+clustername: test
+workspaces:
+    denyfirst:
+        group_acl: ["-students", "+staff"]
+        database: /tmp
+        spaces: [/tmp]
+        deleted: .del
+    grantfirst:
+        group_acl: ["+staff", "-students"]
+        database: /tmp
+        spaces: [/tmp]
+        deleted: .del
+    subtract:
+        group_acl: ["+team", "-team:extend"]
+        database: /tmp
+        spaces: [/tmp]
+        deleted: .del
+    useroverride:
+        user_acl: ["+alice:create"]
+        group_acl: ["-allusers"]
+        database: /tmp
+        spaces: [/tmp]
+        deleted: .del
+)"));
+
+        // member of a denied and a granted group: denied, no matter the group or entry order
+        REQUIRE(config.hasAccess("u", std::vector<string>{"students", "staff"}, "denyfirst", ws::LIST) == false);
+        REQUIRE(config.hasAccess("u", std::vector<string>{"staff", "students"}, "denyfirst", ws::LIST) == false);
+        REQUIRE(config.hasAccess("u", std::vector<string>{"students", "staff"}, "grantfirst", ws::LIST) == false);
+        REQUIRE(config.hasAccess("u", std::vector<string>{"staff", "students"}, "grantfirst", ws::LIST) == false);
+        // only the granted group matches: allowed
+        REQUIRE(config.hasAccess("u", std::vector<string>{"staff"}, "grantfirst", ws::LIST) == true);
+        // a deny entry with an explicit list only subtracts the listed intents
+        REQUIRE(config.hasAccess("u", std::vector<string>{"team"}, "subtract", ws::LIST) == true);
+        REQUIRE(config.hasAccess("u", std::vector<string>{"team"}, "subtract", ws::CREATE) == true);
+        REQUIRE(config.hasAccess("u", std::vector<string>{"team"}, "subtract", ws::EXTEND) == false);
+        // no matching entry at all: denied
+        REQUIRE(config.hasAccess("u", std::vector<string>{"other"}, "subtract", ws::LIST) == false);
+        // a matching user entry replaces the group result, but only for the intents it allows
+        REQUIRE(config.hasAccess("alice", std::vector<string>{"allusers"}, "useroverride", ws::CREATE) == true);
+        REQUIRE(config.hasAccess("alice", std::vector<string>{"allusers"}, "useroverride", ws::LIST) == false);
+        REQUIRE(config.hasAccess("bob", std::vector<string>{"allusers"}, "useroverride", ws::CREATE) == false);
+        // admins still get access
+        REQUIRE(config.hasAccess("admin", std::vector<string>{"allusers"}, "useroverride", ws::LIST) == true);
+    }
+
     SECTION("isAdmin") {
         auto config = Config(std::string(R"(
 admins: [d]

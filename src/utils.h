@@ -89,8 +89,10 @@ std::string getID(const std::string wsid);
 // new version, no terminfo
 bool new_ruh();
 
-// parse a ACL
-auto parseACL(const std::vector<std::string> acl) -> std::map<std::string, std::pair<std::string, std::vector<int>>>;
+// parse an ACL into a vector of (id, (modifier, intents)) entries, preserving config order and keeping duplicates
+// an empty intent list means all intents are covered ("+" grants, "-" denies)
+auto parseACL(const std::vector<std::string> acl)
+    -> std::vector<std::pair<std::string, std::pair<std::string, std::vector<int>>>>;
 
 // delete a directory and its contents, should be temper safe, with a deadline (epoch time)
 // after the deadline is passed, no new recursion will be started,

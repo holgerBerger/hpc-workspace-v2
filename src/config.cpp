@@ -443,6 +443,14 @@ bool Config::isDebugUser(const string user) const {
 // check if given user can assess given filesystem with current config
 //  see validFilesystems for specification of ACLs
 // unittest: yes
+// evaluate a single parsed ACL entry (modifier, intent list) against an intent
+// an empty intent list means "all intents": "+" grants everything, "-" denies everything
+static bool aclEntryAllows(const std::pair<std::string, std::vector<int>>& perm, const ws::intent intent) {
+    if (perm.second.size() == 0)
+        return perm.first == "+";
+    return (perm.first == "+") == canFind(perm.second, intent);
+}
+
 bool Config::hasAccess(const string user, const vector<string> groups, const string filesystem,
                        const ws::intent intent) const {
     if (traceflag)
@@ -466,23 +474,22 @@ bool Config::hasAccess(const string user, const vector<string> groups, const str
         if (filesystems.at(filesystem).group_acl.size() > 0) {
             if (debugflag && debuglevel > 0)
                 spdlog::debug("   group ACL present,");
-            auto aclmap = utils::parseACL(filesystems.at(filesystem).group_acl);
-            for (const auto& group : groups) {
-                if (aclmap.count(group) > 0) {
-                    auto perm = aclmap[group];
-                    if (perm.second.size() == 0) {
-                        ok = (perm.first == "+");
-                    } else {
-                        if (perm.first == "+") {
-                            ok = canFind(perm.second, intent);
-                        } else {
-                            ok = !canFind(perm.second, intent);
-                        }
-                    }
+            // deny wins: all ACL entries matching any of the user's groups must allow the intent, so the
+            // result does not depend on the order in which getgroups()/NSS reports the groups
+            bool any_match = false;
+            bool all_allow = true;
+            for (const auto& aclentry : utils::parseACL(filesystems.at(filesystem).group_acl)) {
+                if (canFind(groups, aclentry.first)) {
+                    bool entry_ok = aclEntryAllows(aclentry.second, intent);
+                    any_match = true;
+                    if (!entry_ok)
+                        all_allow = false;
                     if (debugflag && debuglevel > 0)
-                        spdlog::debug("   access for {} {}", group, ok ? "granted" : "denied");
+                        spdlog::debug("   access for {} {}", aclentry.first, entry_ok ? "granted" : "denied");
                 }
             }
+            if (any_match)
+                ok = all_allow;
             /*  old cold old ACL syntax
             for(const auto & group : groups) {
                 if (canFind(filesystems.at(filesystem).group_acl, group)) ok = true;
@@ -496,21 +503,23 @@ bool Config::hasAccess(const string user, const vector<string> groups, const str
         if (filesystems.at(filesystem).user_acl.size() > 0) {
             if (debugflag && debuglevel > 0)
                 spdlog::debug("   user ACL present,");
-            auto aclmap = utils::parseACL(filesystems.at(filesystem).user_acl);
-            if (aclmap.count(user) > 0) {
-                auto perm = aclmap[user];
-                if (perm.second.size() == 0) {
-                    ok = (perm.first == "+");
-                } else {
-                    if (perm.first == "+") {
-                        ok = canFind(perm.second, intent);
-                    } else {
-                        ok = !canFind(perm.second, intent);
-                    }
+            // explicit user entries replace the group result (so +user can override a group deny
+            // and -user can override a group grant); multiple entries for the same user combine as
+            // deny-wins, just like group entries do
+            bool any_match = false;
+            bool all_allow = true;
+            for (const auto& aclentry : utils::parseACL(filesystems.at(filesystem).user_acl)) {
+                if (aclentry.first == user) {
+                    bool entry_ok = aclEntryAllows(aclentry.second, intent);
+                    any_match = true;
+                    if (!entry_ok)
+                        all_allow = false;
+                    if (debugflag && debuglevel > 0)
+                        spdlog::debug("   access for {} {}", user, entry_ok ? "granted" : "denied");
                 }
-                if (debugflag && debuglevel > 0)
-                    spdlog::debug("   access for {} {}", user, ok ? "granted" : "denied");
             }
+            if (any_match)
+                ok = all_allow;
 
             /* old code for old ACL syntax
             if (canFind(filesystems.at(filesystem).user_acl, user)) ok = true;

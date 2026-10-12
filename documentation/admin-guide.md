@@ -481,6 +481,20 @@ Example: `user_acl: ["usera:list,release","userb:list,release"]`,
 To make a workspace at all usable for a user, `list` is always required,
 Extended ACL syntax is only needed in very special situations, if single users should be prevented from carrying out some operations.
 
+**Rule evaluation:** if multiple entries match a user (directly or via any of
+his groups), *all* matching entries must allow the operation: a single matching
+`-` entry wins over any number of `+` entries. The result is independent of the
+order of the entries in the config and of the order in which the system reports
+group memberships. Entries in `user_acl` for the user himself replace the group
+result, so a single user can always be excluded (`-user`) or included
+(`+user:list,create`) regardless of his groups. A `-` entry with an explicit
+permission list only removes the listed operations, e.g.
+`group_acl: ["+team","-team:extend"]` allows `team` everything except
+extending. A syntactically invalid entry, or an entry with a permission list
+that contains no valid permission name, is ignored and reported as an error;
+an invalid entry can still be used to switch access control on (see hint
+below).
+
 **Caution:** in v1, the global `default` workspace enabled access to the named
 workspace for all users, this is no longer true in v2. Users have to have access
 to the named workspace.

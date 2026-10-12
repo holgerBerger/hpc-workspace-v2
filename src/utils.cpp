@@ -531,38 +531,49 @@ std::vector<std::string> splitString(const std::string& str, char delimiter) {
     return words;
 }
 
-// parse ACL list into a map, empty intent list should be interpreted as all permissions granted
-// FIXME: add unit tests
-auto parseACL(const std::vector<std::string> acl) -> std::map<std::string, std::pair<std::string, std::vector<int>>> {
+// parse ACL list into a config-ordered vector of (id, (modifier, intents)) entries
+// an empty intent list should be interpreted as all permissions granted
+auto parseACL(const std::vector<std::string> acl)
+    -> std::vector<std::pair<std::string, std::pair<std::string, std::vector<int>>>> {
     if (traceflag)
         spdlog::trace("parseACL({})", acl);
-    std::map<std::string, std::pair<std::string, std::vector<int>>> aclmap;
+    std::vector<std::pair<std::string, std::pair<std::string, std::vector<int>>>> entries;
     const std::regex acl_regex(R"(^([-+])?([^:]+)(:(\w+(,\w+)*)?)?$)");
     std::smatch base_match;
     for (const auto& entry : acl) {
         std::string modifier = "+";
-        // if(debugflag) fmt::println(stderr, "   parseACL {}", entry);
-        if (std::regex_match(entry, base_match, acl_regex)) {
-            if (base_match[1] == "+" || base_match[1] == "-") {
-                modifier = base_match[1];
-            }
-            std::string id = base_match[2].str();
-            std::string permissions = base_match[4].str();
-            // if(debugflag) fmt::println(stderr, "  parseACL {} -> {} {} {}", entry, modifier, id, permissions);
-
-            // split intents and convert strings to enum
-            std::vector<int> numerical_intents;
-            for (const auto& p : splitString(permissions, ',')) {
-                if (ws::intentnames.count(p) > 0) {
-                    numerical_intents.push_back(ws::intentnames.at(p));
-                } else {
-                    spdlog::error("invalid permission <{}> in ACL <{}>, ignoring", p, entry);
-                }
-            }
-            aclmap[id] = std::pair{modifier, numerical_intents};
+        if (!std::regex_match(entry, base_match, acl_regex)) {
+            // access control stays enabled (hasAccess gates on the raw list size),
+            // but this entry grants/denies nothing - make it visible, it used to vanish silently
+            spdlog::error("invalid ACL entry <{}>, ignoring", entry);
+            continue;
         }
+        if (base_match[1] == "+" || base_match[1] == "-") {
+            modifier = base_match[1];
+        }
+        std::string id = base_match[2].str();
+        std::string permissions = base_match[4].str();
+
+        // split intents and convert strings to enum
+        const auto tokens = splitString(permissions, ',');
+        std::vector<int> numerical_intents;
+        for (const auto& p : tokens) {
+            if (ws::intentnames.count(p) > 0) {
+                numerical_intents.push_back(ws::intentnames.at(p));
+            } else {
+                spdlog::error("invalid permission <{}> in ACL <{}>, ignoring", p, entry);
+            }
+        }
+        // a given permission list where no name is valid must not silently degrade to
+        // "all intents" (that would upgrade +bob:fin to a full grant); "bob" and "bob:"
+        // without any name keep the documented empty-list meaning
+        if (!tokens.empty() && numerical_intents.empty()) {
+            spdlog::error("ACL entry <{}> has no valid permissions, ignoring", entry);
+            continue;
+        }
+        entries.emplace_back(id, std::pair{modifier, std::move(numerical_intents)});
     }
-    return aclmap;
+    return entries;
 }
 
 // delete path be deleting contents and deleting path itself

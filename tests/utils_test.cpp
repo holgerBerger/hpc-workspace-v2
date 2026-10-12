@@ -17,14 +17,39 @@ int debuglevel = 0;
 TEST_CASE("utils", "[utils]") {
     SECTION("parceACL") {
         auto m = utils::parseACL({"-a", "+abc:list,create", "-z", "c", "-y"});
-        REQUIRE(m["a"].first == "-");
-        REQUIRE(m["abc"].first == "+");
-        REQUIRE(m["c"].first == "+");
-        REQUIRE(m["y"].first == "-");
-        REQUIRE(m["a"].second.size() == 0);
-        REQUIRE(m["abc"].second.size() == 2);
-        REQUIRE(m["c"].second.size() == 0);
-        REQUIRE(m["abc"].second == std::vector<int>{ws::LIST, ws::CREATE});
+        REQUIRE(m.size() == 5);
+        // config order is kept
+        REQUIRE(m[0].first == "a");
+        REQUIRE(m[0].second.first == "-");
+        REQUIRE(m[0].second.second.size() == 0);
+        REQUIRE(m[1].first == "abc");
+        REQUIRE(m[1].second.first == "+");
+        REQUIRE(m[1].second.second == std::vector<int>{ws::LIST, ws::CREATE});
+        REQUIRE(m[2].first == "z");
+        REQUIRE(m[2].second.first == "-");
+        REQUIRE(m[3].first == "c");
+        REQUIRE(m[3].second.first == "+");
+        REQUIRE(m[3].second.second.size() == 0);
+        REQUIRE(m[4].first == "y");
+        REQUIRE(m[4].second.first == "-");
+
+        // syntactically invalid entries are dropped; an entry whose permission list contains only
+        // invalid names is dropped as well (it must not silently degrade to "all intents"); a bare
+        // name or a trailing colon keeps the documented empty-list meaning
+        auto d = utils::parseACL({"bad:entry,", "typo:nonexist", "ok:list", "colon:", "mix:list,typo"});
+        REQUIRE(d.size() == 3);
+        REQUIRE(d[0].first == "ok");
+        REQUIRE(d[0].second.second == std::vector<int>{ws::LIST});
+        REQUIRE(d[1].first == "colon");
+        REQUIRE(d[1].second.second.size() == 0);
+        REQUIRE(d[2].first == "mix");
+        REQUIRE(d[2].second.second == std::vector<int>{ws::LIST});
+
+        // duplicate ids are kept as separate entries (hasAccess combines them as deny-wins)
+        auto dup = utils::parseACL({"dup:list", "dup:create"});
+        REQUIRE(dup.size() == 2);
+        REQUIRE(dup[0].second.second == std::vector<int>{ws::LIST});
+        REQUIRE(dup[1].second.second == std::vector<int>{ws::CREATE});
     }
 
     SECTION("rmtree") {
