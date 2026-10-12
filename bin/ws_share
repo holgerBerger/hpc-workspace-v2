@@ -1,4 +1,5 @@
 #!/bin/bash
+set -u
 #
 # ws_share is a helper script that can be used to grant quickly read or
 # read-write access for a workspace to other users or groups based on UNIX ACLs.
@@ -18,7 +19,7 @@
 #          (c) Holger Berger 2026
 #
 
-progname=$(basename $0)
+progname="$(basename "$0")"
 maxmembers=100 # do not share with a group with more than $maxmembers members
 
 # Test for compatible getopt version.
@@ -78,6 +79,9 @@ unset PARSED
 
 YES="NO"
 ACCESS="rX"  # default: read-only
+CONFIG=""
+FILESYSTEM=""
+answer=""
 # parse options
 while true; do
     case "$1" in
@@ -117,10 +121,10 @@ while true; do
     esac
 done
 
-ACTION="$1"
-shift
-WS_NAME="$1"
-shift
+ACTION="${1:-}"
+shift || true
+WS_NAME="${1:-}"
+shift || true
 
 CALLER_USER=$(id -un)
 if [[ "$ACCESS" == "rwX" ]]; then
@@ -152,8 +156,15 @@ case $ACTION in
         ;;
 esac
 
-WS_PATH=$(ws_find ${CONFIG:+--config $CONFIG} ${CONFIG_FILE:+--config $CONFIG_FILE} ${FILESYSTEM:+-F $FILESYSTEM} $WS_NAME)
-if [[ $? -ne 0 || -z "$WS_PATH" ]]; then
+# Run ws_find with a proper argument array: option values stay intact, the
+# workspace name is never word-split or glob-expanded, and a leading-dash name
+# cannot be mistaken for an option. (CONFIG_FILE used to be honored here as an
+# undocumented ghost hook that silently redirected config resolution.)
+FIND_ARGS=()
+if [[ -n "$CONFIG" ]]; then FIND_ARGS+=(--config "$CONFIG"); fi
+if [[ -n "$FILESYSTEM" ]]; then FIND_ARGS+=(-F "$FILESYSTEM"); fi
+WS_PATH=$(ws_find "${FIND_ARGS[@]}" -- "$WS_NAME")
+if [[ $? -ne 0 || -z "$WS_PATH" || "$WS_PATH" != /* || "$WS_PATH" == *$'\n'* ]]; then
     echo "Error: Invalid workspace name."
     exit 1
 fi
@@ -171,13 +182,12 @@ case $ACTION in
             }'
         ;;
     share)
-        USERS="$@"
-        if [[ -z "$USERS" ]]; then
+        if [[ $# -eq 0 ]]; then
             echo "Error: No user specified"
             exit 1
         fi
         MACL=""
-        for user in $USERS; do
+        for user in "$@"; do
             if ! id "$user" >/dev/null 2>&1; then
                 echo "Error: User $user unknown"
                 exit 1
@@ -191,7 +201,7 @@ case $ACTION in
         fi
         setfacl -R -m "${MACL%,}" "$WS_PATH"
         if [[ $? -eq 0 ]]; then
-            for user in $USERS; do
+            for user in "$@"; do
                 logger -t ws_share -p user.info "Granted $ACCESS_STR access to user <$user> for workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>" || true
             done
         else
@@ -200,13 +210,12 @@ case $ACTION in
         fi
         ;;
     unshare)
-        USERS="$@"
-        if [[ -z "$USERS" ]]; then
+        if [[ $# -eq 0 ]]; then
             echo "Error: No user specified"
             exit 1
         fi
         XACL=""
-        for user in $USERS; do
+        for user in "$@"; do
             if ! id "$user" >/dev/null 2>&1; then
                 echo "Error: User $user unknown"
                 exit 1
@@ -220,7 +229,7 @@ case $ACTION in
         fi
         setfacl -R -x "${XACL%,}" "$WS_PATH"
         if [[ $? -eq 0 ]]; then
-            for user in $USERS; do
+            for user in "$@"; do
                 logger -t ws_share -p user.info "Removed access for user <$user> from workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>" || true
             done
         else
@@ -229,13 +238,12 @@ case $ACTION in
         fi
         ;;
     sharegroup)
-        GROUPARG="$@"
-        if [[ -z "$GROUPARG" ]]; then
+        if [[ $# -eq 0 ]]; then
             echo "Error: No group specified"
             exit 1
         fi
         MACL=""
-        for group in $GROUPARG; do
+        for group in "$@"; do
             line=$(getent group "$group")
             if [[ -z "$line" ]]; then
                 echo "Error: Group $group unknown"
@@ -264,7 +272,7 @@ case $ACTION in
           fi
           setfacl -R -m "${MACL%,}" "$WS_PATH"
           if [[ $? -eq 0 ]]; then
-              for group in $GROUPARG; do
+              for group in "$@"; do
                   logger -t ws_share -p user.info "Granted $ACCESS_STR access to group <$group> for workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>" || true
               done
           else
@@ -274,13 +282,12 @@ case $ACTION in
         fi
         ;;
     unsharegroup)
-        GROUPARG="$@"
-        if [[ -z "$GROUPARG" ]]; then
+        if [[ $# -eq 0 ]]; then
             echo "Error: No group specified"
             exit 1
         fi
         XACL=""
-        for group in $GROUPARG; do
+        for group in "$@"; do
             if ! getent group "$group" >/dev/null; then
                 echo "Error: Group $group unknown"
                 exit 1
@@ -294,7 +301,7 @@ case $ACTION in
         if [[ -n "$XACL" ]]; then
             setfacl -R -x "${XACL%,}" "$WS_PATH"
             if [[ $? -eq 0 ]]; then
-                for group in $GROUPARG; do
+                for group in "$@"; do
                     logger -t ws_share -p user.info "Removed access for group <$group> from workspace <$WS_NAME> ($WS_PATH) by <$CALLER_USER>" || true
                 done
             else

@@ -272,6 +272,31 @@ setup() {
     assert_output --partial "Error: workspace name missing"
 }
 
+@test "ws_share user arguments are not glob-expanded" {
+    # M7 regression: the user list used to be round-tripped through a string
+    # (USERS="$@"; for user in $USERS), so a literal '*' was re-split AND
+    # glob-expanded against the caller's CWD - files in the CWD whose names
+    # happened to be valid accounts would silently receive access.
+    run ws_allocate --config bats/ws.conf ${ws_name}_glob
+    assert_success
+
+    run ws_share --config bats/ws.conf share ${ws_name}_glob '*'
+    assert_failure
+    assert_output --partial "Error: User * unknown"
+
+    ws_release --config bats/ws.conf ${ws_name}_glob
+}
+
+@test "ws_share leading-dash workspace name is not an option for ws_find" {
+    # M7 regression: WS_NAME was passed to ws_find unquoted and without "--",
+    # so a name like -h made ws_find print its help text (exit 0) and that
+    # whole multi-line blob became WS_PATH.
+    run ws_share --config bats/ws.conf list -- -h
+    assert_failure
+    assert_output --partial "Error: Invalid workspace name."
+    refute_output --partial "produce help message"
+}
+
 @test "ws_share error missing user for share" {
     run ws_allocate --config bats/ws.conf ${ws_name}_nouser_share
     assert_success
