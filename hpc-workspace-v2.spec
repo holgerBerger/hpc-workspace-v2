@@ -47,7 +47,7 @@ A workspace is a directory created on behalf of a user, associated with an expir
 # Privileged user tools.
 %caps(cap_dac_override,cap_chown,cap_fowner=p) %{_bindir}/ws_allocate
 %caps(cap_dac_override,cap_chown,cap_fowner=p) %{_bindir}/ws_release
-%caps(cap_dac_override,cap_dac_read_search=p) %{_bindir}/ws_restore
+%caps(cap_dac_override,cap_dac_read_search,cap_fowner=p) %{_bindir}/ws_restore
 
 # Alternative: setuid root instead of capabilities. To use this, drop the three
 # %caps lines above, replace them with the three lines below, and build with

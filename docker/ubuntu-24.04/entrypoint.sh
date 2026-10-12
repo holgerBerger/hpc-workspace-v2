@@ -74,8 +74,8 @@ if [ "$run_bats_test" = true ] || [ "$run_ctest_test" = true ]; then
   cp build/release/bin/ws_restore_notest /tmp/cap
   sudo setcap "CAP_DAC_OVERRIDE=p CAP_CHOWN=p CAP_FOWNER=p" /tmp/cap/ws_allocate
   sudo setcap "CAP_DAC_OVERRIDE=p CAP_CHOWN=p CAP_FOWNER=p" /tmp/cap/ws_release
-  sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p" /tmp/cap/ws_restore
-  sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p" /tmp/cap/ws_restore_notest
+  sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p CAP_FOWNER=p" /tmp/cap/ws_restore
+  sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p CAP_FOWNER=p" /tmp/cap/ws_restore_notest
 
   # create a config for setuid 
   export MYUID=$(id -u)

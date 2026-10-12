@@ -66,6 +66,12 @@ setup() {
     # Data should be gone from deleted directory
     assert_dir_not_exist "$(dirname "$wsdir")/.removed/$wsid/del_test.txt"
 
+    # M6: the (now empty) workspace directory itself must be gone and with it the DB
+    # entry - the old code silently orphaned the directory and removed the entry anyway
+    assert_dir_not_exist "$(dirname "$wsdir")/.removed/$wsid"
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RESTORE -F ws1 -l "$wsid"
+    refute_output --partial "$wsid"
+
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 $ws_name 2>/dev/null || true
 }
 

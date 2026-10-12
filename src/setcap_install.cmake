@@ -22,7 +22,7 @@ endif()
 
 file(TO_NATIVE_PATH "${CMAKE_INSTALL_PREFIX}/bin/ws_restore" _WS_CAPA_RESTORE)
 execute_process(
-    COMMAND setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p" "${_WS_CAPA_RESTORE}"
+    COMMAND setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p CAP_FOWNER=p" "${_WS_CAPA_RESTORE}"
     RESULT_VARIABLE _WS_CAPA_RESTORE_RC)
 if(_WS_CAPA_RESTORE_RC)
     message(WARNING "setcap failed for ws_restore")

@@ -179,8 +179,8 @@ Vagrant.configure("2") do |config|
     sudo chmod u-s build/release/bin/ws_restore build/release/bin/ws_allocate build/release/bin/ws_release build/release/bin/ws_restore_notest
     sudo setcap "CAP_DAC_OVERRIDE=p CAP_CHOWN=p CAP_FOWNER=p" build/release/bin/ws_allocate
     sudo setcap "CAP_DAC_OVERRIDE=p CAP_CHOWN=p CAP_FOWNER=p" build/release/bin/ws_release
-    sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p" build/release/bin/ws_restore
-    sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p" build/release/bin/ws_restore_notest
+    sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p CAP_FOWNER=p" build/release/bin/ws_restore
+    sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p CAP_FOWNER=p" build/release/bin/ws_restore_notest
 
     echo .......................................
     echo ...bats tests with setcap..............

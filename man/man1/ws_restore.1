@@ -103,6 +103,12 @@ The workspace
 .B cannot be recovered
 after this. There is a 5-second grace period during which the operation can be
 interrupted with CTRL-C. Use with care.
+If the data could not be deleted completely (for example because of filesystem
+permissions or an interrupted previous run), an error is reported, the database
+entry is
+.B kept
+and the command exits with a non-zero return code; re-running the command will
+then retry the deletion.
 .TP
 \-\-config CONFIGFILE
 path to configfile, for root only or for unprivileged installations.

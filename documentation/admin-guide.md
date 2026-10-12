@@ -179,7 +179,7 @@ make `ws_allocate`, `ws_release`, `ws_restore` setuid root, *or* execute
 ```
 setcap "CAP_DAC_OVERRIDE=p CAP_CHOWN=p CAP_FOWNER=p" ws_allocate
 setcap "CAP_DAC_OVERRIDE=p CAP_CHOWN=p CAP_FOWNER=p" ws_release
-setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p" ws_restore
+setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p CAP_FOWNER=p" ws_restore
 ```
 *if* capability library was available at compile time.
 

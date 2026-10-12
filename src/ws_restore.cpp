@@ -300,13 +300,13 @@ void restore(const string name, const string target, const string username, cons
         spdlog::info("you have 5 seconds to interrupt with CTRL-C to prevent deletion");
         sleep(5);
 
-        caps.raise_cap({CAP_FOWNER}, utils::SrcPos(__FILE__, __LINE__, __func__));
-        if (caps.isSetuid()) {
-            // get process owner to be allowed to delete files
-            if (seteuid(getuid())) {
-                spdlog::error("can not setuid, bad installation?");
-            }
-        }
+        // CAP_FOWNER: unlinking entries we do not own below the workspace, CAP_DAC_*: the deleted
+        // directory (space/.removed) is dbuid-owned and 0700, we must be allowed to traverse and
+        // unlink inside it. In SUID mode the deletion runs as root (raise_cap sets euid 0) - the
+        // calling user could not even enter the deleted directory; the expirer removes data as
+        // root as well.
+        caps.raise_cap({CAP_FOWNER, CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH},
+                       utils::SrcPos(__FILE__, __LINE__, __func__));
 
         // remove the directory
         if (debugflag) {
@@ -314,28 +314,49 @@ void restore(const string name, const string target, const string username, cons
         }
         utils::rmtree_below(wssourcename);
 
-        if (caps.isSetuid()) {
-            // get root so we can drop again
-            if (seteuid(0)) {
-                spdlog::error("can not setuid, bad installation?");
-            }
-        }
         caps.lower_cap({CAP_FOWNER}, source_entry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
 
         caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-        // FIXME: move this to deleteEntry?
+        // delete toplevel, not recursively, as we are not allowed to delete/look inside
+        // this fails with ENOTEMPTY if rmtree_below could not delete everything - in that case
+        // we keep the DB entry and bail out with an error, so the next run can retry
+        bool data_gone = false;
+        {
+            std::error_code ec;
+            cppfs::remove(wssourcename, ec);
+            if (ec) {
+                spdlog::error("remove {} -> {}", wssourcename, ec.message());
+            } else {
+                data_gone = !cppfs::exists(wssourcename);
+            }
+        }
+
         if (caps.isSetuid()) {
             // get db user to be able to unlink db entry from root_squash filesystems
             if (setegid(config.dbgid()) || seteuid(config.dbuid())) {
                 spdlog::error("can not seteuid or setgid. Bad installation?");
             }
         }
-        // delete toplevel, not recursively, as we are not allowed to delete/look inside
+
+        if (!data_gone) {
+            spdlog::error("data of workspace {} could not be completely deleted, database entry kept!", name);
+            syslog(LOG_ERR, "delete for user <%s> of <%s> incomplete, database entry <%s> kept", username.c_str(),
+                   wssourcename.c_str(), name.c_str());
+            exit(1);
+        }
+
+        // FIXME: move this to deleteEntry? (needs CAP_DAC_OVERRIDE raised, or dbuid in SUID mode)
         try {
-            cppfs::remove(wssourcename);
-        } catch (const std::exception& e) {
-            spdlog::error("remove {} -> {}", wssourcename, e.what());
+            source_db->deleteEntry(name, true);
+            syslog(LOG_INFO, "delete for user <%s> from <%s> done, removed DB entry <%s>.", username.c_str(),
+                   wssourcename.c_str(), name.c_str());
+            spdlog::info("delete successful, database entry removed.");
+        } catch (DatabaseException const& ex) {
+            spdlog::error("error in DB entry removal, {}", ex.what());
+            syslog(LOG_ERR, "delete for user <%s> of <%s>: data gone but DB entry removal failed: %s",
+                   username.c_str(), wssourcename.c_str(), ex.what());
+            exit(1);
         }
 
         if (caps.isSetuid()) {
@@ -346,16 +367,6 @@ void restore(const string name, const string target, const string username, cons
         }
         caps.lower_cap({CAP_DAC_OVERRIDE}, source_entry->getConfig()->dbuid(),
                        utils::SrcPos(__FILE__, __LINE__, __func__));
-
-        // remove DB entry
-        try {
-            source_db->deleteEntry(name, true);
-            syslog(LOG_INFO, "delete for user <%s> from <%s> done, removed DB entry <%s>.", username.c_str(),
-                   wssourcename.c_str(), name.c_str());
-            spdlog::info("delete successful, database entry removed.");
-        } catch (DatabaseException const& ex) {
-            spdlog::error("error in DB entry removal, {}", ex.what());
-        }
     } else { // don't delete data
 
         // find target workspace
