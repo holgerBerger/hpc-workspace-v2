@@ -426,3 +426,27 @@ setup() {
 
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 ZEROEXT-DASH
 }
+
+@test "ws_allocate -x delegate extend keeps owner's mail" {
+    export WS_ALLOCATE=$(which ws_allocate)
+    export WS_LIST=$(which ws_list)
+    export WS_RELEASE=$(which ws_release)
+
+    # owner creates a group workspace (group usera) with its own notification mail
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 -G usera -m owner@test.com DELEGATE-MAIL 5
+    assert_success
+
+    # vagrant is member of group usera and extends in behalf of the owner, trying to redirect mail
+    run sudo -u vagrant --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -F ws1 -x -u mean-user-name -m attacker@evil.com -c "hijacked" DELEGATE-MAIL 10
+    assert_success
+    assert_output --partial "extending in behalf of the owner: keeping owner's mail, reminder and comment"
+    refute_output --partial "changed mail"
+    refute_output --partial "changed comment"
+
+    # the workspace still notifies the owner
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_LIST -v -F ws1 DELEGATE-MAIL
+    assert_output --partial "owner@test.com"
+    refute_output --partial "attacker@evil.com"
+
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RELEASE -F ws1 DELEGATE-MAIL
+}

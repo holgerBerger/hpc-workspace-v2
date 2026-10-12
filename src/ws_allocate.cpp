@@ -245,6 +245,12 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
         spdlog::error("Illegal workspace name, use ASCII characters and numbers, '-','.' and '_' only!");
         exit(1);
     }
+
+    // validate -u username: it is used to build the workspace id <user>-<name> and appears in paths
+    if (!user.empty() && (user.front() == '-' || user == "." || user == ".." || user.find('/') != string::npos)) {
+        spdlog::error("Illegal username specified with -u!");
+        exit(1);
+    }
 }
 
 /*
@@ -495,23 +501,41 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
                 exit(-1); // FIXME: bad for testing
             }
 
-            // we allow a user to specify -u -x together, and to extend a workspace if he has rights on the workspace
-            if (user_option.length() > 0 && (user_option != username) && (getuid() != 0)) {
+            // we allow a user to specify -u -x together, and to extend a workspace if he has rights on the
+            // workspace. a delegate acts in behalf of the owner: unless we are root or the owner ourselves, the
+            // workspace must be a group workspace (created with -G, see man 1 ws_allocate) and the caller must be
+            // member of that group and have access to the workspace directory
+            bool may_modify = getuid() == 0 || user_option.empty() || user_option == username;
+            if (!may_modify) {
                 spdlog::info("you are not owner of the workspace.");
-                if (access(wsdir.c_str(), R_OK | W_OK | X_OK) != 0) {
+                const string& wsgroup = dbentry->getGroup();
+                if (wsgroup.empty() || !canFind(user::getGrouplist(), wsgroup) ||
+                    access(wsdir.c_str(), R_OK | W_OK | X_OK) != 0) {
                     spdlog::info("         and you have no permissions to access the workspace, workspace will "
                                  "not be extended.");
                     exit(-1); // FIXME: bad for testing
                 }
             }
             spdlog::info("extending workspace");
-            syslog(LOG_INFO, "extending <%s/%s>", foundfs.c_str(), username.c_str());
+            if (may_modify)
+                syslog(LOG_INFO, "extending <%s/%s>", foundfs.c_str(), username.c_str());
+            else
+                syslog(LOG_INFO, "extending <%s/%s> by <%s> in behalf of the owner", foundfs.c_str(),
+                       user_option.c_str(), username.c_str());
 
-            // mail address change
+            // mail address change (delegates must not overwrite the owner's settings, see above:
+            // eff_* hold the values we actually apply to the workspace)
+            const bool keep_owner_settings = !may_modify;
+            if (keep_owner_settings)
+                spdlog::info("extending in behalf of the owner: keeping owner's mail, reminder and comment");
+            const string mailaddress_eff = keep_owner_settings ? "" : mailaddress;
+            const int reminder_eff = keep_owner_settings ? 0 : reminder;
+            const string comment_eff = keep_owner_settings ? "" : comment;
+
             auto oldmail = dbentry->getMailaddress();
             string newmail;
-            if (mailaddress != "") {
-                newmail = mailaddress;
+            if (mailaddress_eff != "") {
+                newmail = mailaddress_eff;
                 spdlog::info("changed mail address to {}", newmail);
             } else {
                 if (oldmail != "") {
@@ -520,10 +544,10 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
                 }
             }
 
-            if (reminder != 0) {
+            if (reminder_eff != 0) {
                 spdlog::info("changed reminder setting.");
             }
-            if (comment != "") {
+            if (comment_eff != "") {
                 spdlog::info("changed comment.");
             }
 
@@ -550,7 +574,7 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
             }
 
             try {
-                dbentry->useExtension(exp, newmail, reminder, comment);
+                dbentry->useExtension(exp, newmail, reminder_eff, comment_eff);
             } catch (const DatabaseException& e) {
                 spdlog::error("{}", e.what());
                 exit(-2);

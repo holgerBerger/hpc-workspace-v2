@@ -99,6 +99,9 @@ for a list of available filesystems and their order of allocation.
 mailaddress to send reminder mail to, can be combined with
 .B \-x
 to add mailaddress to existing workspace (combine with duration 0).
+When extending a foreign workspace via
+.B \-u
+("in behalf of the owner"), the owner's mailaddress is kept and this option is ignored.
 .TP
 \-n, \-\-name NAME
 name of workspace, can also be given as first positional parameter
@@ -107,13 +110,18 @@ name of workspace, can also be given as first positional parameter
 comment to attach to workspace, can be combined with
 .B \-x
 to change comment of an existing workspace (combine with duration 0 or omit duration).
+When extending a foreign workspace via
+.B \-u
+("in behalf of the owner"), the owner's comment is kept and this option is ignored.
 .TP
 \-u, \-\-username USERNAME
 act on behalf of USERNAME (for extending group members' workspaces, requires
 .B \-x
 and a workspace created with
-.B \-G
-).
+.BR \-G ).
+The caller must be a member of the workspace's group. A delegate may only extend the
+expiration date: mailaddress, reminder and comment always stay as set by the owner
+(unless the caller is root).
 .TP
 \-\-config CONFIGFILE
 path to configfile, for root only or for unprivileged installations
@@ -126,6 +134,9 @@ reminder email will be sent DAYS days before the
 .B
 workspace
 will expire, can be combined with \-x to add reminder to existing workspace. This could be sent in the night after the exact point in time, during a cleanup.
+When extending a foreign workspace via
+.B \-u
+("in behalf of the owner"), the owner's reminder setting is kept and this option is ignored.
 See
 .B ws_send_ical
 for a way to send calendar entries.
