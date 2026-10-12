@@ -11,5 +11,6 @@ else
         exit $?
     else
         echo "Usage: ws_extend [-F filesystem] workspace days"
+        exit 1
     fi
 fi
