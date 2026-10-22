@@ -233,7 +233,7 @@ setup() {
     wsid=$(ws_restore --config bats/ws.conf -l | grep $ws_name | head -1)
     target_dir=$(ws_allocate --config bats/ws.conf $target_name)
     ws_restore_notest --config bats/ws.conf $wsid $target_name
-    run ws_restore --config bats/ws.conf -l "$wsid"
+    run ws_restore --config bats/ws.conf -l
     refute_output --partial "$wsid"
     assert_success
     ws_release --config bats/ws.conf $target_name
@@ -245,7 +245,7 @@ setup() {
     ws_release --config bats/ws.conf $ws_name
     wsid=$(ws_restore --config bats/ws.conf -l | grep $ws_name | head -1)
     ws_restore_notest --config bats/ws.conf --delete-data $wsid
-    run ws_restore --config bats/ws.conf -l "$wsid"
+    run ws_restore --config bats/ws.conf -l
     refute_output --partial "$wsid"
     assert_success
 }
@@ -360,4 +360,42 @@ setup() {
     assert_file_exists $target_dir/$wsid/datafile
     assert_equal "$(cat $target_dir/$wsid/datafile)" "data on ws1"
     ws_release --config bats/ws.conf -F ws1 $target_name
+}
+
+@test "ws_restore ruh check cannot be bypassed via argv[0]" {
+    # L2 regression: the human check used to be skipped whenever
+    # basename(argv[0]) != "ws_restore" - trivially spoofed with "exec -a".
+    # The name is now taken from /proc/self/exe, so even under a spoofed
+    # argv[0] the ruh test must run: with empty stdin it fails and nothing
+    # is restored.
+    local src_name=ruh-src-$RANDOM
+    local target_name=ruh-target-$RANDOM
+    local target_dir
+    target_dir=$(ws_allocate --config bats/ws.conf $target_name)
+    local wsdir
+    wsdir=$(ws_allocate --config bats/ws.conf $src_name)
+    echo "ruh data" > "$wsdir/TESTFILE"
+    ws_release --config bats/ws.conf $src_name
+
+    local wsid
+    wsid=$(ws_restore --config bats/ws.conf -l | grep $src_name | head -1)
+    assert [ -n "$wsid" ]
+
+    run bash -c 'exec -a ws_restore_notest ws_restore --config bats/ws.conf "$1" "$2" </dev/null' bash "$wsid" "$target_name"
+
+    # the prompt appeared => ruh test ran despite the spoofed argv[0]
+    assert_output --partial "Animal"
+    # ... and failed on EOF => entry still restorable, data untouched
+    # (note: -l takes a name pattern matched as user-pattern, so filter the
+    # full list for the unique wsid instead of passing it as pattern arg)
+    run ws_restore --config bats/ws.conf -l
+    assert_output --partial "$wsid"
+    assert_file_not_exists "$target_dir/$wsid/TESTFILE"
+
+    # control: the real test-copy binary still skips the human check
+    run ws_restore_notest --config bats/ws.conf "$wsid" "$target_name"
+    assert_success
+    assert_file_exists "$target_dir/$wsid/TESTFILE"
+
+    ws_release --config bats/ws.conf $target_name
 }

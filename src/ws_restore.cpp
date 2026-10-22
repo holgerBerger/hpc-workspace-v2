@@ -354,8 +354,8 @@ void restore(const string name, const string target, const string username, cons
             spdlog::info("delete successful, database entry removed.");
         } catch (DatabaseException const& ex) {
             spdlog::error("error in DB entry removal, {}", ex.what());
-            syslog(LOG_ERR, "delete for user <%s> of <%s>: data gone but DB entry removal failed: %s",
-                   username.c_str(), wssourcename.c_str(), ex.what());
+            syslog(LOG_ERR, "delete for user <%s> of <%s>: data gone but DB entry removal failed: %s", username.c_str(),
+                   wssourcename.c_str(), ex.what());
             exit(1);
         }
 
@@ -664,13 +664,22 @@ int main(int argc, char** argv) {
             }
         }
         if (check_name(name, real_username)) {
-            if (cppfs::path(argv[0]).filename() == "ws_restore") {
+            // The human-check must not trust argv[0]: the caller fully controls it
+            // (bash exec -a, renamed symlinks, ...), which would let scripts skip the
+            // test. /proc/self/exe is set by the kernel to the actually executed file,
+            // so the test copy ws_restore_notest is still recognized by its real name.
+            std::string exename = "ws_restore"; // if we cannot tell, run the test
+            std::error_code ec;
+            auto exepath = cppfs::read_symlink("/proc/self/exe", ec);
+            if (!ec)
+                exename = exepath.filename().string();
+            if (exename == "ws_restore") {
                 if (utils::new_ruh()) {
                     restore(name, target, username, config, filesystem, opt.count("delete-data"));
                 } else {
                     syslog(LOG_INFO, "user <%s> failed ruh test.", username.c_str());
                 }
-            } else { // hack to allow test, human test can be skipped if executable has non-standard name
+            } else { // hack to allow test, human test can be skipped for the test copy binary
                 restore(name, target, username, config, filesystem, opt.count("delete-data"));
             }
         }
