@@ -191,6 +191,8 @@ static void setupLogging(const std::string pathname) {
 }
 
 // file rename that falls back to utils::mv in case of EXDEV
+// throws filesystem_error if neither rename nor mv succeeded, so callers never
+// mistake a failed move for a successful one
 void robust_rename(const cppfs::path src, const cppfs::path dest) {
     try {
         cppfs::rename(src, dest);
@@ -199,8 +201,12 @@ void robust_rename(const cppfs::path src, const cppfs::path dest) {
             spdlog::info("cross device rename, falling back to 'mv'");
             int ret = utils::mv(src.c_str(), dest.c_str());
             if (ret != 0) {
-                spdlog::error("mv failed with code {}, errno: {} ({})", ret, errno, strerror(errno));
+                // reason already logged by utils::mv; propagate like a failed rename
+                throw cppfs::filesystem_error("mv failed with code " + std::to_string(ret), src, dest,
+                                              std::make_error_code(std::errc::io_error));
             }
+        } else {
+            throw;
         }
     }
 }

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include <unistd.h>
+
 #include "../src/mail.h"
 #include "../src/utils.h"
 #include "../src/ws.h"
@@ -167,4 +169,40 @@ TEST_CASE("utils", "[utils]") {
         REQUIRE(utils::isValidEmail("user}test@example.com"));
         REQUIRE(utils::isValidEmail("user~test@example.com"));
     }
+}
+
+TEST_CASE("utils::mv", "[utils]") {
+    namespace fs = std::filesystem;
+
+    fs::path tmpbase = fs::temp_directory_path() / ("wsmvtest-" + std::to_string(getpid()));
+    fs::remove_all(tmpbase);
+    fs::create_directories(tmpbase);
+
+    SECTION("successful move returns 0 and moves the file") {
+        utils::writeFile((tmpbase / "src").string(), "content");
+        REQUIRE(utils::mv((tmpbase / "src").c_str(), (tmpbase / "dst").c_str()) == 0);
+        REQUIRE(fs::exists(tmpbase / "dst"));
+        REQUIRE_FALSE(fs::exists(tmpbase / "src"));
+    }
+
+    SECTION("failing move does not report success") {
+        // the regression: a mv that can not do its work must not return 0
+        REQUIRE(utils::mv((tmpbase / "does-not-exist").c_str(), (tmpbase / "dst").c_str()) != 0);
+        REQUIRE_FALSE(fs::exists(tmpbase / "dst"));
+    }
+
+    SECTION("operand names starting with a dash are not parsed as options") {
+        // requires relative paths (as the dash would only reach mv as a leading char then),
+        // and `--` as end-of-options marker in utils::mv
+        utils::writeFile((tmpbase / "-v").string(), "content");
+        auto savedir = fs::current_path();
+        fs::current_path(tmpbase);
+        int ret = utils::mv("-v", "moved");
+        fs::current_path(savedir);
+        REQUIRE(ret == 0);
+        REQUIRE(fs::exists(tmpbase / "moved"));
+        REQUIRE_FALSE(fs::exists(tmpbase / "-v"));
+    }
+
+    fs::remove_all(tmpbase);
 }

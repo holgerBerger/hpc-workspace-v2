@@ -471,7 +471,8 @@ void restore(const string name, const string target, const string username, cons
             if ((ret == -1) && (errno == EXDEV)) {
                 ret = utils::mv(wssourcename.c_str(), targetpathname.c_str());
                 if (ret != 0) {
-                    spdlog::error("mv failed with code {}, errno: {} ({})", ret, errno, strerror(errno));
+                    // reason already logged by utils::mv; non-zero keeps the DB entry (ret==0 gate below)
+                    spdlog::error("mv failed with code {}", ret);
                 }
             }
 
@@ -497,8 +498,12 @@ void restore(const string name, const string target, const string username, cons
             } else {
                 syslog(LOG_INFO, "restore for user <%s> from <%s> to <%s> failed, kept DB entry <%s>.",
                        username.c_str(), wssourcename.c_str(), targetpathname.c_str(), name.c_str());
-                spdlog::error("moving data failed, database entry kept! (code: {} errno:{} {})", ret, errno,
-                              strerror(errno));
+                // ret == -1 comes from rename(), where errno describes the failure; any other
+                // non-zero value is the 'mv' exit code, whose reason utils::mv already logged
+                if (ret == -1)
+                    spdlog::error("moving data failed, database entry kept! (errno:{} {})", errno, strerror(errno));
+                else
+                    spdlog::error("moving data failed, database entry kept! (code: {})", ret);
             }
         } // restorenosub
 

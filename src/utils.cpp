@@ -773,23 +773,37 @@ std::string permstring(const fs::perms p) {
  * fallback for rename in case of EXDEV
  * we do not use system() as we are in setuid
  * and it would fail, and it sucks anyhow
+ *
+ * Returns 0 only if /bin/mv exited normally with status 0. A failed fork/waitpid
+ * or a child killed by a signal (e.g. OOM during a large cross-device copy) is
+ * reported as non-zero and logged here, so callers can keep DB entry and data
+ * directory consistent.
+ * NOTE: even a 0 exit can theoretically leave the source behind (mv killed right
+ * after the last unlink but before exiting); the expirer stray cleanup catches
+ * such leftovers on the next run.
  */
 int mv(const char* source, const char* target) {
-    pid_t pid;
-    int status;
-    pid = fork();
-    if (pid == 0) {
-        auto ret = execl("/bin/mv", "mv", source, target, NULL);
-        // we only get here if execl fails, so log the error and exit
-        spdlog::error("execlmv failed with code {}, errno: {} ({})", ret, errno, strerror(errno));
-        _exit(-1);
-    } else if (pid < 0) {
-        //
-    } else {
-        waitpid(pid, &status, 0);
-        return WEXITSTATUS(status);
+    pid_t pid = fork();
+    if (pid < 0) {
+        spdlog::error("mv: fork failed: {} ({})", errno, strerror(errno));
+        return -1;
     }
-    return 0;
+    if (pid == 0) {
+        execl("/bin/mv", "mv", "--", source, target, nullptr);
+        // we only get here if execl fails, so log the error and exit
+        spdlog::error("execl mv failed, errno: {} ({})", errno, strerror(errno));
+        _exit(127); // shell convention: command could not be executed
+    }
+    int status = 0;
+    if (waitpid(pid, &status, 0) != pid) {
+        spdlog::error("mv: waitpid failed: {} ({})", errno, strerror(errno));
+        return -1;
+    }
+    if (WIFSIGNALED(status)) {
+        spdlog::error("mv: killed by signal {}", WTERMSIG(status));
+        return -1;
+    }
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 
 // helper to get a file time as a long long integer, representing the number of seconds since Unix epoch
