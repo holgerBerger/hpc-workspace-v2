@@ -170,6 +170,18 @@ void commandline(po::variables_map& opt, string& name, string& target, string& f
                 spdlog::error("Illegal workspace name, use characters and numbers, -,. and _ only!");
                 exit(1);
             }
+            // the target is used just like name to build the DB entry ID <user>-<target>,
+            // so it must pass the same charset validation (L3)
+            if (opt.count("target")) {
+                if (!regex_match(target.substr(0, 2), e1)) {
+                    spdlog::error("Illegal workspace name, use characters and numbers, -,. and _ only!");
+                    exit(1);
+                }
+                if (regex_search(target, e2)) {
+                    spdlog::error("Illegal workspace name, use characters and numbers, -,. and _ only!");
+                    exit(1);
+                }
+            }
         }
     } else if (!opt.count("list")) {
         spdlog::error("neither workspace nor -l specified.");

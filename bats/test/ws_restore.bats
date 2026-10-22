@@ -167,6 +167,30 @@ setup() {
     assert_failure
 }
 
+@test "ws_restore invalid target name with slash" {
+    # L3 regression: the target builds the DB entry ID "<user>-<target>" and must
+    # pass the same charset validation as the workspace name
+    run ws_restore_notest --config bats/ws.conf validname '../evil'
+    assert_output --partial "Illegal workspace name"
+    assert_failure
+    run ws_restore_notest --config bats/ws.conf validname -t '../evil'
+    assert_output --partial "Illegal workspace name"
+    assert_failure
+}
+
+@test "ws_restore invalid target name with special chars" {
+    run ws_restore_notest --config bats/ws.conf validname 'bad;name'
+    assert_output --partial "Illegal workspace name"
+    assert_failure
+}
+
+@test "ws_restore target with legal special chars passes validation" {
+    # the new check must not be over-broad: dash, dot and underscore stay allowed;
+    # any failure must come from the source lookup, not from target validation
+    run ws_restore_notest --config bats/ws.conf nosuchws 'my.target_1-2'
+    refute_output --partial "Illegal workspace name"
+}
+
 @test "ws_restore pattern matching with asterisk" {
     ws_name1=pattern-match-a-$RANDOM
     ws_name2=pattern-match-b-$RANDOM
