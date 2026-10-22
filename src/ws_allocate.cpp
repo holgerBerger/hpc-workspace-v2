@@ -380,7 +380,9 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
     }
 
     // validate filesystem and group given on command line
-    if (!validateFsAndGroup(config, opt, user_option)) {
+    // NOTE: when -u was not given, validate against the calling user: an empty name matches no
+    // user_acl entry and would deny access to any filesystem that has ACLs configured
+    if (!validateFsAndGroup(config, opt, user_option.empty() ? username : user_option)) {
         // fmt::print(stderr, "Error  : aborting!\n");
         exit(-2);
     }

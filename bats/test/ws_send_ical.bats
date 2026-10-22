@@ -15,7 +15,82 @@ setup() {
 @test "ws_send_ical print help" {
     run ws_send_ical --help
     assert_output --partial "Usage"
+    assert_output --partial "--username"
     assert_success
+}
+
+@test "ws_send_ical finds workspace on filesystem granted by user_acl" {
+    # regression test: the filesystem ACL check must run against the calling user,
+    # an empty username matches no user_acl entry and hid the whole filesystem
+    conf=/tmp/ws_ical_acl.conf
+    cat > "$conf" <<EOF
+admins: [root]
+adminmail: [root@a.com]
+clustername: bats
+dbgid: 2
+dbuid: 2
+duration: 10
+maxextensions: 3
+smtphost: localhost
+mail_from: root@localhost
+default: ws2
+workspaces:
+  ws1:
+    database: /tmp/ws/ws1-db
+    deleted: .removed
+    keeptime: 7
+    spaces: [/tmp/ws/ws1]
+  ws2:
+    database: /tmp/ws/ws2-db
+    deleted: .removed
+    user_acl: [$USER]
+    keeptime: 7
+    spaces: [/tmp/ws/ws2/1, /tmp/ws/ws2/2]
+EOF
+    run ws_allocate --config "$conf" -F ws2 ICALACL
+    assert_success
+    run ws_send_ical --config "$conf" -m $USER@localhost ICALACL
+    # on a system without reachable SMTP this still shows the send attempt, the
+    # bug produced "no workspace ICALACL found" instead
+    refute_output --partial "no workspace"
+    rm -f /tmp/ws/ws2-db/${USER}-ICALACL "$conf"
+}
+
+@test "ws_send_ical -u is rejected with a warning for non-admins" {
+    # regression: -u must not let an unprivileged caller pick another identity for the
+    # filesystem ACL check; the tool warns and stays on the calling user
+    conf=/tmp/ws_ical_acl.conf
+    cat > "$conf" <<EOF
+admins: [root]
+adminmail: [root@a.com]
+clustername: bats
+dbgid: 2
+dbuid: 2
+duration: 10
+maxextensions: 3
+smtphost: localhost
+mail_from: root@localhost
+default: ws2
+workspaces:
+  ws1:
+    database: /tmp/ws/ws1-db
+    deleted: .removed
+    keeptime: 7
+    spaces: [/tmp/ws/ws1]
+  ws2:
+    database: /tmp/ws/ws2-db
+    deleted: .removed
+    user_acl: [someoneelse]
+    keeptime: 7
+    spaces: [/tmp/ws/ws2/1, /tmp/ws/ws2/2]
+EOF
+    run ws_allocate --config "$conf" -F ws1 NOTME
+    assert_success
+    # even when naming the other user, the ACL check runs against the caller:
+    # ws2 is only granted to someoneelse, so the workspace is not visible
+    run ws_send_ical --config "$conf" -u someoneelse -m $USER@localhost NOTME
+    assert_output --partial "choosing a user with -u is only allowed for root and admins"
+    rm -f /tmp/ws/ws1-db/${USER}-NOTME "$conf"
 }
 
 @test "ws_send_ical no valid config file" {

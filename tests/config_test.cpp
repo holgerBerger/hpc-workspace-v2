@@ -243,6 +243,12 @@ filesystems:
         // admin user check, sees all filesystems
         REQUIRE(config.validFilesystems("e", std::vector<string>{}, ws::LIST) ==
                 std::vector<string>{"third", "first", "fourth", "second"});
+        // regression for L21/L16: an empty username (tools that passed an unset -u option
+        // straight into validFilesystems) must match no user_acl entry, so the ACL'd
+        // filesystem is silently dropped from the list - this is what made every non-root
+        // allocation with -F on an ACL'd filesystem fail
+        REQUIRE(config.validFilesystems("", std::vector<string>{"gb"}, ws::LIST) ==
+                std::vector<string>{"third", "fourth", "second"});
     }
 
     SECTION("hasAccess") {
@@ -285,6 +291,12 @@ filesystems:
         REQUIRE(config.hasAccess("z", std::vector<string>{"cg", "dg"}, "testacl", ws::LIST) == false);
         REQUIRE(config.hasAccess("y", std::vector<string>{"cg", "dg"}, "testacl", ws::LIST) == false);
         REQUIRE(config.hasAccess("y", std::vector<string>{"cg", "dg"}, "testacl", ws::CREATE) == true);
+        // regression for L21: an empty username matches no user_acl entry...
+        REQUIRE(config.hasAccess("", std::vector<string>{}, "testacl", ws::LIST) == false);
+        // ...but group_acl is evaluated against the caller's real group list independently
+        // of the username - that asymmetry is why the empty-username bug stayed invisible
+        // for group_acl-only setups, pinned here on purpose
+        REQUIRE(config.hasAccess("", std::vector<string>{"bg"}, "testacl", ws::LIST) == true);
     }
 
     SECTION("hasAccess ACL conflict resolution") {

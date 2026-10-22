@@ -5,7 +5,7 @@ ws_send_ical \- send a calendar invitation by email for a workspace expiration d
 
 .SH SYNOPSIS
 .B ws_send_ical
-[\-h] [\-F FILESYSTEM] [\-n NAME] [\-m MAILADDRESS] NAME
+[\-h] [\-F FILESYSTEM] [\-n NAME] [\-m MAILADDRESS] [\-u USERNAME] NAME
 
 .SH DESCRIPTION
 Sends an iCal calendar invitation to the specified mail address as a reminder of the
@@ -61,6 +61,10 @@ positional argument.
 mail address to send the calendar invitation to. If not given, the address from
 .B ~/.ws_user.conf
 is used.
+.TP
+\-u, \-\-username USERNAME
+send the invitation for the workspace of this user instead of the calling one.
+Only allowed for root and admins, ignored for normal users.
 .TP
 \-\-config CONFIGFILE
 path to configfile, for root only or for unprivileged installations.

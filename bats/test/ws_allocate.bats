@@ -499,6 +499,78 @@ setup() {
     rm -f /tmp/ws/ws2-db/${USER}-SHOWPATH
 }
 
+# regression tests for SECREVIEW L21: filesystem ACL validation in ws_allocate
+# must use the calling user when no -u was given - an empty username matches no
+# user_acl entry and used to deny every non-root allocation with -F on a
+# filesystem that had any ACL configured
+acl_conf() {
+    conf=/tmp/ws_acl_allocate.conf
+    cat > "$conf" <<EOF
+admins: [root]
+adminmail: [root@a.com]
+clustername: bats
+dbgid: 2
+dbuid: 2
+duration: 10
+maxextensions: 3
+smtphost: localhost
+mail_from: root@localhost
+default: ws2
+workspaces:
+  ws1:
+    database: /tmp/ws/ws1-db
+    deleted: .removed
+    user_acl: [wsoutsider]
+    keeptime: 7
+    spaces: [/tmp/ws/ws1]
+  ws2:
+    database: /tmp/ws/ws2-db
+    deleted: .removed
+    user_acl: [$USER]
+    keeptime: 7
+    spaces: [/tmp/ws/ws2/1, /tmp/ws/ws2/2]
+EOF
+}
+
+@test "ws_allocate grants explicit filesystem via user_acl for listed caller" {
+    acl_conf
+    rm -f "/tmp/ws/ws2-db/${USER}-ACLFSGRANT"
+    run ws_allocate --config "$conf" -F ws2 ACLFSGRANT 5
+    assert_success
+    assert_output --partial "creating workspace"
+    rm -f "/tmp/ws/ws2-db/${USER}-ACLFSGRANT" "$conf"
+}
+
+@test "ws_allocate denies filesystem whose user_acl excludes caller" {
+    # the fix must not fail open: an ACL'd fs that does not list the caller stays denied
+    acl_conf
+    run ws_allocate --config "$conf" -F ws1 ACLFSDENY 5
+    assert_failure
+    assert_output --partial "You are not allowed to use the specified filesystem!"
+    rm -f "$conf"
+}
+
+@test "ws_allocate uses caller identity on ACL filesystem without -F" {
+    # no -F: the searchlist path (which already used the calling user) must find the
+    # ACL-granted default filesystem
+    acl_conf
+    rm -f "/tmp/ws/ws2-db/${USER}-ACLSDEF"
+    run ws_allocate --config "$conf" ACLSDEF 5
+    assert_success
+    assert_output --regexp "/tmp/ws/ws2/.*ACLSDEF"
+    rm -f "/tmp/ws/ws2-db/${USER}-ACLSDEF" "$conf"
+}
+
+@test "ws_allocate extends workspace on user_acl granted filesystem" {
+    acl_conf
+    rm -f "/tmp/ws/ws2-db/${USER}-ACLFSEXT"
+    ws_allocate --config "$conf" -F ws2 ACLFSEXT 5 >/dev/null
+    run ws_allocate --config "$conf" -x -F ws2 ACLFSEXT 8
+    assert_success
+    assert_output --partial "extending workspace"
+    rm -f "/tmp/ws/ws2-db/${USER}-ACLFSEXT" "$conf"
+}
+
 cleanup() {
     ws_release --config bats/ws.conf $ws_name
     ws_release --config bats/ws.conf TEST

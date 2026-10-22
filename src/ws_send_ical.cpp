@@ -67,7 +67,7 @@ template <> struct fmt::formatter<po::options_description> : ostream_formatter {
 std::string CRLF = "\r\n";
 
 void commandline(po::variables_map& opt, string& filesystem, string& mailaddress, string& name, std::string& userconf,
-                 std::string& configfile, int argc, char** argv) {
+                 std::string& configfile, std::string& username, int argc, char** argv) {
 
     // define all options
     po::options_description cmd_options("\nOptions");
@@ -77,6 +77,7 @@ void commandline(po::variables_map& opt, string& filesystem, string& mailaddress
         ("filesystem,F", po::value<string>(&filesystem), "filesystem where the workspace is located in")
         ("mail,m", po::value<string>(&mailaddress), "your mail address to send to")
         ("name,n", po::value<string>(&name), "name of selected workspace")
+        ("username,u", po::value<string>(&username), "send the invitation for this user (root or admins only)")
         ("config", po::value<string>(&configfile), "config file");
     // clang-format on
 
@@ -98,7 +99,7 @@ void commandline(po::variables_map& opt, string& filesystem, string& mailaddress
     } catch (...) {
         fmt::println(stderr,
                      "Usage: {} [-F filesystem | --filesystem filesystem] [-n|--name] workspace_name [-m | --mail] "
-                     "mailadress",
+                     "mailadress [-u | --username] username",
                      argv[0]);
         fmt::println(stderr, "{}", cmd_options);
         exit(1);
@@ -108,7 +109,8 @@ void commandline(po::variables_map& opt, string& filesystem, string& mailaddress
     if (opt.count("help")) {
         fmt::println(
             stderr,
-            "Usage: [-F filesystem | --filesystem filesystem] [-n|--name] workspace_name [-m | --mail] mailadress",
+            "Usage: [-F filesystem | --filesystem filesystem] [-n|--name] workspace_name [-m | --mail] mailadress [-u "
+            "| --username] username",
             argv[0]);
         fmt::println(stderr, "{}", cmd_options);
         fmt::println(stderr, "this command is used to send a calendar invitation by Email to ensure users do not "
@@ -159,7 +161,8 @@ void commandline(po::variables_map& opt, string& filesystem, string& mailaddress
         }
         fmt::println(
             stderr,
-            "Usage: [-F filesystem | --filesystem filesystem] [-n|--name] workspace_name [-m | --mail] mailadress",
+            "Usage: [-F filesystem | --filesystem filesystem] [-n|--name] workspace_name [-m | --mail] mailadress [-u "
+            "| --username] username",
             argv[0]);
         fmt::println(stderr, "{}", cmd_options);
         fmt::println(stderr, "this command is used to send a calendar invitation by Email to ensure users do not "
@@ -312,7 +315,7 @@ int main(int argc, char** argv) {
     std::string userconf;
     std::string configfile;
 
-    std::string username;
+    std::string username; // selected by -u (root/admin only), empty means the calling user
     po::variables_map opt;
 
     // locals settings to prevent strange effects
@@ -341,7 +344,7 @@ int main(int argc, char** argv) {
     }
 
     // read commandlineoptions
-    commandline(opt, filesystem, mailaddress, name, userconf, configfile, argc, argv);
+    commandline(opt, filesystem, mailaddress, name, userconf, configfile, username, argc, argv);
 
     // Get Configfile
     auto configfilestoread = std::vector<cppfs::path>{"/etc/ws.d", "/etc/ws.conf"};
@@ -377,6 +380,9 @@ int main(int argc, char** argv) {
             userpattern = "*";
         }
     } else {
+        if (username != "" && username != user::getUsername()) {
+            spdlog::warn("choosing a user with -u is only allowed for root and admins, using own username");
+        }
         userpattern = user::getUsername();
     }
 
@@ -384,8 +390,11 @@ int main(int argc, char** argv) {
     bool listgroups = false; // don't allow notifications for Group Workspaces yet
 
     // Only search in valid Filesystems
+    // NOTE: ACLs must be evaluated against the calling user (an empty name matches
+    // no user_acl entry and would silently hide filesystems); admins pass anyway
+    // because hasAccess() grants the admin list access to all filesystems
     vector<string> fslist;
-    vector<string> validfs = config.validFilesystems(username, grouplist, ws::USE);
+    vector<string> validfs = config.validFilesystems(user::getUsername(), grouplist, ws::USE);
     if (filesystem != "") {
         if (canFind(validfs, filesystem)) {
             fslist.push_back(filesystem);
