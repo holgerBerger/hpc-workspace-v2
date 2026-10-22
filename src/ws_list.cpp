@@ -82,7 +82,15 @@ static string getMaskedID(const DBEntry* entry) {
     if (entry->getConfig()->isAdmin(user::getUsername())) {
         return entry->getId();
     } else {
-        return utils::getID(entry->getId());
+        // the entry knows its owner (with heuristic fallback for legacy entries), so we can
+        // strip the exact prefix instead of guessing the dash position again
+        const string id = entry->getId();
+        const string owner = entry->getUsername();
+        if (!owner.empty() && id.size() > owner.size() + 1 && id.compare(0, owner.size(), owner) == 0 &&
+            id[owner.size()] == '-') {
+            return id.substr(owner.size() + 1);
+        }
+        return utils::getID(id);
     }
 }
 
@@ -198,9 +206,9 @@ void print_entry_tableformat(const DBEntry* entry, const Config config, [[maybe_
         }
     }
 
-#pragma GCC diagnostic push                            // save the actual diag context
+#pragma GCC diagnostic push // save the actual diag context
 #if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized" // disable maybe warnings (GCC-only warning group)
+    #pragma GCC diagnostic ignored "-Wmaybe-uninitialized" // disable maybe warnings (GCC-only warning group)
 #endif
     fmt::color remaincolor;
 

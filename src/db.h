@@ -88,6 +88,9 @@ class DBEntry {
     // getters
     virtual long getRemaining() const = 0;
     virtual string getId() const = 0;
+    // owner of this workspace. Entries created by current tools store the username explicitly;
+    // for legacy entries without that field, falls back to the dash heuristic (utils::getOwner).
+    virtual string getUsername() const = 0;
     virtual int getExtension() const = 0;
     virtual long getCreation() const = 0;
     virtual string getWSPath() const = 0;
@@ -115,10 +118,10 @@ class DBEntry {
 // this class is constructed through Config::openDB
 class Database {
   public:
-    // new DB entry
-    virtual void createEntry(const string id, const string workspace, const long creation, const long expiration,
-                             const long reminder, const int extensions, const bool groupflag, const string group,
-                             const string mailaddress, const string comment) = 0;
+    // new DB entry, username is the exact owner (stored in the `user` field of the entry)
+    virtual void createEntry(const string id, const string username, const string workspace, const long creation,
+                             const long expiration, const long reminder, const int extensions, const bool groupflag,
+                             const string group, const string mailaddress, const string comment) = 0;
 
     // read specific entry
     virtual std::unique_ptr<DBEntry> readEntry(const WsID id, const bool deleted) = 0;

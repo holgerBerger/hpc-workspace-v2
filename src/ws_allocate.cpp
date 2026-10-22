@@ -661,8 +661,8 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
         auto expiration = time(NULL) + duration * 24 * 3600;
 
         auto id = fmt::format("{}-{}", username, name);
-        creationDB->createEntry(id, wsdir, time(NULL), expiration, reminder, extensions, groupflag, primarygroup,
-                                mailaddress, comment);
+        creationDB->createEntry(id, username, wsdir, time(NULL), expiration, reminder, extensions, groupflag,
+                                primarygroup, mailaddress, comment);
 
         fmt::print("{}\n", wsdir);
         fmt::print(stderr, "remaining extensions  : {}\n", extensions);

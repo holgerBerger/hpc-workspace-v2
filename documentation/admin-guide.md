@@ -616,6 +616,13 @@ Additionally, a file with the DB entry will be created in ```ws1-db```, owned by
 have the naming convention of ```username-workspacename```, so several users
 can have a workspace with the same name.
 
+Since the ```username-workspacename``` convention is ambiguous if either part
+contains dashes, the DB entry also stores the exact owner in a ```user```
+field, and tools use that instead of parsing the ID. Entries created by older
+versions may lack this field; for those the owner is derived heuristically
+from the ID during the transition. Entries written back by the tools never
+persist such a guess, so upgrading leaves the data as it was.
+
 If a workspace is expired or released, both its workspace directory and the DB
 entry file are moved into the corresponding ```deleted``` directories (called
 ```.removed``` in this example) and get a timestamp with the time of deletion

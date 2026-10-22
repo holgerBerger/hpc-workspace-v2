@@ -229,12 +229,12 @@ string FilesystemDBV1::createWorkspace(const string name, const string user_opti
 }
 
 // create new DB entry
-void FilesystemDBV1::createEntry(const WsID id, const string workspace, const long creation, const long expiration,
-                                 const long reminder, const int extensions, const bool groupflag, const string group,
-                                 const string mailaddress, const string comment) {
+void FilesystemDBV1::createEntry(const WsID id, const string username, const string workspace, const long creation,
+                                 const long expiration, const long reminder, const int extensions, const bool groupflag,
+                                 const string group, const string mailaddress, const string comment) {
 
-    DBEntryV1 entry(this, id, workspace, creation, expiration, reminder, extensions, groupflag, group, mailaddress,
-                    comment);
+    DBEntryV1 entry(this, id, username, workspace, creation, expiration, reminder, extensions, groupflag, group,
+                    mailaddress, comment);
     entry.writeEntry();
 }
 
@@ -356,11 +356,12 @@ void FilesystemDBV1::deleteEntry(const string wsid, const bool deleted) {
 }
 
 // constructor to make new entry to write out
-DBEntryV1::DBEntryV1(FilesystemDBV1* pdb, const WsID _id, const string _workspace, const long _creation,
-                     const long _expiration, const long _reminder, const int _extensions, const bool _groupflag,
-                     const string _group, const string _mailaddress, const string _comment)
-    : parent_db(pdb), id(_id), workspace(_workspace), creation(_creation), expiration(_expiration), reminder(_reminder),
-      extensions(_extensions), groupflag(_groupflag), group(_group), mailaddress(_mailaddress), comment(_comment) {
+DBEntryV1::DBEntryV1(FilesystemDBV1* pdb, const WsID _id, const string _username, const string _workspace,
+                     const long _creation, const long _expiration, const long _reminder, const int _extensions,
+                     const bool _groupflag, const string _group, const string _mailaddress, const string _comment)
+    : parent_db(pdb), id(_id), username(_username), workspace(_workspace), creation(_creation), expiration(_expiration),
+      reminder(_reminder), extensions(_extensions), groupflag(_groupflag), group(_group), mailaddress(_mailaddress),
+      comment(_comment) {
     checkID(id);
     dbfilepath = pdb->getconfig()->getFsConfig(pdb->getfs()).database + "/" + id;
     // init extra internals here to avoid problems in release builds
@@ -422,6 +423,8 @@ void DBEntryV1::readFromString(std::string str) {
 
     dbversion = dbentry["dbversion"] ? dbentry["dbversion"].as<int>() : 0; // 0 = legacy
     workspace = dbentry["workspace"] ? dbentry["workspace"].as<string>() : "";
+    // `user` field was added later; legacy entries may lack it (empty = fall back to heuristic)
+    username = dbentry["user"] ? dbentry["user"].as<string>() : "";
     if (dbentry["creation"]) {
         creation = dbentry["creation"].as<long>();
     } else {
@@ -491,6 +494,12 @@ void DBEntryV1::readFromString(std::string str) {
         node >> workspace;
     else
         workspace = "";
+    // `user` field was added later; legacy entries may lack it (empty = fall back to heuristic)
+    node = dbentry["user"];
+    if (node.has_val() && node.val() != "")
+        node >> username;
+    else
+        username = "";
     node = dbentry["creation"];
     if (node.has_val()) {
         node >> creation;
@@ -585,6 +594,15 @@ int DBEntryV1::getExtension() const {
 }
 
 string DBEntryV1::getId() const { return id; }
+
+// Owner of this workspace. For legacy entries created before the `user` field existed,
+// falls back to the dash heuristic (best effort: fails if user or name contain dashes).
+string DBEntryV1::getUsername() const {
+    if (!username.empty()) {
+        return username;
+    }
+    return utils::getOwner(id);
+}
 
 long DBEntryV1::getCreation() const { return creation; }
 
@@ -918,6 +936,11 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
 #ifndef WS_RAPIDYAML_DB
     YAML::Node entry;
     entry["workspace"] = workspace;
+    if (!username.empty()) {
+        // exact owner, avoids parsing the (ambiguous) id; omitted for legacy entries we read
+        // without a `user` field, so a heuristic guess is never persisted into the DB
+        entry["user"] = username;
+    }
     entry["creation"] = creation;
     entry["expiration"] = expiration;
     if (expired > 0) {
@@ -939,6 +962,11 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
     ryml::NodeRef root = tree.rootref();
     root |= ryml::MAP; // mark root as a MAP
     root["workspace"] << workspace;
+    if (!username.empty()) {
+        // exact owner, avoids parsing the (ambiguous) id; omitted for legacy entries we read
+        // without a `user` field, so a heuristic guess is never persisted into the DB
+        root["user"] << username;
+    }
     root["creation"] << creation;
     root["expiration"] << expiration;
     if (expired > 0) {

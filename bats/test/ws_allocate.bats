@@ -26,6 +26,17 @@ setup() {
     assert_dir_exists $wsdir
 }
 
+@test "ws_allocate stores exact owner in DB entry" {
+    ws_allocate --config bats/ws.conf $ws_name >/dev/null
+    dbentry="/tmp/ws/ws2-db/${USER}-${ws_name}"
+    assert_file_exists "$dbentry"
+    run cat "$dbentry"
+    # the `user` field records the owner explicitly, so tools must not guess
+    # it from the (ambiguous) username-workspacename id anymore
+    assert_output --partial "user: ${USER}"
+    rm -f "$dbentry"
+}
+
 @test "ws_allocate rejects dangerous workspace names" {
     # prevent trying to level up directories
     run ws_allocate --config bats/ws.conf '../noup'

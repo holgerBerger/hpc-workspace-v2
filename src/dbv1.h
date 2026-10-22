@@ -51,8 +51,9 @@ class DBEntryV1 : public DBEntry {
     FilesystemDBV1* parent_db;
 
     // information of external format
-    int dbversion; // version
-    string id;     // ID of this workspace
+    int dbversion;   // version
+    string id;       // ID of this workspace
+    string username; // owner username, from `user` field; empty for legacy entries without it
 
     // main components of external format
     string filesystem; // location   // FIXME: is this used anywhere?
@@ -75,9 +76,9 @@ class DBEntryV1 : public DBEntry {
     // simple constructor to read from file
     DBEntryV1(FilesystemDBV1* pdb) : parent_db(pdb) {};
     // constructor to make new entry to write out
-    DBEntryV1(FilesystemDBV1* pdb, const WsID _id, const string _workspace, const long _creation,
-              const long _expiration, const long _reminder, const int _extensions, const bool _groupflag,
-              const string _group, const string _mailaddress, const string _comment);
+    DBEntryV1(FilesystemDBV1* pdb, const WsID _id, const string _username, const string _workspace,
+              const long _creation, const long _expiration, const long _reminder, const int _extensions,
+              const bool _groupflag, const string _group, const string _mailaddress, const string _comment);
 
     // read yaml entry from string
     void readFromString(std::string str);
@@ -108,6 +109,7 @@ class DBEntryV1 : public DBEntry {
     string getMailaddress() const;
     string getComment() const;
     string getId() const;
+    string getUsername() const;
     long getCreation() const;
     string getWSPath() const;
     long getExpiration() const;
@@ -132,9 +134,9 @@ class FilesystemDBV1 : public Database {
     FilesystemDBV1(const Config* config_, const string fs_) : config(config_), fs(fs_) {};
 
     // create new DB entry
-    void createEntry(const WsID id, const string workspace, const long creation, const long expiration,
-                     const long reminder, const int extensions, const bool groupflag, const string group,
-                     const string mailaddress, const string comment);
+    void createEntry(const WsID id, const string username, const string workspace, const long creation,
+                     const long expiration, const long reminder, const int extensions, const bool groupflag,
+                     const string group, const string mailaddress, const string comment);
 
     // read entry
     std::unique_ptr<DBEntry> readEntry(const WsID id, const bool deleted);

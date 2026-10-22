@@ -203,6 +203,30 @@ comment: ""
         REQUIRE(entry4->getExtension() == 0);
     }
 
+    SECTION("username field") {
+
+        // legacy entries without `user` field fall back to the dash heuristic
+        std::unique_ptr<DBEntry> legacy(db1->readEntry("user1-TEST1", false));
+        REQUIRE(legacy->getUsername() == "user1");
+
+        // modifying and rewriting a legacy entry must NOT persist a guessed owner
+        REQUIRE_NOTHROW(legacy->useExtension(legacy->getExpiration() + 1, "x@y.z", 0, "keep"));
+        std::string legacyfile = utils::getFileContents((ws1dbname / "user1-TEST1").string());
+        REQUIRE(legacyfile.find("user:") == string::npos);
+        std::unique_ptr<DBEntry> legacy2(db1->readEntry("user1-TEST1", false));
+        REQUIRE(legacy2->getUsername() == "user1");
+
+        // a stored `user` field takes precedence over the heuristic: for id "aa-bb-cc"
+        // the heuristic would resolve to "aa" (no such system user -> first dash chunk),
+        // the field stores the true owner "aa-bb"
+        {
+            std::ofstream e(ws1dbname / "aa-bb-cc");
+            fmt::println(e, "workspace: /a/path3\nuser: aa-bb\nexpiration: 1734701876\nextensions: 0\nreminder: 0\n");
+        }
+        std::unique_ptr<DBEntry> withuser(db1->readEntry("aa-bb-cc", false));
+        REQUIRE(withuser->getUsername() == "aa-bb");
+    }
+
     SECTION("modify entry") {
 
         std::unique_ptr<DBEntry> entry(db1->readEntry("user1-TEST1", false));
@@ -480,7 +504,7 @@ workspaces:
     }
 
     // create DBentry for it
-    db1->createEntry("user1-test1", wsdir, time(NULL), time(NULL) + 3601, 1, 7, false, "", "", "no comment");
+    db1->createEntry("user1-test1", "user1", wsdir, time(NULL), time(NULL) + 3601, 1, 7, false, "", "", "no comment");
 
     // see if we can match it
     REQUIRE(db1->matchPattern("test1", "user1", vector<string>{}, false, false) == vector<string>{"user1-test1"});
@@ -490,6 +514,9 @@ workspaces:
 
     REQUIRE(entry->getComment() == "no comment");
     REQUIRE(entry->getExtension() == 7);
+    // the exact owner must be stored in the `user` field of the entry file
+    REQUIRE(entry->getUsername() == "user1");
+    REQUIRE(utils::getFileContents((ws1dbname / "user1-test1").string()).find("user: user1") != string::npos);
 
     // group workspace
 
@@ -502,7 +529,8 @@ workspaces:
     REQUIRE(fs::is_directory(wsdir));
 
     // create DBentry for it
-    db1->createEntry(uname + "-gtest2", wsdir, time(NULL), time(NULL) + 3601, 1, 7, true, gname, "", "no comment");
+    db1->createEntry(uname + "-gtest2", uname, wsdir, time(NULL), time(NULL) + 3601, 1, 7, true, gname, "",
+                     "no comment");
 
     // see if we can match it, with a non-existing user
     REQUIRE(db1->matchPattern("gtest2", "does-not-exist", vector<string>{gname}, false, true) ==
@@ -513,6 +541,7 @@ workspaces:
 
     REQUIRE(entry2->getComment() == "no comment");
     REQUIRE(entry2->getExtension() == 7);
+    REQUIRE(entry2->getUsername() == uname);
 
     // file permissions
     permissions = std::filesystem::status(wsdir).permissions();

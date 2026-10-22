@@ -594,7 +594,8 @@ static clean_stray_result_t clean_stray_directories(const Config& config, const 
                     std::time_t deadline = std::time_t(std::time(nullptr)) + config.deldirtimeout();
 
                     auto start = chrono::steady_clock::now();
-                    auto deleted = utils::rmtree(cppfs::path(founddir.space) / config.deletedPath(fs) / founddir.dir, deadline);
+                    auto deleted =
+                        utils::rmtree(cppfs::path(founddir.space) / config.deletedPath(fs) / founddir.dir, deadline);
                     auto end = chrono::steady_clock::now();
                     auto elapsed = end - start;
                     auto duration = chrono::duration_cast<chrono::milliseconds>(elapsed).count();
@@ -728,14 +729,17 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                     // symlinks, bound the size, and on any problem continue with filesystem
                     // defaults instead of aborting the whole run (a single bad entry must not
                     // stop expiration of all remaining workspaces).
-                    auto wsuser = utils::getOwner(id);
+                    // owner from the DB entry: exact for entries with a `user` field, dash
+                    // heuristic inside getUsername() for legacy ones
+                    auto wsuser = dbentry->getUsername();
                     if (debugflag) {
                         spdlog::debug("  sending expiration mail to {}", wsuser);
                     }
                     try {
                         auto wshome = user::getUserhome(wsuser);
                         if (wshome.empty()) {
-                            spdlog::error("  no home directory for {} (workspace {}), using filesystem defaults", wsuser, id);
+                            spdlog::error("  no home directory for {} (workspace {}), using filesystem defaults",
+                                          wsuser, id);
                         } else {
                             string user_conf_filename = wshome + "/.ws_user.conf";
                             if (cppfs::is_symlink(user_conf_filename)) {
@@ -766,8 +770,8 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                             }
                         }
                     } catch (const std::exception& e) {
-                        spdlog::error("  could not process ~/.ws_user.conf of {} ({}): {}, skipping expiration mail", wsuser, id,
-                                      e.what());
+                        spdlog::error("  could not process ~/.ws_user.conf of {} ({}): {}, skipping expiration mail",
+                                      wsuser, id, e.what());
                     }
                 }
             } else {
