@@ -608,6 +608,22 @@ EOF
     rm -f "/tmp/ws/ws2-db/${USER}-ACLFSEXT" "$conf"
 }
 
+@test "ws_allocate skips unreachable space with mostspace selection" {
+    rm -rf /tmp/ws/wss-dead /tmp/ws/wss-live /tmp/ws/wss-db
+    mkdir -p /tmp/ws/wss-db/.removed /tmp/ws/wss-live/.removed
+    echo wss > /tmp/ws/wss-db/.ws_db_magic
+    run ws_allocate --config bats/ws_space.conf MOSTSPACE_TEST 1
+    assert_success
+    # the missing space must be reported as unusable, not compared with uninitialized statfs data
+    assert_output --partial "could not determine free space of /tmp/ws/wss-dead"
+    # the workspace must have landed on the reachable space, and the dead one must not be recreated
+    run ws_find --config bats/ws_space.conf MOSTSPACE_TEST
+    assert_output --partial "/tmp/ws/wss-live/"
+    [ ! -e /tmp/ws/wss-dead ]
+    ws_release --config bats/ws_space.conf MOSTSPACE_TEST
+    rm -rf /tmp/ws/wss-dead /tmp/ws/wss-live /tmp/ws/wss-db
+}
+
 cleanup() {
     ws_release --config bats/ws.conf $ws_name
     ws_release --config bats/ws.conf TEST

@@ -637,3 +637,50 @@ workspaces:
         REQUIRE((permissions & perms::mask) == (perms::owner_all | perms::group_all | perms::set_gid));
     }
 }
+
+TEST_CASE("mostspace selection skips unreachable spaces", "[db]") {
+
+    auto basedirname = fs::temp_directory_path() / fs::path(fmt::format("wsspace{}", getpid()));
+    fs::remove_all(basedirname);
+
+    auto dbdir = basedirname / "db";
+    auto deadspace = basedirname / "dead"; // deliberately never created (simulates a gone mount)
+    auto livespace = basedirname / "live";
+    fs::create_directories(dbdir / ".removed");
+    fs::create_directories(livespace);
+    utils::writeFile(dbdir / ".ws_db_magic", "wsm");
+
+    std::ofstream wsconf(basedirname / "ws.conf");
+    fmt::println(wsconf,
+                 R"yaml(
+admins: [root]
+clustername: space_test
+adminmail: [root]
+dbgid: 2
+dbuid: 2
+duration: 10
+maxextensions: 1
+smtphost: mailhost
+default: wsm
+workspaces:
+    wsm:
+        database: {}
+        deleted: .removed
+        spaceselection: mostspace
+        spaces: [{}, {}]
+)yaml",
+                 dbdir.string(), deadspace.string(), livespace.string());
+    wsconf.close();
+
+    auto config = Config(std::vector<fs::path>{basedirname / "ws.conf"});
+    std::unique_ptr<Database> db(config.openDB("wsm"));
+
+    // the unreachable space is listed first and used to be able to win the comparison with
+    // uninitialized statfs results; it must be skipped instead
+    auto wsdir = db->createWorkspace("ms1", "", false, false, "");
+    REQUIRE(wsdir.rfind(livespace.string(), 0) == 0);
+    REQUIRE(fs::exists(wsdir));
+    REQUIRE_FALSE(fs::exists(deadspace));
+
+    fs::remove_all(basedirname);
+}

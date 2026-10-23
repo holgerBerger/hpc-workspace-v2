@@ -130,9 +130,16 @@ string FilesystemDBV1::createWorkspace(const string name, const string user_opti
             spaceid = 0;
             fsblkcnt_t max_free_bytes = 0;
             for (size_t i = 0; i < spaces.size(); ++i) {
-                struct statfs sfs;
-                statfs(spaces[i].c_str(), &sfs);
-                fsblkcnt_t free_bytes = sfs.f_bsize * sfs.f_bfree;
+                struct statfs sfs = {};
+                // an unreachable space (e.g. gone mount) can not host a workspace anyway,
+                // so skip it instead of comparing uninitialized statfs results
+                if (statfs(spaces[i].c_str(), &sfs) != 0) {
+                    spdlog::warn("could not determine free space of {}: {} (skipping it for mostspace)", spaces[i],
+                                 std::strerror(errno));
+                    continue;
+                }
+                // f_bavail: blocks actually available to users (f_bfree includes the fs reserve)
+                fsblkcnt_t free_bytes = sfs.f_bsize * sfs.f_bavail;
                 if (free_bytes > max_free_bytes) {
                     max_free_bytes = free_bytes;
                     spaceid = i;

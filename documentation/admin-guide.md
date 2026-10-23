@@ -420,6 +420,10 @@ can be `random` which is default, or `uid` or `gid` to select space based on
 modulo operation with uid or gid to select a stable space for a user (useful to avoid cross filesystem
 moves), or `mostspace` to choose the filesystem with most available disk space.
 
+With `mostspace`, spaces whose free space cannot be queried (e.g. because of a
+missing mount) are skipped with a warning and never selected, as long as at
+least one reachable space remains.
+
 #### `deleted`
 
 The name of the subdirectory, both inside the workspace location and inside the
