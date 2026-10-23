@@ -1035,7 +1035,13 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
 #endif
 
     // suppress ctrl-c to prevent broken DB entries when FS is hanging and user gets nervous
-    signal(SIGINT, SIG_IGN);
+    void (*old_sigint)(int) = signal(SIGINT, SIG_IGN);
+    // restore the previous handler on every exit path, including exceptions escaping this
+    // function (a leaked SIG_IGN would make the long-running caller un-killable by Ctrl-C)
+    struct SigIntGuard {
+        void (*prev)(int);
+        ~SigIntGuard() { signal(SIGINT, prev); }
+    } sigint_guard{old_sigint};
 
     if (!calledasroot)
         caps.raise_cap({CAP_DAC_OVERRIDE},
@@ -1054,6 +1060,7 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
 
         if (setegid(dbgid) || seteuid(dbuid)) {
             spdlog::error("can not seteuid or setgid. Bad installation?");
+            signal(SIGINT, old_sigint); // exit() does not unwind, so the guard does not run
             exit(-1);
         }
 
@@ -1133,9 +1140,6 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
 
     if (fd != -1)
         close(fd);
-
-    // normal signal handling
-    signal(SIGINT, SIG_DFL);
 }
 
 // return config of parent DB

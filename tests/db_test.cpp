@@ -1,6 +1,7 @@
 #define CATCH_CONFIG_MAIN // This tells Catch to provide a main() - only do this in one cpp file
 #include <catch2/catch_test_macros.hpp>
 
+#include <csignal>
 #include <filesystem>
 #include <iostream>
 
@@ -492,6 +493,31 @@ comment: "{}"
             REQUIRE(fs::exists(dbdir / "u-X3"));
             REQUIRE_FALSE(fs::exists(db_removed / "u-X3-abc"));
         }
+    }
+
+    SECTION("writeEntry restores the previous SIGINT handler") {
+        // writeEntry ignores SIGINT while writing and must hand back whatever handler the
+        // caller had, not clobber it with SIG_DFL (previously leaked on early exits/throws)
+        std::ofstream e(dbdir / "u-SIG");
+        fmt::println(e,
+                     R"yaml(
+workspace: {}
+expiration: 1734701876
+extensions: 3
+reminder: 0
+mailaddress: ""
+comment: "sigint"
+)yaml",
+                     (spacedir / "u-SIG").string());
+        e.close();
+        fs::create_directories(spacedir / "u-SIG");
+
+        void (*dummy)(int) = +[](int) {};
+        void (*installed)(int) = signal(SIGINT, dummy);
+        std::unique_ptr<DBEntry> entry(db->readEntry("u-SIG", false));
+        REQUIRE_NOTHROW(entry->writeEntry());
+        void (*after)(int) = signal(SIGINT, installed); // fetch and restore
+        REQUIRE(after == dummy);
     }
 
     fs::permissions(ws_removed, fs::perms::owner_all);
