@@ -210,6 +210,22 @@ setup() {
     rm -f /tmp/ws/ws2-db/${USER}-REMINDER
 }
 
+@test "ws_allocate survives malformed user config by using defaults" {
+    # SECREVIEW L9 regression: a wrong type in ~/.ws_user.conf used to abort
+    # ws_allocate with an uncaught YAML exception instead of falling back to defaults
+    [ -f ~/.ws_user.conf ] && mv -f ~/.ws_user.conf ~/.ws_user.conf_testbackup
+    echo "mail: mail@valid.domain" > ~/.ws_user.conf
+    echo "duration: 1w" >> ~/.ws_user.conf
+    run ws_allocate --config bats/ws.conf -r 1 BADUCONF
+    assert_success
+    assert_output --partial "could not parse ~/.ws_user.conf"
+    refute_output --partial "Took email address"
+    refute_output --partial "remaining time in days: 14"
+    rm -f ~/.ws_user.conf
+    [ -f ~/.ws_user.conf_testbackup ] && mv -f ~/.ws_user.conf_testbackup ~/.ws_user.conf
+    rm -f /tmp/ws/ws2-db/${USER}-BADUCONF
+}
+
 @test "ws_allocate with filesystem" {
     run ws_allocate --config bats/ws.conf -F ws1 WS1 10
     assert_success

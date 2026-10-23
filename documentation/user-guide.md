@@ -227,6 +227,8 @@ Those operations are applied to all files and directories in the workspace.
 Some defaults can be set in ~/.ws_user.conf, so you do not have to give them on command line all the time.
 The file is in YAML syntax, and can have the following keys: ```mail```, ```duration```, ```reminder``` and ```groupname```
 and comments.
+If the file is malformed or a value has the wrong type, the tools report the error and ignore the whole
+file (falling back to their defaults) until it is fixed.
 
 Example:
 ```

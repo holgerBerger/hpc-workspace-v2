@@ -55,37 +55,50 @@ UserConfig::UserConfig(std::string userconf) {
     //  this is for compatibility with very old tools, which did not have a yaml file here
     // check if file looks like yaml
     if ((userconf.find(":", 0) != string::npos) || (userconf[0] == '#')) {
+        // see the yaml-cpp branch below: a user-controlled file must never abort the
+        // tool. NOTE: malformed YAML in ryml::parse_in_place is signalled via the global
+        // ryml error callback (compare SECREVIEW M5), not a catchable exception, unless a
+        // throwing callback is installed; the type reads are protected here already
+        try {
+            ryml::Tree config = ryml::parse_in_place(ryml::to_substr(userconf));
+            ryml::NodeRef node;
+            ryml::NodeRef root = config.rootref();
 
-        ryml::Tree config = ryml::parse_in_place(ryml::to_substr(userconf)); // FIXME: error check?
-        ryml::NodeRef node;
-        ryml::NodeRef root = config.rootref();
+            // TODO: type checks if nodes are of right type?
 
-        // TODO: type checks if nodes are of right type?
+            readRyamlScalar(config, "mail", mailaddress);
 
-        readRyamlScalar(config, "mail", mailaddress);
-
-        // if (node=config["mailaddress"]; node.has_val()) node>>mailaddress; else mailaddress="";
-        if (node = config["groupname"]; node.has_val())
-            node >> groupname;
-        else
+            // if (node=config["mailaddress"]; node.has_val()) node>>mailaddress; else mailaddress="";
+            if (node = config["groupname"]; node.has_val())
+                node >> groupname;
+            else
+                groupname = "";
+            if (root.has_child("duration")) {
+                node = config["duration"];
+                node >> duration;
+            } else
+                duration = -1;
+            if (node = config["reminder"]; node.has_val())
+                node >> reminder;
+            else
+                reminder = -1;
+            if (node = config["expirationmail"]; node.has_val())
+                node >> expirationmail;
+        } catch (const std::exception& e) {
+            spdlog::error("could not parse ~/.ws_user.conf ({}), using defaults", e.what());
+            mailaddress = "";
             groupname = "";
-        if (root.has_child("duration")) {
-            node = config["duration"];
-            node >> duration;
-        } else
-            duration = -1;
-        if (node = config["reminder"]; node.has_val())
-            node >> reminder;
-        else
             reminder = -1;
-        if (node = config["expirationmail"]; node.has_val())
-            node >> expirationmail;
+            duration = -1;
+            expirationmail = true;
+        }
     } else {
         // get first line of userconf only that will include the mailaddress for reminder mails
         mailaddress = utils::getFirstLine(userconf);
     }
 
-    if (!utils::isValidEmail(mailaddress)) {
+    // only complain about a set-but-invalid address; an unset one is the legitimate default
+    if (mailaddress != "" && !utils::isValidEmail(mailaddress)) {
         spdlog::error("invalid email address in ~/.ws_user.conf, ignored.");
         mailaddress = "";
     }
@@ -97,22 +110,34 @@ UserConfig::UserConfig(std::string userconf) {
 // read user config from string (has to be read before dropping privileges)
 //  unitest: yes
 UserConfig::UserConfig(std::string userconf) {
-    YAML::Node user_home_config; // load yaml file from home here, not used anywhere else so far
     // get first line, this is either a mailaddress or something like key: value
     // std::getline(userconf, mailaddress);
     // check if file looks like yaml
     if ((userconf.find(":", 0) != std::string::npos) || (userconf[0] == '#')) {
-        user_home_config = YAML::Load(userconf);
-        if (user_home_config["mail"])
-            mailaddress = user_home_config["mail"].as<std::string>();
-        if (user_home_config["groupname"])
-            groupname = user_home_config["groupname"].as<std::string>();
-        if (user_home_config["duration"])
-            duration = user_home_config["duration"].as<int>();
-        if (user_home_config["reminder"])
-            reminder = user_home_config["reminder"].as<int>();
-        if (user_home_config["expirationmail"])
-            expirationmail = user_home_config["expirationmail"].as<bool>();
+        // ~/.ws_user.conf is completely user-controlled: malformed YAML or wrong value
+        // types must never abort the (possibly setuid) tool, so any parse error resets
+        // all fields to their defaults instead of propagating out of the constructor
+        try {
+            YAML::Node user_home_config =
+                YAML::Load(userconf); // load yaml file from home here, not used anywhere else so far
+            if (user_home_config["mail"])
+                mailaddress = user_home_config["mail"].as<std::string>();
+            if (user_home_config["groupname"])
+                groupname = user_home_config["groupname"].as<std::string>();
+            if (user_home_config["duration"])
+                duration = user_home_config["duration"].as<int>();
+            if (user_home_config["reminder"])
+                reminder = user_home_config["reminder"].as<int>();
+            if (user_home_config["expirationmail"])
+                expirationmail = user_home_config["expirationmail"].as<bool>();
+        } catch (const std::exception& e) {
+            spdlog::error("could not parse ~/.ws_user.conf ({}), using defaults", e.what());
+            mailaddress = "";
+            groupname = "";
+            reminder = -1;
+            duration = -1;
+            expirationmail = true;
+        }
     } else {
         // get first line of userconf only that will include the mailaddress for reminder mails
         mailaddress = utils::getFirstLine(userconf);
