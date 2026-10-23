@@ -34,6 +34,7 @@
 #include <filesystem>
 #include <map>
 #include <string>
+#include <sys/types.h>
 #include <vector>
 
 #include "db.h"
@@ -59,8 +60,8 @@ struct Global_config {
     int reminderdefault;     // when to send a reminder, 0 no default reminder
     int maxextensions;       // max extensions a user gets
     int maxuserworkspaces;   // max number of workspaces a user can create
-    int dbuid;               // uid of DB user
-    int dbgid;               // gid of DB user
+    uid_t dbuid;             // uid of DB user
+    gid_t dbgid;             // gid of DB user
     int deldirtimeout;       // timeout for directory deletion in seconds
     string expirerlogpath;   // path where ws_expirer should place logfiles
     bool restorenosub;       // if true, restore will not create subdirectories for workspaces
@@ -78,8 +79,8 @@ struct Filesystem_config {
     strings userdefault;   // users having this filesytem as default
     strings user_acl;      // if present, users have to match ACL, user or +user grant access, -user denies
     strings group_acl;     // if present, users have to match ACL
-    int keeptime;          // max time in days to keep deleted workspace after expiration
-    int releasekeeptime;   // max time in days to keep deleted workspace after release
+    long keeptime;         // max time in days to keep deleted workspace after expiration
+    long releasekeeptime;  // max time in days to keep deleted workspace after release
     int maxduration;       // max duration a user can choose for this filesystem
     int maxextensions;     // max extensiones a user can do for this filesystem
     bool expirationmail;   // send a mail to the user when their workspace expires
@@ -140,8 +141,8 @@ class Config {
     string deletedPath(const string filesystem) const;
     int reminderdefault() const { return global.reminderdefault; };
     int durationdefault() const { return global.durationdefault; };
-    long dbuid() const { return global.dbuid; };
-    long dbgid() const { return global.dbgid; };
+    uid_t dbuid() const { return global.dbuid; };
+    gid_t dbgid() const { return global.dbgid; };
     string clustername() const { return global.clustername; };
     int maxextensions() const { return global.maxextensions; };
     int maxduration() const { return global.maxduration; };

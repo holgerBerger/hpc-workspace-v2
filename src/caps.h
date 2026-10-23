@@ -56,8 +56,8 @@ class Cap {
     Cap();
 
     // functions that can be called to raise and lower caps
-    void drop_caps(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos srcpos);
-    void lower_cap(std::vector<cap_value_t> cap_arg, int dbuid, utils::SrcPos);
+    void drop_caps(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos srcpos);
+    void lower_cap(std::vector<cap_value_t> cap_arg, uid_t dbuid, utils::SrcPos);
     void raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos);
 
     bool isSetuid() { return issetuid; };

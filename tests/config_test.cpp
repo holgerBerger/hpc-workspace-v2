@@ -507,3 +507,103 @@ workspaces:
     // neither present: falls back to global duration/maxduration
     REQUIRE(config.getFsConfig("fs3").maxduration == 10);
 }
+
+TEST_CASE("config: dbuid/dbgid support the full uid_t range", "[config]") {
+    // regression test for SECREVIEW L8: dbuid/dbgid used to be int, so high-range
+    // (AD/LDAP) uids > INT_MAX made every tool die at config parse time
+    auto config = Config(std::string(R"(
+clustername: aName
+smtphost: localhost
+mail_from: noreply@mydomain.de
+default: fs1
+duration: 10
+maxextensions: 1
+dbuid: 3000000000
+dbgid: 3000000001
+workspaces:
+  fs1:
+    keeptime: 1
+    spaces: [/tmp]
+    database: /tmp
+    deleted: .del
+)"));
+
+    SECTION("high range ids are parsed exactly") {
+        REQUIRE(config.dbuid() == uid_t(3000000000));
+        REQUIRE(config.dbgid() == gid_t(3000000001));
+    }
+
+    SECTION("high range ids validate") { REQUIRE(config.validate()); }
+}
+
+TEST_CASE("config: chown sentinel (uid -1) is rejected", "[config]") {
+    // regression test for SECREVIEW L8: (uid_t)-1 passed validation and made
+    // chown()/fchown() silently "succeed" without changing ownership
+    auto config = Config(std::string(R"(
+clustername: aName
+smtphost: localhost
+mail_from: noreply@mydomain.de
+default: fs1
+duration: 10
+maxextensions: 1
+dbuid: 4294967295
+dbgid: 2
+workspaces:
+  fs1:
+    keeptime: 1
+    spaces: [/tmp]
+    database: /tmp
+    deleted: .del
+)"));
+
+    REQUIRE_FALSE(config.validate());
+}
+
+TEST_CASE("config: dbuid 0 is rejected", "[config]") {
+    auto config = Config(std::string(R"(
+clustername: aName
+smtphost: localhost
+mail_from: noreply@mydomain.de
+default: fs1
+duration: 10
+maxextensions: 1
+dbuid: 0
+dbgid: 2
+workspaces:
+  fs1:
+    keeptime: 1
+    spaces: [/tmp]
+    database: /tmp
+    deleted: .del
+)"));
+
+    REQUIRE_FALSE(config.validate());
+}
+
+TEST_CASE("config: keeptime is not truncated to int", "[config]") {
+    // regression test for SECREVIEW L8: keeptime * 86400 overflowed 32-bit int
+    // arithmetic in ws_list/ws_restore before converting to the 64-bit result
+    auto config = Config(std::string(R"(
+clustername: aName
+smtphost: localhost
+mail_from: noreply@mydomain.de
+default: fs1
+duration: 10
+maxextensions: 1
+dbuid: 2
+dbgid: 2
+workspaces:
+  fs1:
+    keeptime: 3000000000
+    spaces: [/tmp]
+    database: /tmp
+    deleted: .del
+)"));
+
+    auto fs = config.getFsConfig("fs1");
+    REQUIRE(fs.keeptime == 3000000000L);
+    // the seconds computation used by ws_list must not overflow
+    REQUIRE(fs.keeptime * 86400L == 259200000000000L);
+    // releasekeeptime defaults to keeptime and must keep the full value
+    REQUIRE(fs.releasekeeptime == 3000000000L);
+}

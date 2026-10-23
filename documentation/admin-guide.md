@@ -327,6 +327,10 @@ UID of the database directory, and the UID that will be used by all setuid
 tools (as long as UID 0 is not required). Can be a shared UID, but be aware
 the user using that UID can mess with the DB.
 It is strongly suggested to use a dedicated UID or an UID of another daemon.
+Allowed values are `1` .. `4294967294` (the full `uid_t` range, so high-range
+AD/LDAP IDs work); `0` and `-1` are rejected by validation, because `chown`
+treats `-1` as "leave owner unchanged" and would silently skip the ownership
+change.
 
 #### `dbgid`
 
@@ -334,6 +338,7 @@ GID of the database directory, and the GID that will be used by all setuid
 tools (as long as GID 0 is not required). Can be a shared GID, but be aware
 users assigned to that GID can mess with the DB. It is strongly suggested
 to use a dedicated GID or a GID of another daemon.
+Same range as `dbuid`: `1` .. `4294967294`, `0` and `-1` are rejected.
 
 #### `debugusers`
 

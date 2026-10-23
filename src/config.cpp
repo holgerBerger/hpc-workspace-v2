@@ -130,16 +130,27 @@ bool Config::validate() {
         valid = false;
         spdlog::error("No dbuid in config!");
     }
+    // (uid_t)-1 must be rejected: chown()/fchown() treat it as "leave owner unchanged"
+    // and would silently not apply the configured ownership
+    if (global.dbuid == static_cast<uid_t>(-1)) {
+        valid = false;
+        spdlog::error("Invalid dbuid -1 in config!");
+    }
     if (global.dbgid == 0) {
         valid = false;
         spdlog::error("No dbgid in config!");
+    }
+    if (global.dbgid == static_cast<gid_t>(-1)) {
+        valid = false;
+        spdlog::error("Invalid dbgid -1 in config!");
     }
     if (global.clustername.empty()) {
         valid = false;
         spdlog::error("No clustername in config!");
     }
     if (global.adminmail.empty()) {
-        valid = true;
+        // optional setting: only warn. Must NOT touch `valid`, or this would
+        // override errors found by the checks above (e.g. an invalid dbuid)
         spdlog::warn("No adminmail in config!");
     }
     if (global.maxuserworkspaces == 0) {
@@ -326,9 +337,9 @@ void Config::readYAML(const string yaml) {
     if (config["maxextensions"])
         global.maxextensions = config["maxextensions"].as<int>();
     if (config["dbuid"])
-        global.dbuid = config["dbuid"].as<int>();
+        global.dbuid = config["dbuid"].as<uid_t>();
     if (config["dbgid"])
-        global.dbgid = config["dbgid"].as<int>();
+        global.dbgid = config["dbgid"].as<gid_t>();
     if (config["admins"])
         global.admins = config["admins"].as<vector<string>>();
     if (config["debugusers"])
@@ -378,11 +389,11 @@ void Config::readYAML(const string yaml) {
                     if (ws["group_acl"])
                         fs.group_acl = ws["group_acl"].as<vector<string>>();
                     if (ws["keeptime"])
-                        fs.keeptime = ws["keeptime"].as<int>();
+                        fs.keeptime = ws["keeptime"].as<long>();
                     else
                         fs.keeptime = 10;
                     if (ws["releasekeeptime"])
-                        fs.releasekeeptime = ws["releasekeeptime"].as<int>();
+                        fs.releasekeeptime = ws["releasekeeptime"].as<long>();
                     else
                         fs.releasekeeptime = fs.keeptime; // SPEC: releasekeeptime defaults to keeptime
                     fs.maxduration = 0;

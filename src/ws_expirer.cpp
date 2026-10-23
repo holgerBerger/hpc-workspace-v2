@@ -250,7 +250,7 @@ std::string generateReminderMail(const std::string& mail_from, std::vector<std::
 // construct expiration mail for user
 std::string generateExpirationMail(const std::string& mail_from, std::vector<std::string>& mail_to,
                                    const long expirationtime, const std::string& wsname, const std::string& fsname,
-                                   const std::string& clustername, const int keeptime) {
+                                   const std::string& clustername, const long keeptime) {
 
     std::stringstream mail;
     std::string expirationtimestr = mail::generateMailDateFormat(expirationtime);
@@ -761,7 +761,7 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
                             std::vector<std::string> mail_to;
                             mail_to.push_back(dbentry->getMailaddress());
                             std::string clustername = config.clustername();
-                            int keeptime = config.getFsConfig(fs).keeptime;
+                            long keeptime = config.getFsConfig(fs).keeptime;
 
                             std::string completeMail =
                                 generateExpirationMail(mail_from, mail_to, expiration, id, fs, clustername, keeptime);

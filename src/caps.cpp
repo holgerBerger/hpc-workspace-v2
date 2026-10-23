@@ -111,7 +111,7 @@ Cap::Cap() {
 }
 
 // drop root/effective capabilities (not necessary), and verify the permitted set
-void Cap::drop_caps(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos srcpos) {
+void Cap::drop_caps(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos srcpos) {
     if (traceflag) {
         spdlog::trace("Cap::dropcap( {}, {}, {})", uid, cap_arg, srcpos.getSrcPos());
         if (debugflag)
@@ -158,7 +158,7 @@ void Cap::drop_caps(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos src
 }
 
 // remove a capability from the effective set
-void Cap::lower_cap(std::vector<cap_value_t> cap_arg, int uid, utils::SrcPos srcpos) {
+void Cap::lower_cap(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos srcpos) {
     if (traceflag) {
         spdlog::trace("Cap::lower_cap( {}, {})", uid, srcpos.getSrcPos());
         dump();

@@ -1003,7 +1003,8 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
         caps.raise_cap({CAP_DAC_OVERRIDE},
                        utils::SrcPos(__FILE__, __LINE__, __func__)); // === Section with raised capabuility START ====
 
-    long dbgid = 0, dbuid = 0;
+    uid_t dbuid = 0;
+    gid_t dbgid = 0;
 
     dbuid = parent_db->getconfig()->dbuid();
     dbgid = parent_db->getconfig()->dbgid();
