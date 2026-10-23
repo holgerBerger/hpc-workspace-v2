@@ -624,6 +624,28 @@ EOF
     rm -rf /tmp/ws/wss-dead /tmp/ws/wss-live /tmp/ws/wss-db
 }
 
+@test "ws_allocate refuses planted symlink at workspace path" {
+    local symdir="/tmp/ws/ws1/${USER}-SYMTARGET"
+    local target=/tmp/ws/symlink-target
+    rm -f "$symdir"
+    rm -rf "$target"
+    rm -f "/tmp/ws/ws1-db/${USER}-SYMTARGET"
+    mkdir -p "$target"
+    chmod 755 "$target"
+    ln -s "$target" "$symdir"
+    run ws_allocate --config bats/ws.conf -F ws1 SYMTARGET 1
+    assert_failure
+    assert_output --partial "could not open workspace directory"
+    # the link target must be untouched: pre-fix it was chmoded to 0700 (and chowned)
+    # while the allocation appeared to succeed
+    [ -d "$target" ]
+    [ "$(stat -c %a "$target")" = "755" ]
+    # the planted link itself is removed on the error path
+    [ ! -e "$symdir" ]
+    rm -f "$symdir"
+    rm -rf "$target" "/tmp/ws/ws1-db/${USER}-SYMTARGET"
+}
+
 cleanup() {
     ws_release --config bats/ws.conf $ws_name
     ws_release --config bats/ws.conf TEST

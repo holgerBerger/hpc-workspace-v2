@@ -186,6 +186,21 @@ string FilesystemDBV1::createWorkspace(const string name, const string user_opti
         exit(-1); // FIXME: throw
     }
 
+    // Refuse a symlink planted at the workspace path (needs write access to the space root,
+    // or a swap race): the path-based chown/chmod below would resolve it and act on the link
+    // target - an arbitrary directory, as this runs privileged. Open the final component
+    // exactly once with O_NOFOLLOW|O_DIRECTORY and use that fd, so the path is never
+    // re-resolved after the check (same pattern as the DB entry write in writeEntry).
+    // A real pre-existing directory still works as before.
+    caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
+    int wsfd = open(wsdir.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    caps.lower_cap({CAP_DAC_OVERRIDE}, db_uid, utils::SrcPos(__FILE__, __LINE__, __func__));
+    if (wsfd == -1) {
+        spdlog::error("could not open workspace directory <{}>: {}!", wsdir, std::strerror(errno));
+        unlink(wsdir.c_str()); // removes a planted symlink itself, never a target directory
+        exit(-1);              // FIXME: throw
+    }
+
     uid_t tuid = getuid();
     gid_t tgid = getgid();
 
@@ -204,9 +219,10 @@ string FilesystemDBV1::createWorkspace(const string name, const string user_opti
 
     caps.raise_cap({CAP_CHOWN}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-    if (chown(wsdir.c_str(), tuid, tgid)) {
+    if (fchown(wsfd, tuid, tgid)) {
         caps.lower_cap({CAP_CHOWN}, db_uid, utils::SrcPos(__FILE__, __LINE__, __func__));
         spdlog::error("could not change owner of workspace!");
+        close(wsfd);
         unlink(wsdir.c_str());
         exit(-1); // FIXME: throw
     }
@@ -224,14 +240,16 @@ string FilesystemDBV1::createWorkspace(const string name, const string user_opti
     if (groupwritable) {
         mode |= S_IWGRP;
     }
-    if (chmod(wsdir.c_str(), mode)) {
+    if (fchmod(wsfd, mode)) {
         caps.lower_cap({CAP_FOWNER}, db_uid, utils::SrcPos(__FILE__, __LINE__, __func__));
         spdlog::error("could not change permissions of workspace!");
+        close(wsfd);
         unlink(wsdir.c_str());
         exit(-1); // FIXME: throw
     }
     caps.lower_cap({CAP_FOWNER}, db_uid, utils::SrcPos(__FILE__, __LINE__, __func__));
 
+    close(wsfd);
     return wsdir;
 }
 
