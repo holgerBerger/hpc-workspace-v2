@@ -433,6 +433,67 @@ comment: "{}"
         REQUIRE(fs::exists(db_removed / "ubroken"));
     }
 
+    SECTION("expire never overwrites deleted entries") {
+        // a live entry: file in dbdir, workspace directory in spacedir
+        auto make_live = [&](const std::string& base, const std::string& tag) {
+            std::ofstream e(dbdir / base);
+            fmt::println(e,
+                         R"yaml(
+workspace: {}
+expiration: 1734701876
+extensions: 3
+reminder: 0
+mailaddress: ""
+comment: "{}"
+)yaml",
+                         (spacedir / base).string(), tag);
+            e.close();
+            fs::create_directories(spacedir / base);
+        };
+
+        // no collision: name is used as-is
+        make_live("u-X1", "first");
+        {
+            std::unique_ptr<DBEntry> entry(db->readEntry("u-X1", false));
+            REQUIRE(entry->expire("1000") == "1000");
+        }
+        REQUIRE_FALSE(fs::exists(dbdir / "u-X1"));
+        REQUIRE(fs::exists(db_removed / "u-X1-1000"));
+
+        // DB entry with that name already in deleted area: bump, never overwrite
+        make_live("u-X1", "second");
+        {
+            std::unique_ptr<DBEntry> entry(db->readEntry("u-X1", false));
+            REQUIRE(entry->expire("1000") == "1001");
+        }
+        std::unique_ptr<DBEntry> old(db->readEntry("u-X1-1000", true));
+        REQUIRE(old->getComment() == "first"); // the pre-fix silent truncate is the bug pinned here
+        std::unique_ptr<DBEntry> now(db->readEntry("u-X1-1001", true));
+        REQUIRE(now->getComment() == "second");
+
+        // only the workspace directory with that name exists (split-brain from an old move):
+        // DB entry and workspace must end up with the same suffix
+        make_live("u-X2", "wscollide");
+        fs::create_directories(ws_removed / "u-X2-2000");
+        {
+            std::unique_ptr<DBEntry> entry(db->readEntry("u-X2", false));
+            REQUIRE(entry->expire("2000") == "2001");
+        }
+        REQUIRE(fs::exists(db_removed / "u-X2-2001"));
+        REQUIRE_FALSE(fs::exists(db_removed / "u-X2-2000"));
+
+        // garbage timestamps are refused and leave the live entry alone
+        make_live("u-X3", "garbage");
+        {
+            std::unique_ptr<DBEntry> entry(db->readEntry("u-X3", false));
+            REQUIRE_THROWS_AS(entry->expire("abc"), DatabaseException);
+            REQUIRE_THROWS_AS(entry->expire(""), DatabaseException);
+            REQUIRE_THROWS_AS(entry->expire("12a"), DatabaseException);
+            REQUIRE(fs::exists(dbdir / "u-X3"));
+            REQUIRE_FALSE(fs::exists(db_removed / "u-X3-abc"));
+        }
+    }
+
     fs::permissions(ws_removed, fs::perms::owner_all);
     fs::remove_all(basedirname);
 }

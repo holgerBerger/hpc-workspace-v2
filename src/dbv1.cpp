@@ -875,13 +875,49 @@ void DBEntryV1::release(time_t& timestamp_time) {
 // SPEC: can be called by root only!
 // SPEC: does not work on root_squash!
 // remarkthis can be called as root or user in user test mode
-void DBEntryV1::expire(const std::string timestamp) {
+// Never overwrites an existing deleted entry: on a name collision the timestamp is bumped to the
+// next free one and returned, so the caller can move the workspace directory to the same name.
+std::string DBEntryV1::expire(const std::string timestamp) {
     if (traceflag)
         spdlog::trace("expire({})", timestamp);
 
+    if (timestamp.empty() ||
+        !std::all_of(timestamp.begin(), timestamp.end(), [](unsigned char c) { return std::isdigit(c); })) {
+        throw DatabaseException(fmt::format("refusing to expire {}: invalid timestamp {}", id, timestamp));
+    }
+    time_t base_ts;
+    try {
+        base_ts = std::stol(timestamp);
+    } catch (const std::exception&) {
+        throw DatabaseException(fmt::format("refusing to expire {}: timestamp {} out of range", id, timestamp));
+    }
+
     auto wsconfig = parent_db->getconfig()->getFsConfig(filesystem);
-    cppfs::path dbtarget = cppfs::path(wsconfig.database) / cppfs::path(wsconfig.deletedPath) /
-                           cppfs::path(fmt::format("{}-{}", id, timestamp));
+    auto db_deleted_dir = cppfs::path(wsconfig.database) / wsconfig.deletedPath;
+    auto ws_deleted_dir = cppfs::path(workspace).remove_filename() / wsconfig.deletedPath;
+
+    // Find a free "<id>-<ts>" name in both deleted areas before touching anything, so a failed
+    // lookup leaves the live entry untouched. Collisions happen when two expirer runs rename into
+    // the same second (re-run, clock step); unlike expiredIdFor the timestamp here is "now", but
+    // waiting is still not an option within one run, so count up. Check and rename are not atomic,
+    // consistent with the other guards in this file.
+    const int maxtries = 1000;
+    std::string used_ts;
+    cppfs::path dbtarget;
+    for (int i = 0; i < maxtries; i++) {
+        std::string candidate_ts = std::to_string(base_ts + i);
+        WsID candidate = fmt::format("{}-{}", id, candidate_ts);
+        if (!nameTaken(db_deleted_dir / candidate) && !nameTaken(ws_deleted_dir / candidate)) {
+            used_ts = candidate_ts;
+            dbtarget = db_deleted_dir / candidate;
+            break;
+        }
+    }
+    if (used_ts.empty()) {
+        throw DatabaseException(fmt::format("no free name found to expire {} after {} tries", id, maxtries));
+    }
+    if (used_ts != timestamp)
+        spdlog::info("   name {}-{} taken, expiring as {}-{} instead", id, timestamp, id, used_ts);
 
     if (debugflag)
         spdlog::debug("dbtarget={}", dbtarget.string());
@@ -904,6 +940,8 @@ void DBEntryV1::expire(const std::string timestamp) {
             spdlog::error("{}", e.what());
         throw DatabaseException("database entry could not be deleted!");
     }
+
+    return used_ts;
 }
 
 // remove DB entry

@@ -80,7 +80,12 @@ class DBEntry {
     // change release date (mark as released and not expired) and write updated entry and move entry
     virtual void release(time_t& timestamp) = 0;
     // set expired (not released) can be called by root only
-    virtual void expire(const std::string timestamp) = 0;
+    // Moves the DB entry to <deleted>/<id>-<timestamp>; on a name collision (another expirer run
+    // in the same second, a clock step) uses the next free timestamp instead, so it never silently
+    // overwrites an existing deleted entry. Returns the timestamp actually used (the input on the
+    // common no-collision path); the caller must move the workspace directory to the same suffix.
+    // Throws DatabaseException if the timestamp is not a plain number or no free name exists.
+    virtual std::string expire(const std::string timestamp) = 0;
 
     // consume an extension (writes entry back)
     virtual void useExtension(const long expiration, const string mail, const int reminder, const string comment) = 0;

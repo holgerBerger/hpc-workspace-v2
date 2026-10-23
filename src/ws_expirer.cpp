@@ -707,13 +707,19 @@ static expire_result_t expire_workspaces(const Config& config, const string fs, 
 
         // do we have to expire?
         if (time((long*)0L) > expiration) {
-            auto timestamp = to_string(time((long*)0L));
-
             result.active_expired++;
             if (!dryrun) {
                 spdlog::info("  expiring {} (expired {})", id, utils::ctime(&expiration));
-                // db entry first
-                dbentry->expire(timestamp);
+                // db entry first; expire() returns the timestamp it actually used, which can be
+                // higher than "now" if the deleted name was taken, and the workspace must move
+                // under the same one. On failure the entry stays live and the next run retries.
+                std::string timestamp;
+                try {
+                    timestamp = dbentry->expire(to_string(time((long*)0L)));
+                } catch (const std::exception& e) {
+                    spdlog::error("   expiring {} failed: {}", id, e.what());
+                    continue;
+                }
 
                 // workspace second
                 auto wspath = dbentry->getWSPath();

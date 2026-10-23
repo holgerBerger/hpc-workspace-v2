@@ -98,7 +98,7 @@ class DBEntryV1 : public DBEntry {
     // change release date (mark as released and not expired) and write updated entry and move entry
     void release(time_t& timestamp);
     // set expired (not released) can be called by root only
-    void expire(const std::string timestamp);
+    std::string expire(const std::string timestamp) override;
     // write entry to DB after update (read with readEntry) or creation
     void writeEntry(const bool calledasroot = false);
     // remove entry from DB

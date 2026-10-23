@@ -635,6 +635,11 @@ appended to the name. This ensures that there can be several generations of a
 workspace with the same name from the same user that exist in parallel in the
 restorable location.
 
+If the name with the current timestamp is already taken (e.g. because a previous
+expirer run in the same second left an entry behind), the expirer bumps the
+timestamp to the next free name instead, so it never silently overwrites an
+already deleted entry.
+
 **Caution:** since the moved data is still owned by the user, only in a
 non-accessible location, it is still counted towards the user's quota. Users
 who want to free the space have to restore the data with ```ws_restore```,

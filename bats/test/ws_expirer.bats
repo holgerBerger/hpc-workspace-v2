@@ -525,3 +525,35 @@ setup() {
     rm -f ~/.ws_user.conf
     if [ -f ~/.ws_user.conf_testbackup ]; then mv -f ~/.ws_user.conf_testbackup ~/.ws_user.conf; fi
 }
+
+@test "ws_expirer never overwrites existing deleted entries" {
+    local id="$USER-COLLIDE_TEST"
+    rm -f /tmp/ws/ws1-db/.removed/${id}-*
+    rm -rf /tmp/ws/ws1/.removed/${id}-*
+    ws_allocate --config bats/ws.conf -F ws1 COLLIDE_TEST 1
+    ws_editdb --config bats/ws.conf --not-kidding --add-time -2 -F ws1 COLLIDE_TEST
+    local t0=$(date +%s)
+    # occupy the next few second-granularity expiry names in the DB deleted area,
+    # so the expirer has to roll over to a free name instead of clobbering
+    for i in 0 1 2; do
+        echo "old record $i" > "/tmp/ws/ws1-db/.removed/${id}-$((t0 + i))"
+    done
+    run ws_expirer --config bats/ws.conf -c
+    assert_output --regexp 'expiring .*-COLLIDE_TEST'
+    assert_success
+    # none of the pre-existing deleted entries were truncated
+    for i in 0 1 2; do
+        run cat "/tmp/ws/ws1-db/.removed/${id}-$((t0 + i))"
+        assert_output "old record $i"
+    done
+    # the live entry is gone, and exactly one new (rolled-over) deleted entry appeared
+    [ ! -f "/tmp/ws/ws1-db/${id}" ]
+    local files=(/tmp/ws/ws1-db/.removed/${id}-*)
+    [ "${#files[@]}" -eq 4 ]
+    # the workspace directory moved under the same rolled-over name
+    local wsfiles=(/tmp/ws/ws1/.removed/${id}-*)
+    [ "${#wsfiles[@]}" -eq 1 ]
+    [ "${wsfiles[0]##*-}" = "${files[3]##*-}" ]
+    rm -f /tmp/ws/ws1-db/.removed/${id}-*
+    rm -rf /tmp/ws/ws1/.removed/${id}-*
+}
