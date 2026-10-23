@@ -120,11 +120,10 @@ void print_entry(const DBEntry* entry, const Config config, const bool verbose, 
         } else {
             fmt::println("    remaining time       : {}", "expired");
             remaining = (entry->getExpired() + (fsconfig.keeptime * 86400)) - time(0L);
-            if (remaining == 0) { // compatability with v1 --> get expiration from the name if expired is not defined
-                std::string id = entry->getId();
-                remaining = (std::stol(utils::splitString(id, '-').at(std::count(id.begin(), id.end(), '-'))) +
-                             (fsconfig.keeptime * 86400)) -
-                            time(0L);
+            // compatability with v1 --> get expiration from the name if expired is not defined
+            if (entry->getExpired() == 0) {
+                if (auto ts = utils::timestampFromId(entry->getId()))
+                    remaining = (*ts + (fsconfig.keeptime * 86400)) - time(0L);
             }
         }
 
@@ -182,11 +181,10 @@ void print_entry_tableformat(const DBEntry* entry, const Config config, [[maybe_
             remaining = (entry->getReleaseTime() + (fsconfig.releasekeeptime * 86400)) - time(0L);
         } else {
             remaining = (entry->getExpired() + (fsconfig.keeptime * 86400)) - time(0L);
-            if (remaining == 0) { // compatability with v1 --> get expiration from the name if expired is not defined
-                std::string id = entry->getId();
-                remaining = (std::stol(utils::splitString(id, '-').at(std::count(id.begin(), id.end(), '-'))) +
-                             (fsconfig.keeptime * 86400)) -
-                            time(0L);
+            // compatability with v1 --> get expiration from the name if expired is not defined
+            if (entry->getExpired() == 0) {
+                if (auto ts = utils::timestampFromId(entry->getId()))
+                    remaining = (*ts + (fsconfig.keeptime * 86400)) - time(0L);
             }
         }
     }

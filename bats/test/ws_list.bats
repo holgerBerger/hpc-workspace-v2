@@ -483,6 +483,53 @@ ws1"
     ws_release --config bats/ws.conf pathtest
 }
 
+@test "ws_list shows deletion deadline for legacy v1 entries without expired field" {
+    # v1 deleted-area entries carry no `expired` field; the timestamp is encoded in the ID.
+    # ws1 keeptime is 7 days, so an entry timestamped ~10 days ahead is ~17 days from deletion
+    # (+1 h buffer so the expected day count does not depend on second boundaries)
+    mkdir -p /tmp/ws/ws1-db/.removed
+    local ts=$(( $(date +%s) + 10 * 86400 + 3600 ))
+    cat > "/tmp/ws/ws1-db/.removed/${USER}-v1deadline-${ts}" <<EOF
+workspace: /tmp/ws/ws1/.removed/${USER}-v1deadline-${ts}
+creation: ${ts}
+expiration: ${ts}
+reminder: 3
+extensions: 3
+EOF
+
+    run ws_list --config bats/ws.conf -F ws1 -e 'v1deadline*'
+    rm -f "/tmp/ws/ws1-db/.removed/${USER}-v1deadline-${ts}"
+    assert_success
+    assert_output --regexp "until deletion       : 17 days"
+}
+
+@test "ws_list does not crash on malformed legacy deleted-area entry names" {
+    # with the v1 fallback active for every entry lacking an `expired` field, names without a
+    # numeric timestamp suffix must be handled gracefully, not terminate the listing
+    mkdir -p /tmp/ws/ws1-db/.removed
+    local ts=$(( $(date +%s) + 10 * 86400 + 3600 ))
+    local entry
+    for entry in "${USER}-v1bad-backup" "${USER}-v1bad-" "${USER}-v1bad-${ts}"; do
+        cat > "/tmp/ws/ws1-db/.removed/${entry}" <<EOF
+workspace: /tmp/ws/ws1/.removed/${entry}
+creation: ${ts}
+expiration: ${ts}
+reminder: 3
+extensions: 3
+EOF
+    done
+
+    run ws_list --config bats/ws.conf -F ws1 -e 'v1bad*'
+    rm -f "/tmp/ws/ws1-db/.removed/${USER}-v1bad-backup" "/tmp/ws/ws1-db/.removed/${USER}-v1bad-" \
+        "/tmp/ws/ws1-db/.removed/${USER}-v1bad-${ts}"
+    assert_success
+    # all three entries are listed (no crash on the malformed names): the two malformed ones
+    # show no deletion deadline (0 days), the well-named one shows the real one
+    assert_output --partial "v1bad-backup"
+    assert_equal "$(printf '%s\n' "$output" | grep -c 'until deletion       : 0 days, 0 hours')" "2"
+    assert_output --regexp "until deletion       : 17 days"
+}
+
 cleanup() {
     ws_release --config bats/ws.conf $ws_name
     assert_failure

@@ -206,3 +206,54 @@ TEST_CASE("utils::mv", "[utils]") {
 
     fs::remove_all(tmpbase);
 }
+
+TEST_CASE("utils::timestampFromId", "[utils]") {
+    SECTION("well-formed deleted-area ID returns the timestamp") {
+        auto ts = utils::timestampFromId("alice-proj-1699000000");
+        REQUIRE(ts.has_value());
+        REQUIRE(*ts == 1699000000);
+    }
+
+    SECTION("dashes in user and workspace name do not shift the suffix") {
+        auto ts = utils::timestampFromId("al-ice-my-proj-1699000000");
+        REQUIRE(ts.has_value());
+        REQUIRE(*ts == 1699000000);
+    }
+
+    SECTION("leading zeros are accepted") {
+        auto ts = utils::timestampFromId("alice-001699000000");
+        REQUIRE(ts.has_value());
+        REQUIRE(*ts == 1699000000);
+    }
+
+    SECTION("empty base before the dash is rejected") {
+        // same shape rule as splitExpiredId() in dbv1.cpp
+        REQUIRE_FALSE(utils::timestampFromId("-1699000000").has_value());
+    }
+
+    SECTION("non-numeric suffix returns nullopt") {
+        // the regression: unguarded std::stol threw std::invalid_argument here
+        REQUIRE_FALSE(utils::timestampFromId("alice-proj-backup").has_value());
+    }
+
+    SECTION("trailing dash returns nullopt") {
+        // the regression: splitString drops the empty last field, so indexing with the dash
+        // count threw std::out_of_range
+        REQUIRE_FALSE(utils::timestampFromId("alice-proj-").has_value());
+    }
+
+    SECTION("missing dash or empty ID returns nullopt") {
+        REQUIRE_FALSE(utils::timestampFromId("aliceproj").has_value());
+        REQUIRE_FALSE(utils::timestampFromId("").has_value());
+        REQUIRE_FALSE(utils::timestampFromId("-").has_value());
+    }
+
+    SECTION("suffix with sign or space is rejected") {
+        REQUIRE_FALSE(utils::timestampFromId("alice-+123").has_value());
+        REQUIRE_FALSE(utils::timestampFromId("alice- 123").has_value());
+    }
+
+    SECTION("digits beyond time_t range return nullopt instead of throwing") {
+        REQUIRE_FALSE(utils::timestampFromId("alice-99999999999999999999999").has_value());
+    }
+}

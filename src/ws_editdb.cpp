@@ -337,17 +337,8 @@ int main(int argc, char** argv) {
 
         // entries from the deleted area (-e) carry a timestamp in their name "<base>-<ts>"
         std::optional<time_t> name_time;
-        if (listexpired) {
-            auto id = entry->getId();
-            auto dash = id.rfind('-');
-            if (dash != string::npos && dash + 1 < id.size() &&
-                std::all_of(id.begin() + dash + 1, id.end(), [](unsigned char c) { return std::isdigit(c); })) {
-                try {
-                    name_time = std::stoll(id.substr(dash + 1));
-                } catch (const std::exception&) { // out of range
-                }
-            }
-        }
+        if (listexpired)
+            name_time = utils::timestampFromId(entry->getId());
 
         // retention boundary of an expired (not released) entry, as ws_expirer computes it:
         // max(expiration, expired), for v1 entries (expired == 0) the name timestamp replaces expired

@@ -35,6 +35,7 @@
 #include <ctime>
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -111,6 +112,12 @@ std::size_t rmtree_below(std::string path);
 
 // split a string at delimiter and return vector
 std::vector<std::string> splitString(const std::string& str, char delimiter);
+
+// extract the trailing timestamp of a deleted-area entry ID ("<base>-<ts>"), as v1 entries
+// without an `expired` field encode it in their name.
+// Returns std::nullopt if the ID does not have that shape (no dash, leading dash, empty or
+// non-digit suffix) or if the number does not fit into a time_t. Never throws.
+std::optional<time_t> timestampFromId(const std::string& id);
 
 // pretty print a size into a string with KB/GB etc unit
 std::string prettyBytes(const uint64_t size);

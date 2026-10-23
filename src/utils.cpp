@@ -29,6 +29,7 @@
  */
 
 #include <cassert>
+#include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -529,6 +530,22 @@ std::vector<std::string> splitString(const std::string& str, char delimiter) {
         words.push_back(word);
     }
     return words;
+}
+
+std::optional<time_t> timestampFromId(const std::string& id) {
+    // same shape rules as splitExpiredId() in dbv1.cpp: last dash-separated field, non-empty
+    // base and suffix, digits only
+    auto dash = id.rfind('-');
+    if (dash == std::string::npos || dash == 0 || dash + 1 >= id.size())
+        return std::nullopt;
+    const auto suffix = id.substr(dash + 1);
+    if (!std::all_of(suffix.begin(), suffix.end(), [](unsigned char c) { return std::isdigit(c); }))
+        return std::nullopt;
+    try {
+        return static_cast<time_t>(std::stoll(suffix));
+    } catch (const std::exception&) { // out of range
+        return std::nullopt;
+    }
 }
 
 // parse ACL list into a config-ordered vector of (id, (modifier, intents)) entries
