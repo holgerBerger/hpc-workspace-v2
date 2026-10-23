@@ -99,6 +99,9 @@ for a list of available filesystems and their order of allocation.
 mailaddress to send reminder mail to, can be combined with
 .B \-x
 to add mailaddress to existing workspace (combine with duration 0).
+Must contain an @ and be a syntactically valid address; values without an @
+(except the caller's own bare username, which requests local delivery) are
+rejected in favor of the local user account.
 When extending a foreign workspace via
 .B \-u
 ("in behalf of the owner"), the owner's mailaddress is kept and this option is ignored.

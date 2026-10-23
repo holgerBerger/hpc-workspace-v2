@@ -233,9 +233,15 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
     }
 
     // validate email
-    if (mailaddress != "" && mailaddress.find("@") != std::string::npos && !utils::isValidEmail(mailaddress)) {
-        spdlog::error("Invalid email address, ignoring and using local user account");
-        mailaddress = user::getUsername();
+    // NOTE: an '@'-less address used to skip validation entirely and was stored raw, so a
+    // typo (e.g. "user-at-example.com") silently failed every reminder for the lifetime of
+    // the DB entry. Only our own local-account fallback (the bare username, which the MTA
+    // expands locally) may stay '@'-less; everything else must be a valid address.
+    if (mailaddress != "" && mailaddress != user::getUsername()) {
+        if (mailaddress.find("@") == std::string::npos || !utils::isValidEmail(mailaddress)) {
+            spdlog::error("Invalid email address <{}>, ignoring and using local user account", mailaddress);
+            mailaddress = user::getUsername();
+        }
     }
 
     // validate workspace name against nasty characters

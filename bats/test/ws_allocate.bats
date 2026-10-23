@@ -176,6 +176,27 @@ setup() {
     rm -f /tmp/ws/ws2-db/${USER}-REMINDER
 }
 
+@test "ws_allocate with reminder, mail without @ falls back to local account" {
+    # L7 regression: '@'-less -m values used to skip validation and were stored raw,
+    # so every reminder of the entry's lifetime silently failed against the typo
+    run ws_allocate --config bats/ws.conf -r 1 -m user-at-example.com NOATSIGN 10
+    assert_output --partial "Invalid email address"
+    assert_success
+    run ws_list --config bats/ws.conf -v NOATSIGN
+    # the stored mail address must be the local fallback, not the typo
+    refute_output --partial "user-at-example.com"
+    rm -f /tmp/ws/ws2-db/${USER}-NOATSIGN
+}
+
+@test "ws_allocate accepts own bare username as local mail address" {
+    # the local-account fallback is exactly the bare username; passing it explicitly
+    # must not trigger the validator
+    run ws_allocate --config bats/ws.conf -r 1 -m $USER BARESELF 10
+    refute_output --partial "Invalid email address"
+    assert_success
+    rm -f /tmp/ws/ws2-db/${USER}-BARESELF
+}
+
 @test "ws_allocate with user config for email and duration" {
     [ -f ~/.ws_user.conf ] && mv -f ~/.ws_user.conf ~/.ws_user.conf_testbackup
     echo "mail: mail@valid.domain" > ~/.ws_user.conf
