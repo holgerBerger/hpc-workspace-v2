@@ -122,8 +122,11 @@ void commandline(po::variables_map& opt, string& name, string& filesystem, strin
         exit(0);
     }
 
-    // this allows user to extend foreign workspaces
-    if (opt.count("username") && !(opt.count("extension") || getuid() == 0)) {
+    // -u is for root only here (see man page): a non-root caller always releases their own
+    // workspaces. The copy-pasted opt.count("extension") clause from ws_allocate was always
+    // false (ws_release defines no extension option); removed, the second gate at the dbid
+    // construction below remains as defense in depth.
+    if (opt.count("username") && getuid() != 0) {
         spdlog::info("Ignoring username option.");
         user = "";
     }
@@ -195,7 +198,9 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
     }
 
     // validate filesystem and group given on command line
-    if (!validateFs(config, opt, user_option)) {
+    // NOTE: when -u was not given, validate against the calling user: an empty name matches no
+    // user_acl entry and would deny access to any filesystem that has ACLs configured
+    if (!validateFs(config, opt, user_option.empty() ? username : user_option)) {
         spdlog::error("aborting, no valid filesystem given.");
         return false;
     }

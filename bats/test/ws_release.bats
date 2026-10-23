@@ -207,6 +207,57 @@ setup() {
     assert_success
 }
 
+# filesystems with user_acl: ws2 grants the caller, ws1 lists someone else
+# (mirrors the acl_conf helper in ws_allocate.bats, distinct conf file name)
+acl_conf() {
+    conf=/tmp/ws_acl_release.conf
+    cat > "$conf" <<EOF
+admins: [root]
+adminmail: [root@a.com]
+clustername: bats
+dbgid: 2
+dbuid: 2
+duration: 10
+maxextensions: 3
+smtphost: localhost
+mail_from: root@localhost
+default: ws2
+workspaces:
+  ws1:
+    database: /tmp/ws/ws1-db
+    deleted: .removed
+    user_acl: [wsoutsider]
+    keeptime: 7
+    spaces: [/tmp/ws/ws1]
+  ws2:
+    database: /tmp/ws/ws2-db
+    deleted: .removed
+    user_acl: [$USER]
+    keeptime: 7
+    spaces: [/tmp/ws/ws2/1, /tmp/ws/ws2/2]
+EOF
+}
+
+@test "ws_release grants explicit filesystem via user_acl for listed caller" {
+    # the -F validation must use the calling user, not the (empty unless -u given) user_option
+    acl_conf
+    rm -f "/tmp/ws/ws2-db/${USER}-ACLFSREL"
+    ws_allocate --config "$conf" -F ws2 ACLFSREL 5 >/dev/null
+    run ws_release --config "$conf" -F ws2 ACLFSREL
+    assert_success
+    assert_output --partial "workspace ACLFSREL released"
+    rm -f "$conf"
+}
+
+@test "ws_release denies filesystem whose user_acl excludes caller" {
+    # must not fail open: an ACL'd fs that does not list the caller stays denied
+    acl_conf
+    run ws_release --config "$conf" -F ws1 ACLFSGHOST
+    assert_failure
+    assert_output --partial "You are not allowed to use the specified filesystem!"
+    rm -f "$conf"
+}
+
 cleanup() {
     ws_release $ws_name
 }
