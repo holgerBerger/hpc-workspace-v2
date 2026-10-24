@@ -540,7 +540,11 @@ int main(int argc, char** argv) {
     bool listflag, terse;
 
     // lower capabilities to user, before interpreting any data from user
-    caps.drop_caps({CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH}, getuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
+    // Keep the full installed permitted set (see src/setcap_install.cmake): in capability
+    // mode drop_caps() replaces the process permitted set, so a capability not listed here
+    // can never be raised again - restore() --delete-data raises CAP_FOWNER later.
+    caps.drop_caps({CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH, CAP_FOWNER}, getuid(),
+                   utils::SrcPos(__FILE__, __LINE__, __func__));
 
     // locals settings to prevent strange effects
     utils::setCLocal();
