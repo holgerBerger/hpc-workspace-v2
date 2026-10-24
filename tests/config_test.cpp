@@ -607,3 +607,56 @@ workspaces:
     // releasekeeptime defaults to keeptime and must keep the full value
     REQUIRE(fs.releasekeeptime == 3000000000L);
 }
+
+TEST_CASE("config: missing optional scalars get documented defaults", "[config]") {
+    // regression test for SECREVIEW L10: the YAML readers only assign keys that are present,
+    // so scalar members without initializers kept indeterminate values when the config
+    // omitted an optional key
+    auto config = Config(std::string(R"(
+clustername: aName
+smtphost: localhost
+mail_from: noreply@mydomain.de
+default: fs1
+dbuid: 2
+dbgid: 2
+workspaces:
+  fs1:
+    spaces: [/tmp]
+    database: /tmp
+    deleted: .del
+)"));
+
+    // the string ctor never validates on its own
+    REQUIRE_FALSE(config.isValid());
+    REQUIRE(config.validate());
+
+    // absent optional keys must fall back to the documented defaults, never to garbage
+    REQUIRE(config.durationdefault() == 1);
+    REQUIRE(config.reminderdefault() == 0);
+    REQUIRE(config.maxduration() == 0);
+    REQUIRE(config.maxextensions() == 0);
+    REQUIRE(config.maxuserworkspaces() == 0);
+    REQUIRE(config.deldirtimeout() == 300);
+    REQUIRE_FALSE(config.restorenosub());
+}
+
+TEST_CASE("config: missing dbuid/dbgid is deterministically rejected", "[config]") {
+    // regression test for SECREVIEW L10: validate() uses dbuid/dbgid == 0 as the "unset"
+    // sentinel; without initializers a missing dbuid could leave random memory that
+    // slipped past the sentinel check and was later used for chown/seteuid
+    auto config = Config(std::string(R"(
+clustername: aName
+smtphost: localhost
+mail_from: noreply@mydomain.de
+default: fs1
+workspaces:
+  fs1:
+    spaces: [/tmp]
+    database: /tmp
+    deleted: .del
+)"));
+
+    REQUIRE_FALSE(config.validate());
+    REQUIRE(config.dbuid() == 0);
+    REQUIRE(config.dbgid() == 0);
+}

@@ -55,16 +55,19 @@ struct Global_config {
     strings admins;          // people allowed to see all workspaces
     strings debugusers;      // users allowed to see debug output
     strings adminmail;       // mail addresses to alert in case of problems
-    int maxduration;         // max duration user can choose
-    int durationdefault;     // default duration
-    int reminderdefault;     // when to send a reminder, 0 no default reminder
-    int maxextensions;       // max extensions a user gets
-    int maxuserworkspaces;   // max number of workspaces a user can create
-    uid_t dbuid;             // uid of DB user
-    gid_t dbgid;             // gid of DB user
-    int deldirtimeout;       // timeout for directory deletion in seconds
-    string expirerlogpath;   // path where ws_expirer should place logfiles
-    bool restorenosub;       // if true, restore will not create subdirectories for workspaces
+    // NOTE: scalar members carry in-class initializers matching the documented defaults: the YAML
+    // readers only assign keys that are present, so a missing optional key must not leave
+    // indeterminate values behind (see SECREVIEW L10).
+    int maxduration = 0;       // max duration user can choose, 0 = no global cap
+    int durationdefault = 1;   // default duration
+    int reminderdefault = 0;   // when to send a reminder, 0 no default reminder
+    int maxextensions = 0;     // max extensions a user gets
+    int maxuserworkspaces = 0; // max number of workspaces a user can create, 0 = no limit
+    uid_t dbuid = 0;           // uid of DB user (0 = unset, rejected by validate())
+    gid_t dbgid = 0;           // gid of DB user (0 = unset, rejected by validate())
+    int deldirtimeout = 300;   // timeout for directory deletion in seconds
+    string expirerlogpath;     // path where ws_expirer should place logfiles
+    bool restorenosub = false; // if true, restore will not create subdirectories for workspaces
 };
 
 // config of filesystem
@@ -101,8 +104,8 @@ class Config {
     // Filesystems
     std::map<string, Filesystem_config> filesystems; // list of workspace filesystems
 
-    // validation helpers
-    bool isvalid;
+    // validation helpers (false until validate() has run, e.g. the string ctor does not validate)
+    bool isvalid = false;
 
   public:
     // read config from list of files or directories, in given order, stops after first existing file
