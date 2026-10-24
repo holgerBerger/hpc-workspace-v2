@@ -517,7 +517,11 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
             if (!may_modify) {
                 spdlog::info("you are not owner of the workspace.");
                 const string& wsgroup = dbentry->getGroup();
-                if (wsgroup.empty() || !canFind(user::getGrouplist(), wsgroup) ||
+                // note: we must use the full NSS group list of the calling user here,
+                // user::getGrouplist() only returns the process' supplementary groups, which
+                // do not contain the user's primary group in many environments (e.g. when the
+                // session was started via docker USER or before a group membership was added)
+                if (wsgroup.empty() || !canFind(user::getUserGroupList(username), wsgroup) ||
                     access(wsdir.c_str(), R_OK | W_OK | X_OK) != 0) {
                     spdlog::info("         and you have no permissions to access the workspace, workspace will "
                                  "not be extended.");
