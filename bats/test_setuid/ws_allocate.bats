@@ -82,10 +82,15 @@ setup() {
 }
 
 @test "ws_allocate -x with correct group" {
+    # delegate must be member of usera in the user database (NSS) - provisioning error if not
+    id -nG "$(id -un)" | grep -qw usera || skip "user database does not list $(id -un) as member of group usera"
     export WS_ALLOCATE=$(which ws_allocate)
     sudo -u userb --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -G usera WS4 10
-    run ws_allocate -u userb -x WS4 20
+    # sudo to our own user refreshes the kernel group list from the user database, so the
+    # test does not depend on whether this login session predates provisioning's usermod
+    run sudo -u "$(id -un)" --preserve-env=ASAN_OPTIONS $WS_ALLOCATE -u userb -x WS4 20
     assert_success
+    assert_output --partial "extending in behalf of the owner"
 }
 
 

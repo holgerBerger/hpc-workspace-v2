@@ -532,6 +532,10 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
                 if (!inwsgroup || !dir_access) {
                     spdlog::info("         and you have no permissions to access the workspace, workspace will "
                                  "not be extended.");
+                    if (inwsgroup && !dir_access)
+                        spdlog::info("         note: you are member of group <{}>, but not in the group list of this "
+                                     "session, please start a new login session or use newgrp.",
+                                     wsgroup);
                     exit(-1); // FIXME: bad for testing
                 }
             }
