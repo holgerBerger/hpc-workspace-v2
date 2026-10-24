@@ -75,6 +75,11 @@ Grant read-only (or read-write with \-\-readwrite) access to WORKSPACE for one o
 When granting read-write access, a warning is shown as this may allow immediate workspace
 deletion and may interfere with quota.
 .sp
+Groups whose NSS entry lists more than 100 members are rejected to prevent accidental
+worldwide sharing. This guardrail is best-effort: some NSS backends (e.g. LDAP, NIS) return
+an empty member list even for large groups; \fBws_share\fP then warns that the member count
+could not be verified and continues.
+.sp
 ws_share [\-\-readwrite] sharegroup [\-F FILESYSTEM] WORKSPACE GROUP [GROUP...]
 .RE
 

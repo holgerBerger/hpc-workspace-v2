@@ -249,7 +249,17 @@ case $ACTION in
                 echo "Error: Group $group unknown"
                 exit 1
             fi
-            if [[ $(echo "$line" | awk -F "," '{print NF-1}') -gt $maxmembers ]] ; then
+            # count the members listed in the NSS line (field 4, comma separated); this
+            # guardrail is best-effort: backends like LDAP or NIS may return an empty
+            # member list for large groups, so say so instead of silently passing
+            members="${line#*:*:*:}"
+            nmembers=0
+            if [[ -n "$members" ]]; then
+                nmembers=$(awk -F "," '{print NF}' <<< "$members")
+            else
+                echo "Warning: cannot verify member count of group $group from NSS"
+            fi
+            if [[ $nmembers -gt $maxmembers ]] ; then
                 echo "Too many members in group, please do not share worldwide"
                 exit 1
             fi

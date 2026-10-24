@@ -862,3 +862,54 @@ setup() {
     # Cleanup
     ws_release --config bats/ws.conf ${ws_name}_member_check
 }
+
+@test "ws_share sharegroup maxmembers guard counts NSS members correctly" {
+    # SECREVIEW L20: the guard must count listed members (101 rejected, 100 allowed)
+    # and must not silently pass when the NSS member list is empty (typical for LDAP/NIS)
+    run ws_allocate --config bats/ws.conf ${ws_name}_l20
+    assert_success
+
+    local testgroup="nogroup"
+    getent group "$testgroup" >/dev/null || testgroup="video"
+
+    # getent shim: fabricates a member list for $testgroup so the group-size guard can
+    # be tested without root (the name stays real, so setfacl still succeeds afterwards)
+    local shim="$BATS_TEST_TMPDIR/shim"
+    mkdir -p "$shim"
+    cat > "$shim/getent" <<'SHIM'
+#!/bin/bash
+if [[ "$1" == "group" && -n "${L20_GROUP:-}" && "$2" == "$L20_GROUP" ]]; then
+    if [[ "${L20_MEMBERS:-}" == "empty" ]]; then
+        echo "$L20_GROUP:x:65534:"
+    else
+        m="u1"
+        for i in $(seq 2 "${L20_MEMBERS:-1}"); do m+=",u$i"; done
+        echo "$L20_GROUP:x:65534:$m"
+    fi
+    exit 0
+fi
+exec /usr/bin/getent "$@"
+SHIM
+    chmod +x "$shim/getent"
+
+    # 101 listed members exceed the limit of 100 (pre-fix: 100 commas slipped through)
+    run env L20_GROUP="$testgroup" L20_MEMBERS=101 PATH="$shim:$PATH" \
+        ws_share --config bats/ws.conf sharegroup ${ws_name}_l20 "$testgroup"
+    assert_failure
+    assert_output --partial "Too many members"
+
+    # exactly 100 listed members is allowed
+    run env L20_GROUP="$testgroup" L20_MEMBERS=100 PATH="$shim:$PATH" \
+        ws_share --config bats/ws.conf sharegroup ${ws_name}_l20 "$testgroup"
+    assert_success
+    assert_output --partial "Granting"
+
+    # empty NSS member list: allowed, but the guard must say it could not verify
+    run env L20_GROUP="$testgroup" L20_MEMBERS=empty PATH="$shim:$PATH" \
+        ws_share --config bats/ws.conf sharegroup ${ws_name}_l20 "$testgroup"
+    assert_success
+    assert_output --partial "cannot verify member count"
+
+    # Cleanup
+    ws_release --config bats/ws.conf ${ws_name}_l20
+}
