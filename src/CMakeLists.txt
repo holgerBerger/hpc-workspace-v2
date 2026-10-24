@@ -157,13 +157,16 @@ target_link_libraries(ws_restore
 
 # create copy with different name for tests
 # this file should not get installed!
+# Use rm -f so a missing ws_restore_notest does not fail the build.
 add_custom_command(
- TARGET ws_restore
- POST_BUILD
- COMMAND rm ${CMAKE_BINARY_DIR}/bin/ws_restore_notest
- COMMENT "rm ${CMAKE_BINARY_DIR}/bin/ws_restore_notest"
- COMMAND cp ${CMAKE_BINARY_DIR}/bin/ws_restore ${CMAKE_BINARY_DIR}/bin/ws_restore_notest
- COMMENT "cp ${CMAKE_BINARY_DIR}/bin/ws_restore ${CMAKE_BINARY_DIR}/bin/ws_restore_notest"
+    TARGET ws_restore
+    POST_BUILD
+    COMMAND rm -f
+        ${CMAKE_BINARY_DIR}/bin/ws_restore_notest
+    COMMAND cp
+        ${CMAKE_BINARY_DIR}/bin/ws_restore
+        ${CMAKE_BINARY_DIR}/bin/ws_restore_notest
+    COMMENT "Copy ws_restore to ws_restore_notest"
 )
 
 add_executable(ws_prepare
