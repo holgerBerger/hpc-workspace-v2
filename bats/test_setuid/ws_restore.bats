@@ -43,6 +43,11 @@ setup() {
     export WS_ALLOCATE=$(which ws_allocate)
     export WS_RELEASE=$(which ws_release)
     export WS_RESTORE=$(which ws_restore)
+    # the real ws_restore only restores when a human confirms the are-you-a-human
+    # question on the terminal.  That is impossible inside bats (no TTY on stdin),
+    # so a no-TTY call silently skips the restore with exit code 0 - use the test
+    # binary, which skips the human check (same as the other restore tests).
+    export WS_RESTORE_NOTEST=$(which ws_restore_notest)
     export WS_FIND=$(which ws_find)
 
     ws_name=restore-dash-del-$RANDOM
@@ -60,15 +65,20 @@ setup() {
     [ -n "$wsid" ]
 
     # Delete data via restore
-    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RESTORE -F ws1 --delete-data $wsid
+    run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RESTORE_NOTEST -F ws1 --delete-data $wsid
     assert_success
+    assert_output --partial "deleting files as --delete-data was given"
 
-    # Data should be gone from deleted directory
-    assert_dir_not_exist "$(dirname "$wsdir")/.removed/$wsid/del_test.txt"
+    # Data should be gone from deleted directory.  The .removed directory is owned by
+    # dbuid with mode 0700, so the bats user cannot even look inside it; check as root,
+    # otherwise a simple "not visible to me" would make the test pass vacuously.
+    run sudo test -e "$(dirname "$wsdir")/.removed/$wsid/del_test.txt"
+    assert_failure
 
     # M6: the (now empty) workspace directory itself must be gone and with it the DB
     # entry - the old code silently orphaned the directory and removed the entry anyway
-    assert_dir_not_exist "$(dirname "$wsdir")/.removed/$wsid"
+    run sudo test -e "$(dirname "$wsdir")/.removed/$wsid"
+    assert_failure
     run sudo -u mean-user-name --preserve-env=ASAN_OPTIONS $WS_RESTORE -F ws1 -l
     refute_output --partial "$wsid"
 
