@@ -160,6 +160,8 @@ target_link_libraries(ws_restore
 add_custom_command(
  TARGET ws_restore
  POST_BUILD
+ COMMAND rm ${CMAKE_BINARY_DIR}/bin/ws_restore_notest
+ COMMENT "rm ${CMAKE_BINARY_DIR}/bin/ws_restore_notest"
  COMMAND cp ${CMAKE_BINARY_DIR}/bin/ws_restore ${CMAKE_BINARY_DIR}/bin/ws_restore_notest
  COMMENT "cp ${CMAKE_BINARY_DIR}/bin/ws_restore ${CMAKE_BINARY_DIR}/bin/ws_restore_notest"
 )
