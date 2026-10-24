@@ -521,8 +521,15 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
                 // user::getGrouplist() only returns the process' supplementary groups, which
                 // do not contain the user's primary group in many environments (e.g. when the
                 // session was started via docker USER or before a group membership was added)
-                if (wsgroup.empty() || !canFind(user::getUserGroupList(username), wsgroup) ||
-                    access(wsdir.c_str(), R_OK | W_OK | X_OK) != 0) {
+                const auto callergroups = user::getUserGroupList(username);
+                const bool inwsgroup = !wsgroup.empty() && canFind(callergroups, wsgroup);
+                const bool dir_access = access(wsdir.c_str(), R_OK | W_OK | X_OK) == 0;
+                if (debugflag) {
+                    spdlog::debug("delegate check by <{}>: workspace group=<{}>, caller groups={}, "
+                                  "group member={}, access to <{}>={}",
+                                  username, wsgroup, callergroups, inwsgroup, wsdir, dir_access);
+                }
+                if (!inwsgroup || !dir_access) {
                     spdlog::info("         and you have no permissions to access the workspace, workspace will "
                                  "not be extended.");
                     exit(-1); // FIXME: bad for testing
