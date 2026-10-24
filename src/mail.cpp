@@ -75,12 +75,17 @@ bool sendCurl(const std::string& smtpUrl, const std::string& mail_from, std::vec
 }
 
 std::string generateMailDateFormat(const time_t time) {
-    char timeString[std::size("Mon, 29 Nov 2010 21:54:29 +1100")];
-    struct tm tm_buf;
-    localtime_r(&time, &tm_buf);
-    std::strftime(std::data(timeString), std::size(timeString), "%a, %d %h %Y %X %z", &tm_buf);
-    std::string s(timeString);
-    return s;
+    // generous buffer: far-future years and localized names must not make strftime run out of space
+    char timeString[128];
+    struct tm tm_buf = {};
+    // both calls can fail (EOVERFLOW for extreme timestamps / result does not fit); never read the
+    // buffer then, and never invent a date, as callers print this in subject and body of mails
+    if (localtime_r(&time, &tm_buf) == nullptr ||
+        std::strftime(timeString, sizeof(timeString), "%a, %d %h %Y %X %z", &tm_buf) == 0) {
+        spdlog::warn("could not format timestamp {} as mail date", time);
+        return "(date out of range)";
+    }
+    return std::string(timeString);
 }
 
 std::string generateMessageID(const std::string& domain) {

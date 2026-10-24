@@ -1,6 +1,7 @@
 #include <filesystem>
 #define CATCH_CONFIG_MAIN // This tells Catch to provide a main() - only do this in one cpp file
 #include <catch2/catch_test_macros.hpp>
+#include <climits>
 #include <string>
 #include <vector>
 
@@ -256,4 +257,66 @@ TEST_CASE("utils::timestampFromId", "[utils]") {
     SECTION("digits beyond time_t range return nullopt instead of throwing") {
         REQUIRE_FALSE(utils::timestampFromId("alice-99999999999999999999999").has_value());
     }
+}
+
+TEST_CASE("mail::generateMailDateFormat", "[mail]") {
+    // the tests pin the zone via TZ; restore whatever the process had afterwards
+    const char* old_tz = getenv("TZ");
+    const std::string saved_tz = old_tz ? old_tz : "";
+    const bool had_tz = old_tz != nullptr;
+
+    auto set_tz = [](const char* tz) {
+        setenv("TZ", tz, 1);
+        tzset();
+    };
+
+    SECTION("fixed UTC timestamps format as RFC 2822 with English names") {
+        set_tz("UTC");
+        REQUIRE(mail::generateMailDateFormat(0) == "Thu, 01 Jan 1970 00:00:00 +0000");
+        REQUIRE(mail::generateMailDateFormat(1291038869) == "Mon, 29 Nov 2010 13:54:29 +0000");
+    }
+
+    SECTION("pre-1970 times work") {
+        set_tz("UTC");
+        REQUIRE(mail::generateMailDateFormat(-86400) == "Wed, 31 Dec 1969 00:00:00 +0000");
+        set_tz("America/New_York");
+        REQUIRE(mail::generateMailDateFormat(-86400) == "Tue, 30 Dec 1969 19:00:00 -0500");
+    }
+
+    SECTION("DST and half-hour offsets are taken from the local timezone") {
+        set_tz("America/New_York");
+        REQUIRE(mail::generateMailDateFormat(1609459200) == "Thu, 31 Dec 2020 19:00:00 -0500"); // EST
+        REQUIRE(mail::generateMailDateFormat(1593561600) == "Tue, 30 Jun 2020 20:00:00 -0400"); // EDT
+        set_tz("Asia/Kolkata");
+        REQUIRE(mail::generateMailDateFormat(1793500000) == "Sun, 01 Nov 2026 07:56:40 +0530");
+    }
+
+    // regression: the old buffer was sized for exactly 31 output chars (year 9999 still fits),
+    // longer output made strftime return 0 and string(timeString) read uninitialized stack
+    SECTION("4-digit year, the longest output the old buffer held") {
+        set_tz("UTC");
+        REQUIRE(mail::generateMailDateFormat(253402300799) == "Fri, 31 Dec 9999 23:59:59 +0000");
+    }
+
+    SECTION("5-digit year, 32 chars") {
+        set_tz("UTC");
+        REQUIRE(mail::generateMailDateFormat(300000000000) == "Tue, 15 Aug 11476 05:20:00 +0000");
+    }
+
+    SECTION("7-digit year, 34 chars") {
+        set_tz("UTC");
+        REQUIRE(mail::generateMailDateFormat(100000000000000) == "Sat, 07 Nov 3170843 09:46:40 +0000");
+    }
+
+    SECTION("timestamps outside localtime_r range yield a placeholder, not garbage or a fake date") {
+        set_tz("UTC");
+        REQUIRE(mail::generateMailDateFormat(LLONG_MAX) == "(date out of range)");
+        REQUIRE(mail::generateMailDateFormat(LLONG_MIN) == "(date out of range)");
+    }
+
+    if (had_tz)
+        setenv("TZ", saved_tz.c_str(), 1);
+    else
+        unsetenv("TZ");
+    tzset();
 }
