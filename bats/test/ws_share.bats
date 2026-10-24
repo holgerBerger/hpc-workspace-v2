@@ -477,6 +477,34 @@ setup() {
     ws_release --config bats/ws.conf ${ws_name}_rw_prompt
 }
 
+@test "ws_share sharegroup read-write prompt honors literal answer only" {
+    # SECREVIEW L19: prompt uses IFS= read -r, so backslashes and whitespace are not
+    # mangled; only an answer starting with y/Y confirms
+    run ws_allocate --config bats/ws.conf ${ws_name}_rw_answer
+    assert_success
+
+    local testgroup="nogroup"
+    getent group "$testgroup" >/dev/null || testgroup="nobody"
+
+    # plain "n" aborts
+    run bash -c "echo n | ws_share --config bats/ws.conf --readwrite sharegroup ${ws_name}_rw_answer $testgroup"
+    assert_failure
+    assert_output --partial "Aborted."
+
+    # "\\y" (backslash-escaped y) must NOT count as confirmation thanks to read -r
+    run bash -c "printf '\\\\y\n' | ws_share --config bats/ws.conf --readwrite sharegroup ${ws_name}_rw_answer $testgroup"
+    assert_failure
+    assert_output --partial "Aborted."
+
+    # plain "y" proceeds
+    run bash -c "echo y | ws_share --config bats/ws.conf --readwrite sharegroup ${ws_name}_rw_answer $testgroup"
+    assert_success
+    assert_output --partial "Granting"
+
+    # Cleanup
+    ws_release --config bats/ws.conf ${ws_name}_rw_answer
+}
+
 @test "ws_share help shows all options" {
     run ws_share --help
     assert_output --partial "readwrite"

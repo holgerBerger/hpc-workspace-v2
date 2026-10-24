@@ -263,7 +263,7 @@ case $ACTION in
               echo "  * allow immediate workspace deletion"
               echo "  * interfere with your quota (depending on system setup)"
 	      if [[ "$YES" != "YES" ]]; then
-		      read -p "Continue (y/N)? " answer
+		      IFS= read -r -p "Continue (y/N)? " answer
 			case "$answer" in
 			    [yY]*) ;;
 			    *) echo "Aborted."; exit 1 ;;
