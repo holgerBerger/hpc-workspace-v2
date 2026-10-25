@@ -1,12 +1,14 @@
 #include <filesystem>
 #define CATCH_CONFIG_MAIN // This tells Catch to provide a main() - only do this in one cpp file
 #include <catch2/catch_test_macros.hpp>
+#include <algorithm>
 #include <climits>
 #include <string>
 #include <vector>
 
 #include <unistd.h>
 
+#include "../src/caps.h"
 #include "../src/mail.h"
 #include "../src/utils.h"
 #include "../src/ws.h"
@@ -16,6 +18,9 @@ namespace fs = std::filesystem;
 bool debugflag = false;
 bool traceflag = false;
 int debuglevel = 0;
+
+// init caps here, when euid!=uid
+Cap caps{};
 
 TEST_CASE("utils", "[utils]") {
     SECTION("parceACL") {
@@ -319,4 +324,142 @@ TEST_CASE("mail::generateMailDateFormat", "[mail]") {
     else
         unsetenv("TZ");
     tzset();
+}
+
+TEST_CASE("utils::getFirstLine", "[utils]") {
+    SECTION("returns text before the first newline") { REQUIRE(utils::getFirstLine("a\nb\nc") == "a"); }
+    SECTION("no newline returns whole string") { REQUIRE(utils::getFirstLine("single") == "single"); }
+    SECTION("empty string") { REQUIRE(utils::getFirstLine("") == ""); }
+    SECTION("leading newline yields empty first line") { REQUIRE(utils::getFirstLine("\nrest") == ""); }
+    SECTION("trailing newline") { REQUIRE(utils::getFirstLine("a\n") == "a"); }
+}
+
+TEST_CASE("utils::splitString", "[utils]") {
+    SECTION("splits on delimiter") {
+        REQUIRE(utils::splitString("a,b,c", ',') == std::vector<std::string>{"a", "b", "c"});
+    }
+    SECTION("no delimiter is a single token") { REQUIRE(utils::splitString("abc", ',') == std::vector<std::string>{"abc"}); }
+    SECTION("empty string yields no tokens") { REQUIRE(utils::splitString("", ',').empty()); }
+    SECTION("consecutive delimiters yield empty tokens") {
+        REQUIRE(utils::splitString("a,,b", ',') == std::vector<std::string>{"a", "", "b"});
+    }
+    SECTION("trailing delimiter does not add an empty token") {
+        REQUIRE(utils::splitString("a,b,", ',') == std::vector<std::string>{"a", "b"});
+    }
+}
+
+TEST_CASE("utils::permstring", "[utils]") {
+    using fperms = std::filesystem::perms;
+    REQUIRE(utils::permstring(fperms::all) == "rwxrwxrwx");
+    REQUIRE(utils::permstring(fperms::none) == "---------");
+    REQUIRE(utils::permstring(fperms::owner_all) == "rwx------");
+    // 0644 -> rw-r--r--  ;  0755 -> rwxr-xr-x
+    REQUIRE(utils::permstring(static_cast<fperms>(0644)) == "rw-r--r--");
+    REQUIRE(utils::permstring(static_cast<fperms>(0755)) == "rwxr-xr-x");
+}
+
+TEST_CASE("utils::getFileContents", "[utils]") {
+    auto dir = fs::temp_directory_path() / ("_wsGFC-" + std::to_string(getpid()));
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+
+    SECTION("round-trips written content") {
+        utils::writeFile((dir / "f").string(), "hello world");
+        REQUIRE(utils::getFileContents((dir / "f").string()) == "hello world");
+    }
+
+    SECTION("empty file reads as empty string") {
+        utils::writeFile((dir / "empty").string(), "");
+        REQUIRE(utils::getFileContents((dir / "empty").string()) == "");
+    }
+
+    SECTION("missing file throws") { REQUIRE_THROWS_AS(utils::getFileContents((dir / "nothere").string()), std::exception); }
+
+    fs::remove_all(dir);
+}
+
+TEST_CASE("utils::dirEntries", "[utils]") {
+    auto dir = fs::temp_directory_path() / ("_wsDE-" + std::to_string(getpid()));
+    fs::remove_all(dir);
+    fs::create_directories(dir / "sub");
+    utils::writeFile((dir / "a.txt").string(), "x");
+    utils::writeFile((dir / "b.txt").string(), "x");
+    utils::writeFile((dir / "c.log").string(), "x");
+
+    SECTION("glob filters by pattern") {
+        auto txt = utils::dirEntries(dir.string(), "*.txt", false);
+        std::sort(txt.begin(), txt.end());
+        REQUIRE(txt == std::vector<std::string>{"a.txt", "b.txt"});
+    }
+
+    SECTION("dirs==false excludes directories") {
+        auto files = utils::dirEntries(dir.string(), "*", false);
+        std::sort(files.begin(), files.end());
+        REQUIRE(files == std::vector<std::string>{"a.txt", "b.txt", "c.log"});
+    }
+
+    SECTION("dirs==true includes directories") {
+        auto all = utils::dirEntries(dir.string(), "*", true);
+        std::sort(all.begin(), all.end());
+        REQUIRE(all == std::vector<std::string>{"a.txt", "b.txt", "c.log", "sub"});
+    }
+
+    SECTION("nonexistent directory returns empty") { REQUIRE(utils::dirEntries((dir / "gone").string(), "*", true).empty()); }
+
+    fs::remove_all(dir);
+}
+
+TEST_CASE("utils::getFileTimeAsLong", "[utils]") {
+    auto dir = fs::temp_directory_path() / ("_wsGFT-" + std::to_string(getpid()));
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    utils::writeFile((dir / "f").string(), "x");
+
+    SECTION("existing file has a positive timestamp") { REQUIRE(utils::getFileTimeAsLong(dir / "f") > 0); }
+
+    SECTION("missing file returns 0") { REQUIRE(utils::getFileTimeAsLong(dir / "nothere") == 0); }
+
+    fs::remove_all(dir);
+}
+
+TEST_CASE("utils::getDBYamlReader", "[utils]") {
+    // compile-time constant; the build selects one of the two readers
+    const std::string reader = utils::getDBYamlReader();
+    REQUIRE((reader == "yaml-cpp" || reader == "RapidYAML"));
+}
+
+TEST_CASE("utils::SrcPos", "[utils]") {
+    REQUIRE(utils::SrcPos("f.cpp", 42, "foo").getSrcPos() == "f.cpp:42[foo]");
+}
+
+TEST_CASE("utils::getOwner and getID", "[utils]") {
+    SECTION("single dash uses the simple split") {
+        REQUIRE(utils::getOwner("root-123") == "root");
+        REQUIRE(utils::getID("root-123") == "123");
+    }
+
+    SECTION("multi-dash resolves the owner against existing users") {
+        // "root" exists; "root-a" / "root-a-b" do not, so owner is "root" and id keeps the rest
+        REQUIRE(utils::getOwner("root-a-b") == "root");
+        REQUIRE(utils::getID("root-a-b") == "a-b");
+    }
+
+    SECTION("no dash yields empty owner") { REQUIRE(utils::getOwner("nodash").empty()); }
+}
+
+TEST_CASE("utils::HasGroupIntersection", "[utils]") {
+    SECTION("known user shares groups with itself") {
+        utils::HasGroupIntersection h("root");
+        REQUIRE(h.hasCommonGroups("root"));
+    }
+
+    SECTION("unknown user is assumed to intersect") {
+        utils::HasGroupIntersection h("root");
+        REQUIRE(h.hasCommonGroups("this_user_does_not_exist_9f3a"));
+    }
+
+    SECTION("result is cached (same answer on repeat)") {
+        utils::HasGroupIntersection h("root");
+        REQUIRE(h.hasCommonGroups("daemon") == h.hasCommonGroups("daemon"));
+    }
 }
