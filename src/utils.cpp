@@ -806,9 +806,12 @@ int mv(const char* source, const char* target) {
         return -1;
     }
     if (pid == 0) {
-        execl("/bin/mv", "mv", "--", source, target, nullptr);
-        // we only get here if execl fails, so log the error and exit
-        spdlog::error("execl mv failed, errno: {} ({})", errno, strerror(errno));
+        // mv may run as root on behalf of the caller (setuid build): give it a fixed environment
+        // instead of the caller's one
+        char* const envp[] = {const_cast<char*>("PATH=/usr/bin:/bin"), const_cast<char*>("LC_ALL=C"), nullptr};
+        execle("/bin/mv", "mv", "--", source, target, nullptr, envp);
+        // we only get here if execle fails, so log the error and exit
+        spdlog::error("execle mv failed, errno: {} ({})", errno, strerror(errno));
         _exit(127); // shell convention: command could not be executed
     }
     int status = 0;
