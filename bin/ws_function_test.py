@@ -51,13 +51,17 @@ def run_cmd(cmd_list, capture_output=True, interactive=False):
             shell=isinstance(cmd_list, str)
         )
 
-    return subprocess.run(
-        cmd_list,
-        text=True,
-        capture_output=capture_output,
-        shell=isinstance(cmd_list, str)
-    )
+    # Python 3.6 compatible equivalents for capture_output=True and text=True
+    stdout_val = subprocess.PIPE if capture_output else None
+    stderr_val = subprocess.PIPE if capture_output else None
 
+    return subprocess.run(
+        cmd,
+        universal_newlines=True,
+        stdout=stdout_val,
+        stderr=stderr_val,
+        shell=use_shell
+    )
 
 def merge_yaml(base: dict, extra: dict) -> dict:
     """Recursively merge `extra` into `base`; later values win for scalar keys."""
