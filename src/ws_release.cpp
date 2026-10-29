@@ -311,9 +311,12 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             auto src = dbentry->getWSPath();
 
             caps.raise_cap({CAP_FOWNER}, utils::SrcPos(__FILE__, __LINE__, __func__));
+            // the DB write above left the effective group at dbgid; delete the user's files with the
+            // caller's group as well, and restore the group for the DB steps afterwards
+            const gid_t savedegid = getegid();
             if (caps.isSetuid()) {
                 // get process owner to be allowed to delete files
-                if (seteuid(getuid())) {
+                if (setegid(getgid()) || seteuid(getuid())) {
                     spdlog::error("can not setuid, bad installation?");
                 }
             }
@@ -326,7 +329,7 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
 
             if (caps.isSetuid()) {
                 // get root so we can drop again
-                if (seteuid(0)) {
+                if (seteuid(0) || setegid(savedegid)) {
                     spdlog::error("can not setuid, bad installation?");
                 }
             }
