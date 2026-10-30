@@ -11,20 +11,40 @@ declare -F _ws_filesystem_list >/dev/null ||
     . "${BASH_SOURCE[0]%/*}/../helpers/hpc-workspace.bash" || return
 
 function _complete_ws_find() {
-    local file_system=""
+    local i
     _ws_complete_filesystem && return
+    case "${COMP_WORDS[$COMP_CWORD - 1]}" in
+        -n|--name)
+            COMPREPLY=($(compgen -W "$(_ws_workspace_list "$(_ws_option_filesystem)")" -- "${COMP_WORDS[$COMP_CWORD]}"))
+            return
+            ;;
+        -u|--username|--config)
+            return
+            ;;
+    esac
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
-            [[ "$COMP_CWORD" != "1" ]] && return
             COMPREPLY=($(compgen -W "-F --filesystem -g -h -u --help --version" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
         *)
-            if [[ "${COMP_WORDS[1]}" == "-F" || "${COMP_WORDS[1]}" == "--filesystem" ]] ; then
-                file_system="${COMP_WORDS[2]}"
-            fi
-            [[ ! ("$COMP_CWORD" == "1" || ("$file_system" != "" && "$COMP_CWORD" == "3")) ]] && return
-            local ws_names=$(_ws_workspace_list "$file_system")
-            COMPREPLY=($(compgen -W "$ws_names" -- "${COMP_WORDS[$COMP_CWORD]}"))
+            # ws_find takes exactly one workspace name, as argument or with -n; options can appear anywhere,
+            # -F, -u, -n and --config take a value
+            for (( i = 1; i < COMP_CWORD; i++ )); do
+                case "${COMP_WORDS[i]}" in
+                    -n|--name|-n?*)
+                        return
+                        ;;
+                    -F|--filesystem|-u|--username|--config)
+                        (( i++ ))
+                        ;;
+                    -*)
+                        ;;
+                    *)
+                        return
+                        ;;
+                esac
+            done
+            COMPREPLY=($(compgen -W "$(_ws_workspace_list "$(_ws_option_filesystem)")" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
     esac
 }
