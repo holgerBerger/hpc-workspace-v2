@@ -14,7 +14,7 @@ function _complete_ws_release() {
     _ws_complete_filesystem && return
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
-            COMPREPLY=($(compgen -W "-F --filesystem -h --help -n --name -u --username -V --version --config --delete-data" -- "${COMP_WORDS[$COMP_CWORD]}"))
+            COMPREPLY=($(compgen -W "-F --filesystem -h --help -n --name -u --username -V --version --delete-data" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
         *)
             COMPREPLY=($(compgen -W "$(_ws_workspace_list "$(_ws_option_filesystem)")" -- "${COMP_WORDS[$COMP_CWORD]}"))

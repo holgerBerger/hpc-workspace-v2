@@ -32,7 +32,7 @@ function _complete_ws_allocate() {
     esac
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
-            COMPREPLY=($(compgen -W "-h --help -V --version -d --duration -n --name -F --filesystem -r --reminder -m --mailaddress -x --extension -u --username -g --groupreadable -G --groupwritable -c --comment --config" -- "${COMP_WORDS[$COMP_CWORD]}"))
+            COMPREPLY=($(compgen -W "-h --help -V --version -d --duration -n --name -F --filesystem -r --reminder -m --mailaddress -x --extension -u --username -g --groupreadable -G --groupwritable -c --comment" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
         *)
             [[ -n "$extension" ]] || return

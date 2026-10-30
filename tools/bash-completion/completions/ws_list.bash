@@ -19,7 +19,7 @@ function _complete_ws_list() {
         -p|--pattern|-n|--threads|--config)
             ;;
         *)
-            COMPREPLY=($(compgen -W "-h --help -V --version -F --filesystem -g --group -l --listfilesystems -L --listfilesystemdetails -s --short -u --username -e --expired -N --name -C --creation -R --remaining -r --reverted -t --terse -T --table --config -p --pattern -P --permissions -v --verbose -n --threads" -- "${COMP_WORDS[$COMP_CWORD]}"))
+            COMPREPLY=($(compgen -W "-h --help -V --version -F --filesystem -g --group -l --listfilesystems -L --listfilesystemdetails -s --short -u --username -e --expired -N --name -C --creation -R --remaining -r --reverted -t --terse -T --table -p --pattern -P --permissions -v --verbose -n --threads" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
     esac
 }

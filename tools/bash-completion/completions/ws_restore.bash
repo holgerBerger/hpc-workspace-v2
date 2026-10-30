@@ -16,7 +16,7 @@ function _complete_ws_restore() {
     _ws_complete_filesystem && return
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
-            COMPREPLY=($(compgen -W "-b --brief --delete-data -F --filesystem -h --help -l --list -n --name -t --target -u --username -V --version --config" -- "${COMP_WORDS[$COMP_CWORD]}"))
+            COMPREPLY=($(compgen -W "-b --brief --delete-data -F --filesystem -h --help -l --list -n --name -t --target -u --username -V --version" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
         *)
             prev="${COMP_WORDS[$COMP_CWORD - 1]}"

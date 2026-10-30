@@ -16,7 +16,7 @@ function _complete_ws_share() {
     _ws_complete_filesystem && return
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
-            COMPREPLY=($(compgen -W "-F --filesystem -h --help --readwrite --config --version" -- "${COMP_WORDS[$COMP_CWORD]}"))
+            COMPREPLY=($(compgen -W "-F --filesystem -h --help --readwrite --version" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
         *)
             # positional arguments before the current word: action, workspace name, users or groups.
