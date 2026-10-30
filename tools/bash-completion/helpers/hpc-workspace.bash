@@ -5,7 +5,7 @@
 # the bash-completion helpers directory, which the loader never searches, so
 # it cannot be mistaken for the completion of a command.
 #
-# Copyright(c) 2020-2021 Christoph Niethammer
+# Copyright(c) 2020-2021, 2026 Christoph Niethammer
 # Copyright(c) 2026 Holger Berger
 #
 # bash completion for hpc-workspace is free software: you can redistribute it

@@ -1,7 +1,7 @@
 #
 # bash completion for ws_extend (hpc-workspace)
 #
-# Copyright(c) 2020-2021 Christoph Niethammer
+# Copyright(c) 2020-2021, 2026 Christoph Niethammer
 # Copyright(c) 2026 Holger Berger
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
