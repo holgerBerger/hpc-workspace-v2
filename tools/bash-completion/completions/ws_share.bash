@@ -38,7 +38,7 @@ function _complete_ws_share() {
                 COMPREPLY=($(compgen -W "share unshare unshare-all unsharegroup sharegroup list" -- "${COMP_WORDS[$COMP_CWORD]}"))
             else
                 action="${args[0]}"
-                ws_name="${args[1]}"
+                ws_name="${args[1]-}"
                 file_system="$(_ws_option_filesystem)"
                 case $action in
                     share)
