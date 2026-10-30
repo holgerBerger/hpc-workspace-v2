@@ -17,16 +17,6 @@ project(workspace
 
 include(GNUInstallDirs)
 
-if(NOT DEFINED CMAKE_INSTALL_MAN1DIR)
-    set(CMAKE_INSTALL_MAN1DIR "${CMAKE_INSTALL_MANDIR}/man1")
-endif()
-if(NOT DEFINED CMAKE_INSTALL_MAN7DIR)
-    set(CMAKE_INSTALL_MAN8DIR "${CMAKE_INSTALL_MANDIR}/man7")
-endif()
-if(NOT DEFINED CMAKE_INSTALL_MAN8DIR)
-    set(CMAKE_INSTALL_MAN8DIR "${CMAKE_INSTALL_MANDIR}/man8")
-endif()
-
 # Set version macro
 add_compile_definitions(WS_VERSION="${workspace_VERSION}")
 add_compile_options(-Wno-deprecated-declarations)
@@ -205,9 +195,9 @@ add_custom_target(
 )
 
 # Install manpages
-install(DIRECTORY man/man1/ DESTINATION ${CMAKE_INSTALL_MAN1DIR} FILES_MATCHING PATTERN "*.1")
-install(DIRECTORY man/man7/ DESTINATION ${CMAKE_INSTALL_MAN8DIR} FILES_MATCHING PATTERN "*.7")
-install(DIRECTORY man/man8/ DESTINATION ${CMAKE_INSTALL_MAN8DIR} FILES_MATCHING PATTERN "*.8")
+install(DIRECTORY man/man1/ DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 FILES_MATCHING PATTERN "*.1")
+install(DIRECTORY man/man7/ DESTINATION ${CMAKE_INSTALL_MANDIR}/man7 FILES_MATCHING PATTERN "*.7")
+install(DIRECTORY man/man8/ DESTINATION ${CMAKE_INSTALL_MANDIR}/man8 FILES_MATCHING PATTERN "*.8")
 
 # Install shell scripts
 install(FILES
