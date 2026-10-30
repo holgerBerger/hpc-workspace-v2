@@ -11,11 +11,8 @@ declare -F _ws_filesystem_list >/dev/null ||
     . "${BASH_SOURCE[0]%/*}/../helpers/hpc-workspace.bash" || return
 
 function _complete_ws_list() {
+    _ws_complete_filesystem && return
     case "${COMP_WORDS[$COMP_CWORD - 1]}" in
-        -F|--filesystem)
-            local file_systems="$(_ws_filesystem_list)"
-            COMPREPLY=($(compgen -W "$file_systems" -- "${COMP_WORDS[$COMP_CWORD]}"))
-            ;;
         -u)
             COMPREPLY=($(compgen -A user -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;

@@ -39,6 +39,46 @@ function _ws_workspace_list() {
 }
 
 function _ws_restore_list() {
-    local restore_targets="$(ws_restore -l -b 2>/dev/null | grep -E -v ":$")"
+    local file_system="$1"
+    local restore_targets
+    if [ "$file_system" != "" ] ; then
+        restore_targets="$(ws_restore -F "$file_system" -l -b 2>/dev/null | grep -E -v ":$")"
+    else
+        restore_targets="$(ws_restore -l -b 2>/dev/null | grep -E -v ":$")"
+    fi
     printf "%s" "$restore_targets"
+}
+
+# Complete filesystem names if the current word is the value of -F/--filesystem, return 1 if it is not.
+# Handles "-F fs", "-Ffs" and "--filesystem fs".
+function _ws_complete_filesystem() {
+    local cur="${COMP_WORDS[COMP_CWORD]}" prev="${COMP_WORDS[COMP_CWORD - 1]}" prefix=""
+    if [[ "$prev" == "-F" || "$prev" == "--filesystem" ]] ; then
+        :
+    elif [[ "$cur" == -F?* ]] ; then
+        prefix="-F"
+        cur="${cur#-F}"
+    else
+        return 1
+    fi
+    COMPREPLY=($(compgen -P "$prefix" -W "$(_ws_filesystem_list)" -- "$cur"))
+}
+
+# Print the filesystem given with -F/--filesystem on the command line before the current word.
+# Handles "-F fs", "-Ffs" and "--filesystem fs".
+function _ws_option_filesystem() {
+    local i word file_system=""
+    for (( i = 1; i < COMP_CWORD; i++ )); do
+        word="${COMP_WORDS[i]}"
+        case "$word" in
+            -F|--filesystem)
+                (( i + 1 < COMP_CWORD )) && file_system="${COMP_WORDS[i + 1]}"
+                (( i++ ))
+                ;;
+            -F?*)
+                file_system="${word#-F}"
+                ;;
+        esac
+    done
+    printf "%s" "$file_system"
 }

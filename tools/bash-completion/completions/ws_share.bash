@@ -11,18 +11,15 @@ declare -F _ws_filesystem_list >/dev/null ||
     . "${BASH_SOURCE[0]%/*}/../helpers/hpc-workspace.bash" || return
 
 function _complete_ws_share() {
-    local prev action file_system="" ws_name filesysopt
+    local action file_system="" ws_name filesysopt
+    _ws_complete_filesystem && return
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
             COMPREPLY=($(compgen -W "-F --filesystem -h --help" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
         *)
-            prev="${COMP_WORDS[$COMP_CWORD - 1]}"
             if [[ "$COMP_CWORD" == "1" ]] ; then
                 COMPREPLY=($(compgen -W "share unshare unshare-all unsharegroup sharegroup list" -- "${COMP_WORDS[$COMP_CWORD]}"))
-            elif [[ "$prev" == "-F" || "$prev" == "--filesystem" ]] ; then
-                local file_systems="$(_ws_filesystem_list)"
-                COMPREPLY=($(compgen -W "$file_systems" -- "${COMP_WORDS[$COMP_CWORD]}"))
             else
                 action="${COMP_WORDS[1]}"
                 declare -i argpos=$((COMP_CWORD - 1))

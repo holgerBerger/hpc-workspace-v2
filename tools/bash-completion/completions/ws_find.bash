@@ -12,6 +12,7 @@ declare -F _ws_filesystem_list >/dev/null ||
 
 function _complete_ws_find() {
     local file_system=""
+    _ws_complete_filesystem && return
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
             [[ "$COMP_CWORD" != "1" ]] && return
@@ -21,17 +22,9 @@ function _complete_ws_find() {
             if [[ "${COMP_WORDS[1]}" == "-F" || "${COMP_WORDS[1]}" == "--filesystem" ]] ; then
                 file_system="${COMP_WORDS[2]}"
             fi
-            case "${COMP_WORDS[$COMP_CWORD - 1]}" in
-                -F|--filesystem)
-                    local file_systems="$(_ws_filesystem_list)"
-                    COMPREPLY=($(compgen -W "$file_systems" -- "${COMP_WORDS[$COMP_CWORD]}"))
-                    ;;
-                *)
-                    [[ ! ("$COMP_CWORD" == "1" || ("$file_system" != "" && "$COMP_CWORD" == "3")) ]] && return
-                    local ws_names=$(_ws_workspace_list "$file_system")
-                    COMPREPLY=($(compgen -W "$ws_names" -- "${COMP_WORDS[$COMP_CWORD]}"))
-                    ;;
-            esac
+            [[ ! ("$COMP_CWORD" == "1" || ("$file_system" != "" && "$COMP_CWORD" == "3")) ]] && return
+            local ws_names=$(_ws_workspace_list "$file_system")
+            COMPREPLY=($(compgen -W "$ws_names" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
     esac
 }

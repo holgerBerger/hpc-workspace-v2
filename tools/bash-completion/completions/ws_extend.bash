@@ -7,7 +7,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+declare -F _ws_filesystem_list >/dev/null ||
+    . "${BASH_SOURCE[0]%/*}/../helpers/hpc-workspace.bash" || return
+
 function _complete_ws_extend() {
-    COMPREPLY=($(compgen -W "$(ws_list -s)" -- "${COMP_WORDS[$COMP_CWORD]}"))
+    _ws_complete_filesystem && return
+    COMPREPLY=($(compgen -W "$(_ws_workspace_list "$(_ws_option_filesystem)")" -- "${COMP_WORDS[$COMP_CWORD]}"))
 }
 complete -F _complete_ws_extend ws_extend
