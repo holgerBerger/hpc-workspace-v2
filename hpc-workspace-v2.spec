@@ -73,6 +73,7 @@ A workspace is a directory created on behalf of a user, associated with an expir
 
 # Manual pages.
 %{_mandir}/man1/ws_*.1*
+%{_mandir}/man7/ws.7*
 %{_mandir}/man8/ws_*.8*
 
 
