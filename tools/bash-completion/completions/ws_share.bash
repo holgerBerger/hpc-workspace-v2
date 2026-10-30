@@ -48,7 +48,9 @@ function _complete_ws_share() {
                             *)
                                 ws_name="${COMP_WORDS[$((COMP_CWORD - argpos + 1))]}"
                                 filesysopt="${file_system:+-F $file_system}"
-                                COMPREPLY=($(compgen -W "$(ws_share list $filesysopt $ws_name 2>/dev/null)" -- "${COMP_WORDS[$COMP_CWORD]}"))
+                                # users the workspace is shared with, "ws_share list" prints lines "user|group <name> <access>"
+                                local shared_users="$(ws_share list $filesysopt $ws_name 2>/dev/null | awk '$1 == "user" { print $2 }')"
+                                COMPREPLY=($(compgen -W "$shared_users" -- "${COMP_WORDS[$COMP_CWORD]}"))
                                 ;;
                         esac
                         ;;
@@ -57,7 +59,7 @@ function _complete_ws_share() {
                             local ws_names=$(_ws_workspace_list "$file_system")
                             COMPREPLY=($(compgen -W "$ws_names" -- "${COMP_WORDS[$COMP_CWORD]}"))
                         else
-                            COMPREPLY=""
+                            COMPREPLY=()
                         fi
                         ;;
                     unsharegroup|sharegroup)
@@ -65,7 +67,7 @@ function _complete_ws_share() {
                             local ws_names=$(_ws_workspace_list "$file_system")
                             COMPREPLY=($(compgen -W "$ws_names" -- "${COMP_WORDS[$COMP_CWORD]}"))
                         else
-                            COMPREPLY=""
+                            COMPREPLY=()
                         fi
                         ;;
                 esac
