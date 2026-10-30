@@ -11,22 +11,35 @@ declare -F _ws_filesystem_list >/dev/null ||
     . "${BASH_SOURCE[0]%/*}/../helpers/hpc-workspace.bash" || return
 
 function _complete_ws_share() {
-    local action file_system="" ws_name filesysopt
+    local action file_system ws_name i
+    local -a args=() fs_opt=()
     _ws_complete_filesystem && return
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
             COMPREPLY=($(compgen -W "-F --filesystem -h --help --readwrite --config --version" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
         *)
-            if [[ "$COMP_CWORD" == "1" ]] ; then
+            # positional arguments before the current word: action, workspace name, users or groups.
+            # ws_share parses its options with getopt, so they can appear anywhere; -F and --config take a value.
+            for (( i = 1; i < COMP_CWORD; i++ )); do
+                case "${COMP_WORDS[i]}" in
+                    -F|--filesystem|--config)
+                        (( i++ ))
+                        ;;
+                    -*)
+                        ;;
+                    *)
+                        args+=("${COMP_WORDS[i]}")
+                        ;;
+                esac
+            done
+            declare -i argpos=${#args[@]}
+            if [[ $argpos -eq 0 ]] ; then
                 COMPREPLY=($(compgen -W "share unshare unshare-all unsharegroup sharegroup list" -- "${COMP_WORDS[$COMP_CWORD]}"))
             else
-                action="${COMP_WORDS[1]}"
-                declare -i argpos=$((COMP_CWORD - 1))
-                if [[ "${COMP_WORDS[2]}" == "-F" || "${COMP_WORDS[2]}" == "--filesystem" ]] ; then
-                    file_system="${COMP_WORDS[3]}"
-                    argpos=$((argpos - 2))
-                fi
+                action="${args[0]}"
+                ws_name="${args[1]}"
+                file_system="$(_ws_option_filesystem)"
                 case $action in
                     share)
                         case $argpos in
@@ -46,10 +59,9 @@ function _complete_ws_share() {
                                 COMPREPLY=($(compgen -W "$ws_names" -- "${COMP_WORDS[$COMP_CWORD]}"))
                                 ;;
                             *)
-                                ws_name="${COMP_WORDS[$((COMP_CWORD - argpos + 1))]}"
-                                filesysopt="${file_system:+-F $file_system}"
+                                [[ -n "$file_system" ]] && fs_opt=(-F "$file_system")
                                 # users the workspace is shared with, "ws_share list" prints lines "user|group <name> <access>"
-                                local shared_users="$(ws_share list $filesysopt $ws_name 2>/dev/null | awk '$1 == "user" { print $2 }')"
+                                local shared_users="$(ws_share list "${fs_opt[@]}" "$ws_name" 2>/dev/null | awk '$1 == "user" { print $2 }')"
                                 COMPREPLY=($(compgen -W "$shared_users" -- "${COMP_WORDS[$COMP_CWORD]}"))
                                 ;;
                         esac
