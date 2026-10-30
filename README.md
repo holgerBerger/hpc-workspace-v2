@@ -283,7 +283,7 @@ C++ language level requirement might evolve from c++17 to c++20 if there is reas
 ### Todo 
 
 - [ ] review what gets logged for security reasons, should not leak details of other workspaces anymore (v1.x version did)
-- [ ] bash completion testing
+- [x] bash completion testing
 
 ### Future Development
 
