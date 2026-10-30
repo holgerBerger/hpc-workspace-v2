@@ -75,6 +75,10 @@ A workspace is a directory created on behalf of a user, associated with an expir
 %{_mandir}/man1/ws_*.1*
 %{_mandir}/man8/ws_*.8*
 
+# Bash completion.
+%{_datadir}/bash-completion/completions/ws_*.bash
+%{_datadir}/bash-completion/helpers/hpc-workspace.bash
+
 
 %changelog
 * Thu Jun 18 2026 Maria Hampel <maria.hampel@mailbox.tu-dresden.de> - 2.0.0-1
