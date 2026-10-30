@@ -12,6 +12,11 @@ declare -F _ws_filesystem_list >/dev/null ||
 
 function _complete_ws_extend() {
     _ws_complete_filesystem && return
+    # the ws_extend wrapper accepts -F only as first argument
+    if [[ "$COMP_CWORD" == "1" && "${COMP_WORDS[1]}" == -* ]] ; then
+        COMPREPLY=($(compgen -W "-F" -- "${COMP_WORDS[1]}"))
+        return
+    fi
     COMPREPLY=($(compgen -W "$(_ws_workspace_list "$(_ws_option_filesystem)")" -- "${COMP_WORDS[$COMP_CWORD]}"))
 }
 complete -F _complete_ws_extend ws_extend

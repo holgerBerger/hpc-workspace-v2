@@ -13,11 +13,13 @@ declare -F _ws_filesystem_list >/dev/null ||
 function _complete_ws_list() {
     _ws_complete_filesystem && return
     case "${COMP_WORDS[$COMP_CWORD - 1]}" in
-        -u)
+        -u|--username)
             COMPREPLY=($(compgen -A user -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
+        -p|--pattern|-n|--threads|--config)
+            ;;
         *)
-            COMPREPLY=($(compgen -W "-a -C -F --filesystem -g -h -l -L -N -r -R -s -t -T -u -v -P --help --version" -- "${COMP_WORDS[$COMP_CWORD]}"))
+            COMPREPLY=($(compgen -W "-h --help -V --version -F --filesystem -g --group -l --listfilesystems -L --listfilesystemdetails -s --short -u --username -e --expired -N --name -C --creation -R --remaining -r --reverted -t --terse -T --table --config -p --pattern -P --permissions -v --verbose -n --threads" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
     esac
 }
