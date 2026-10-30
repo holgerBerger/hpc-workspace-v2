@@ -225,6 +225,7 @@ install(FILES
 # their prefix. Installing relative to the prefix gives the same result for prefix /usr (e.g. RPM),
 # and bash-completion finds the files of other prefixes via $PATH (>= 2.12) or $XDG_DATA_DIRS.
 install(FILES
+    ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_allocate.bash
     ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_extend.bash
     ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_find.bash
     ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_list.bash
