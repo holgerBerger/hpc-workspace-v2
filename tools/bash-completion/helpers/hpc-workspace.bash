@@ -29,6 +29,7 @@ function _ws_filesystem_list() {
 
 function _ws_workspace_list() {
     local file_system="$1"
+    local ws_names
     if [ "$file_system" != "" ] ; then
         ws_names="$(ws_list -F "$file_system" -s 2>/dev/null)"
     else

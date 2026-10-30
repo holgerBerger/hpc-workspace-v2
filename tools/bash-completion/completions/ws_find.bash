@@ -11,6 +11,7 @@ declare -F _ws_filesystem_list >/dev/null ||
     . "${BASH_SOURCE[0]%/*}/../helpers/hpc-workspace.bash" || return
 
 function _complete_ws_find() {
+    local file_system=""
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
             [[ "$COMP_CWORD" != "1" ]] && return

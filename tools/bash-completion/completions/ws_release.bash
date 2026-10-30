@@ -11,6 +11,7 @@ declare -F _ws_filesystem_list >/dev/null ||
     . "${BASH_SOURCE[0]%/*}/../helpers/hpc-workspace.bash" || return
 
 function _complete_ws_release() {
+    local prev
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
             COMPREPLY=($(compgen -W "-F --filesystem -n --name -u --username --delete-data --help --version" -- "${COMP_WORDS[$COMP_CWORD]}"))

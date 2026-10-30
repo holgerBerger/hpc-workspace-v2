@@ -11,6 +11,7 @@ declare -F _ws_filesystem_list >/dev/null ||
     . "${BASH_SOURCE[0]%/*}/../helpers/hpc-workspace.bash" || return
 
 function _complete_ws_share() {
+    local prev action file_system="" ws_name filesysopt
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
             COMPREPLY=($(compgen -W "-F --filesystem -h --help" -- "${COMP_WORDS[$COMP_CWORD]}"))

@@ -11,6 +11,7 @@ declare -F _ws_filesystem_list >/dev/null ||
     . "${BASH_SOURCE[0]%/*}/../helpers/hpc-workspace.bash" || return
 
 function _complete_ws_restore() {
+    local prev
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
             COMPREPLY=($(compgen -W "--brief --delete-data --filesystem --help --list --name --target --username --version" -- "${COMP_WORDS[$COMP_CWORD]}"))
@@ -21,7 +22,7 @@ function _complete_ws_restore() {
             if [[ "$prev" == "-F" || "$prev" == "--filesystem" ]] ; then
                 local file_systems="$(_ws_filesystem_list)"
                 COMPREPLY=($(compgen -W "$file_systems" -- "${COMP_WORDS[$COMP_CWORD]}"))
-            elif [[ "$prev" == "--name" || "$prev" == "-n" || " $restore_targets " =~ " $prev " ]] ; then
+            elif [[ "$prev" == "--name" || "$prev" == "-n" || " $restore_targets " == *" $prev "* ]] ; then
                 COMPREPLY=($(compgen -W "$(ws_list -s)" -- "${COMP_WORDS[$COMP_CWORD]}"))
             else
                 COMPREPLY=($(compgen -W "$restore_targets" -- "${COMP_WORDS[$COMP_CWORD]}"))
