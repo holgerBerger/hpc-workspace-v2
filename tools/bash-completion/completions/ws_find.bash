@@ -24,7 +24,7 @@ function _complete_ws_find() {
     esac
     case "${COMP_WORDS[$COMP_CWORD]}" in
         -*)
-            COMPREPLY=($(compgen -W "-F --filesystem -g -h -u --help --version" -- "${COMP_WORDS[$COMP_CWORD]}"))
+            COMPREPLY=($(compgen -W "-F --filesystem -g --group -h --help -n --name -u --username -V --version --config" -- "${COMP_WORDS[$COMP_CWORD]}"))
             ;;
         *)
             # ws_find takes exactly one workspace name, as argument or with -n; options can appear anywhere,
