@@ -1058,6 +1058,9 @@ int main(int argc, char** argv) {
         exit(-2);
     }
 
+    // in SUID mode, lower_cap()/become_db() switch uid and gid as a pair to the DB identity
+    caps.setDbIdentity(config.dbuid(), config.dbgid());
+
     spdlog::info("deldirtimeout = {} seconds", config.deldirtimeout());
 
     // now we can add file logging

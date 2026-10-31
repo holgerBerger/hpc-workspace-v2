@@ -311,12 +311,8 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             auto src = dbentry->getWSPath();
 
             caps.raise_cap({CAP_FOWNER}, utils::SrcPos(__FILE__, __LINE__, __func__));
-            if (caps.isSetuid()) {
-                // get process owner to be allowed to delete files
-                if (seteuid(getuid())) {
-                    spdlog::error("can not setuid, bad installation?");
-                }
-            }
+            // get process owner to be allowed to delete files (with his own groups)
+            caps.become_caller(utils::SrcPos(__FILE__, __LINE__, __func__));
 
             // remove the directory
             if (debugflag) {
@@ -324,22 +320,13 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
             }
             utils::rmtree_below(src); // #66
 
-            if (caps.isSetuid()) {
-                // get root so we can drop again
-                if (seteuid(0)) {
-                    spdlog::error("can not setuid, bad installation?");
-                }
-            }
+            // lower the caps back to the DB identity (set_identity anchors at root itself)
             caps.lower_cap({CAP_FOWNER}, dbentry->getConfig()->dbuid(), utils::SrcPos(__FILE__, __LINE__, __func__));
 
             caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
             // to be allowed to delete the toplevel, we need to be DB user
-            if (caps.isSetuid()) {
-                if (seteuid(dbentry->getConfig()->dbuid())) {
-                    spdlog::error("can not setuid to DB user, bad installation?");
-                }
-            }
+            caps.become_db(utils::SrcPos(__FILE__, __LINE__, __func__));
             // delete toplevel, not recursively, as we are not allowed to delete/look inside
             try {
                 cppfs::remove(src);
@@ -347,12 +334,7 @@ bool release(const Config& config, const po::variables_map& opt, string filesyst
                 spdlog::error("remove {} -> {}", src, e.what());
             }
 
-            if (caps.isSetuid()) {
-                // get root so we can drop again
-                if (seteuid(0)) {
-                    spdlog::error("can not setuid, bad installation?");
-                }
-            }
+            // back to the DB identity (set_identity anchors at root itself)
             caps.lower_cap({CAP_DAC_OVERRIDE}, dbentry->getConfig()->dbuid(),
                            utils::SrcPos(__FILE__, __LINE__, __func__));
 
@@ -469,6 +451,9 @@ int main(int argc, char** argv) {
         spdlog::error("No valid config file found!");
         exit(-2);
     }
+
+    // in SUID mode, lower_cap()/become_db() switch uid and gid as a pair to the DB identity
+    caps.setDbIdentity(config.dbuid(), config.dbgid());
 
     // check if user is in debugusers list
     if (!config.isDebugUser(user::getUsername())) {

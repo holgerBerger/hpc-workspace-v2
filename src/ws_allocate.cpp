@@ -752,6 +752,9 @@ int main(int argc, char** argv) {
         exit(-2);
     }
 
+    // in SUID mode, lower_cap()/become_db() switch uid and gid as a pair to the DB identity
+    caps.setDbIdentity(config.dbuid(), config.dbgid());
+
     // now we have config, fix values
     if (duration == -1) {
         duration = min(config.durationdefault(), config.maxduration());

@@ -693,14 +693,8 @@ static bool nameTaken(const cppfs::path& p) {
 static void renameDBFile(const Config* config, const cppfs::path& from, const cppfs::path& to) {
     caps.raise_cap({CAP_FOWNER, CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-    if (caps.isSetuid()) {
-        // for filesystems with root_squash, we need to be DB user here
-        if (setegid(config->dbgid()) || seteuid(config->dbuid())) {
-            caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, config->dbuid(),
-                           utils::SrcPos(__FILE__, __LINE__, __func__));
-            throw DatabaseException("can not seteuid or setgid. Bad installation?");
-        }
-    }
+    // for filesystems with root_squash, we need to be DB user here (uid and gid as a pair)
+    caps.become_db(utils::SrcPos(__FILE__, __LINE__, __func__));
 
     if (debugflag)
         spdlog::debug("rename({}, {})", from.string(), to.string());
@@ -856,14 +850,8 @@ void DBEntryV1::release(time_t& timestamp_time) {
 
     caps.raise_cap({CAP_FOWNER, CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-    if (caps.isSetuid()) {
-        // for filesystem with root_squash, we need to be DB user here
-        if (setegid(parent_db->getconfig()->dbgid()) || seteuid(parent_db->getconfig()->dbuid())) {
-            caps.lower_cap({CAP_DAC_OVERRIDE, CAP_FOWNER}, parent_db->getconfig()->dbuid(),
-                           utils::SrcPos(__FILE__, __LINE__, __func__));
-            throw DatabaseException("can not seteuid or setgid. Bad installation?");
-        }
-    }
+    // for filesystem with root_squash, we need to be DB user here (uid and gid as a pair)
+    caps.become_db(utils::SrcPos(__FILE__, __LINE__, __func__));
 
     // check if target exists, as std::filesystem::rename does delete target if it exists
     // in case of collision, delay and wait for 1s resolution (but increment to avoid glitches)
@@ -973,12 +961,8 @@ std::string DBEntryV1::expire(const std::string timestamp) {
 void DBEntryV1::remove() {
     caps.raise_cap({CAP_DAC_OVERRIDE}, utils::SrcPos(__FILE__, __LINE__, __func__));
 
-    if (caps.isSetuid()) {
-        // for filesystem with root_squash, we need to be DB user here
-        if (setegid(getConfig()->dbgid()) || seteuid(getConfig()->dbuid())) {
-            spdlog::error("can not setuid, bad installation?");
-        }
-    }
+    // for filesystem with root_squash, we need to be DB user here (uid and gid as a pair)
+    caps.become_db(utils::SrcPos(__FILE__, __LINE__, __func__));
 
     if (debugflag)
         spdlog::debug("deleting db entry file {}", dbfilepath);
@@ -1078,19 +1062,9 @@ void DBEntryV1::writeEntry(const bool calledasroot) {
     dbuid = parent_db->getconfig()->dbuid();
     dbgid = parent_db->getconfig()->dbgid();
 
-    if (user::isSetuid()) {
-        // for filesystem with root_squash, we need to be DB user here
-        if (debugflag)
-            spdlog::debug("isSetuid -> dbuid={}, dbgid={}", dbuid, dbgid);
-
-        if (setegid(dbgid) || seteuid(dbuid)) {
-            spdlog::error("can not seteuid or setgid. Bad installation?");
-            signal(SIGINT, old_sigint); // exit() does not unwind, so the guard does not run
-            exit(-1);
-        }
-
-        if (debugflag)
-            spdlog::debug("isSetuid -> euid={}, egid={}", geteuid(), getegid());
+    if (!calledasroot) {
+        // for filesystem with root_squash, we need to be DB user here (uid and gid as a pair)
+        caps.become_db(utils::SrcPos(__FILE__, __LINE__, __func__));
     }
 
     // write entry to DB file, overwrite existing contents <<<< this is the critical write operation

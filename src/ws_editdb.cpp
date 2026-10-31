@@ -200,6 +200,9 @@ int main(int argc, char** argv) {
         exit(-2);
     }
 
+    // in SUID mode, lower_cap()/become_db() switch uid and gid as a pair to the DB identity
+    caps.setDbIdentity(config.dbuid(), config.dbgid());
+
     // check if user is in debugusers list, disable debug/trace mode if not
     if (!config.isDebugUser(user::getUsername())) {
         if (debugflag || traceflag) {

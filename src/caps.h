@@ -33,6 +33,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <vector>
+
 #include "utils.h"
 
 #ifdef WS_CAPA
@@ -47,10 +49,33 @@ const int CAP_SYS_ADMIN = 4;
 #endif
 
 class Cap {
+  public:
+    // which supplementary groups to set when changing identity (SUID mode)
+    enum class GroupsMode {
+        Keep,    // leave current groups untouched
+        Clear,   // no supplementary groups (used for DB identity on root_squash filesystems)
+        Restore, // restore the groups of the calling user
+    };
+
   private:
     bool hascaps;
     bool issetuid;
     bool isusermode;
+
+    // identity of the calling user, captured before any change is made (constructor)
+    uid_t user_uid;
+    gid_t user_gid;
+    std::vector<gid_t> user_groups;
+
+    // identity of the DB user, set once after the config is parsed via setDbIdentity()
+    uid_t db_uid = 0;
+    gid_t db_gid = 0;
+    bool db_identity_set = false;
+
+    // change euid and egid together; gid and group changes are only done while the
+    // process is root (seteuid(0) always works in SUID mode: the saved uid stays 0
+    // for the whole run by design, which is what makes raise_cap possible)
+    void set_identity(uid_t euid, gid_t egid, GroupsMode groups, utils::SrcPos srcpos);
 
   public:
     Cap();
@@ -59,6 +84,15 @@ class Cap {
     void drop_caps(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos srcpos);
     void lower_cap(std::vector<cap_value_t> cap_arg, uid_t dbuid, utils::SrcPos);
     void raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos);
+
+    // tell the Cap object which uid/gid own the database (call once after parsing the
+    // config); lower_cap()/become_db() use this to switch uid and gid as a pair
+    void setDbIdentity(uid_t dbuid, gid_t dbgid);
+
+    // explicit paired identity transitions (no-ops outside SUID mode)
+    void become_root(utils::SrcPos srcpos);
+    void become_db(utils::SrcPos srcpos);
+    void become_caller(utils::SrcPos srcpos);
 
     bool isSetuid() { return issetuid; };
     bool hasCaps() { return hascaps; };

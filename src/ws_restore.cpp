@@ -344,12 +344,8 @@ void restore(const string name, const string target, const string username, cons
             }
         }
 
-        if (caps.isSetuid()) {
-            // get db user to be able to unlink db entry from root_squash filesystems
-            if (setegid(config.dbgid()) || seteuid(config.dbuid())) {
-                spdlog::error("can not seteuid or setgid. Bad installation?");
-            }
-        }
+        // get db user to be able to unlink db entry from root_squash filesystems
+        caps.become_db(utils::SrcPos(__FILE__, __LINE__, __func__));
 
         if (!data_gone) {
             spdlog::error("data of workspace {} could not be completely deleted, database entry kept!", name);
@@ -371,12 +367,7 @@ void restore(const string name, const string target, const string username, cons
             exit(1);
         }
 
-        if (caps.isSetuid()) {
-            // get root so we can drop again
-            if (seteuid(0)) {
-                spdlog::error("can not setuid, bad installation?");
-            }
-        }
+        // lower the caps and return to the DB identity (set_identity anchors at root itself)
         caps.lower_cap({CAP_DAC_OVERRIDE}, source_entry->getConfig()->dbuid(),
                        utils::SrcPos(__FILE__, __LINE__, __func__));
     } else { // don't delete data
@@ -440,13 +431,8 @@ void restore(const string name, const string target, const string username, cons
                 spdlog::error("renameat failed: {}", strerror(errno));
             }
 
-            if (caps.isSetuid()) {
-                // get db user to be able to unlink db entry from root_squash filesystems
-                if (setegid(config.dbgid()) || seteuid(config.dbuid())) {
-                    spdlog::error("can not seteuid or setgid. Bad installation?");
-                    exit(-1);
-                }
-            }
+            // get db user to be able to unlink db entry from root_squash filesystems
+            caps.become_db(utils::SrcPos(__FILE__, __LINE__, __func__));
 
             if (ret == 0) {
                 // carry over group workspace flag from source entry
@@ -489,13 +475,8 @@ void restore(const string name, const string target, const string username, cons
             }
 
             // FIXME: move this to deleteEntry?
-            if (caps.isSetuid()) {
-                // get db user to be able to unlink db entry from root_squash filesystems
-                if (setegid(config.dbgid()) || seteuid(config.dbuid())) {
-                    spdlog::error("can not seteuid or setgid. Bad installation?");
-                    exit(-1);
-                }
-            }
+            // get db user to be able to unlink db entry from root_squash filesystems
+            caps.become_db(utils::SrcPos(__FILE__, __LINE__, __func__));
 
             if (ret == 0) {
                 // remove DB entry
@@ -519,13 +500,7 @@ void restore(const string name, const string target, const string username, cons
             }
         } // restorenosub
 
-        // get user again
-        if (caps.isSetuid()) {
-            if (seteuid(0) || setegid(0)) {
-                spdlog::error("can not seteuid or setgid. Bad installation?");
-                exit(-1);
-            }
-        }
+        // back to the DB identity (lower_cap anchors at root internally)
         caps.lower_cap({CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH}, config.dbuid(),
                        utils::SrcPos(__FILE__, __LINE__, __func__));
     }
@@ -572,6 +547,9 @@ int main(int argc, char** argv) {
         spdlog::error("No valid config file found!");
         exit(-2);
     }
+
+    // in SUID mode, lower_cap()/become_db() switch uid and gid as a pair to the DB identity
+    caps.setDbIdentity(config.dbuid(), config.dbgid());
 
     // check if user is in debugusers list
     if (!config.isDebugUser(user::getUsername())) {

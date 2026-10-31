@@ -806,6 +806,20 @@ int mv(const char* source, const char* target) {
         return -1;
     }
     if (pid == 0) {
+        // In SUID mode the saved uid is 0 for the whole run, and a child that execs a
+        // plain binary inherits it: /bin/mv could regain root via seteuid(0) and would
+        // also carry the caller's supplementary groups. Anchor at root (always allowed
+        // while the saved uid is 0), fully pin all three uids/gids to the current
+        // effective ones and drop supplementary groups before exec. In user mode and in
+        // capability mode seteuid(0) fails (saved uid is the caller) and there is
+        // nothing to pin, so the whole block is best-effort.
+        uid_t keep_euid = geteuid();
+        gid_t keep_egid = getegid();
+        if (seteuid(0) == 0) {
+            setgroups(0, nullptr);
+            setresgid(keep_egid, keep_egid, keep_egid);
+            setresuid(keep_euid, keep_euid, keep_euid);
+        }
         // mv may run as root on behalf of the caller (setuid build): give it a fixed environment
         // instead of the caller's one
         char* const envp[] = {const_cast<char*>("PATH=/usr/bin:/bin"), const_cast<char*>("LC_ALL=C"), nullptr};
