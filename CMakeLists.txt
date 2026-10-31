@@ -206,4 +206,26 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
+# Install bash completion files
+#
+# Unlike the bash-completion README (https://github.com/scop/bash-completion/blob/main/README.md),
+# we do not use the directories from find_package(bash-completion): they are absolute paths of the
+# bash-completion found on the build host (e.g. /usr/share/bash-completion/completions). Installs
+# into any other prefix (Spack, environment modules, /opt, ~/.local) would then write outside
+# their prefix. Installing relative to the prefix gives the same result for prefix /usr (e.g. RPM),
+# and bash-completion finds the files of other prefixes via $PATH (>= 2.12) or $XDG_DATA_DIRS.
+install(FILES
+    ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_allocate.bash
+    ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_extend.bash
+    ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_find.bash
+    ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_list.bash
+    ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_release.bash
+    ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_restore.bash
+    ${CMAKE_SOURCE_DIR}/tools/bash-completion/completions/ws_share.bash
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions)
+# shared helper functions, sourced by the completion files from ../helpers
+install(FILES
+    ${CMAKE_SOURCE_DIR}/tools/bash-completion/helpers/hpc-workspace.bash
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/helpers)
+
 message(STATUS "Project ${PROJECT_NAME} v${PROJECT_VERSION} configured successfully")
