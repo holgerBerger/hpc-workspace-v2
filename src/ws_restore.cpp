@@ -603,6 +603,9 @@ int main(int argc, char** argv) {
             userpattern = "*";
         }
     } else {
+        if (username != "" && username != user::getUsername()) {
+            spdlog::warn("choosing a user with -u is only allowed for root and admins, using own username");
+        }
         userpattern = user::getUsername();
     }
 
@@ -613,8 +616,12 @@ int main(int argc, char** argv) {
         auto grouplist = user::getGrouplist();
 
         // where to list from?
+        // NOTE: ACLs must be evaluated against the calling user, never against the
+        // attacker controlled -u value (an empty name matches no user_acl entry and
+        // would silently hide the caller's own filesystems) - same invariant as
+        // ws_send_ical.cpp, rights checks always use the real caller
         vector<string> fslist;
-        vector<string> validfs = config.validFilesystems(username, grouplist, ws::RESTORE);
+        vector<string> validfs = config.validFilesystems(user::getUsername(), grouplist, ws::RESTORE);
         if (filesystem != "") {
             if (canFind(validfs, filesystem)) {
                 fslist.push_back(filesystem);

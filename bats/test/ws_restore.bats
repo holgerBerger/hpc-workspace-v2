@@ -423,3 +423,11 @@ setup() {
 
     ws_release --config bats/ws.conf $target_name
 }
+
+@test "ws_restore -l ignores -u for non-admin" {
+    # a non-admin must not be able to borrow another user's filesystem ACLs via -u;
+    # the listing is computed from the real caller and -u is only acknowledged
+    run ws_restore --config bats/ws.conf -l -u definitely-not-this-user "*nonexistent-$RANDOM*"
+    assert_output --partial "choosing a user with -u is only allowed for root and admins"
+    assert_success
+}
