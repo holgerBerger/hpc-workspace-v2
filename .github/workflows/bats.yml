@@ -1,27 +1,57 @@
-name: "Bats CLI tests"
+name: "Tests"
 
 on:
   push:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-  # allow manual triggering of the workflow in the github UI
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  analyze:
-    name: CLI tests
+  unit-test:
+    name: Unit tests (${{ matrix.cmake_preset }})
     runs-on: 'ubuntu-24.04'
-    permissions:
-      # required for all workflows
-      security-events: write
 
-      # required to fetch internal or private CodeQL packs
-      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # only presets with BUILD_TESTS and a matching test preset
+        cmake_preset: ["debug"]
 
-      # only required for workflows in private repositories
-      actions: read
-      contents: read
+    steps:
+    - name: Install OS package dependencies to build hpc-workspace
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libboost-system-dev \
+          libboost-program-options-dev \
+          libcurl4-openssl-dev \
+          libcap-dev
+
+    - name: Checkout repository
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+
+    - name: Configure and build code
+      run: |
+        cmake --preset ${{ matrix.cmake_preset }}
+        cmake --build --preset ${{ matrix.cmake_preset }} -j
+
+    - name: Run unit tests
+      run: |
+        ctest --preset ${{ matrix.cmake_preset }} --output-on-failure
+
+  cli-test:
+    name: CLI tests (${{ matrix.cmake_preset }})
+    runs-on: 'ubuntu-24.04'
 
     strategy:
       fail-fast: false
@@ -29,46 +59,37 @@ jobs:
         cmake_preset: ["debug", "release"]
 
     steps:
-    - name: Install additional OS package dependencies to build hpc-workspace
+    - name: Install OS package dependencies to build and test hpc-workspace
       run: |
-        sudo apt-get update --fix-missing
-        sudo apt-get install --fix-missing  \
+        sudo apt-get update
+        sudo apt-get install -y \
           libboost-system-dev \
           libboost-program-options-dev \
-          libcurl4t64 libcurl4-openssl-dev \
+          libcurl4-openssl-dev \
+          libcap-dev \
           postfix s-nail \
-          libcap-dev
+          bats bats-support bats-assert bats-file
         sudo sed -i 's/^inet_interfaces = localhost$/inet_interfaces = loopback-only/' /etc/postfix/main.cf
         sudo systemctl enable --now postfix
 
-    - name: Install Bats and its support libraries for testing
-      # for the moment continue if we fail installing the support libraries bats-assert and bats-file
-      continue-on-error: true
-      run: |
-        sudo apt update
-        sudo apt install \
-          bats \
-          bats-assert \
-          bats-file
-      
     - name: Checkout repository
-      uses: actions/checkout@v4
-
-    #- name: Fetch external sources
-      #run: |
-        #cd external
-        #./get_externals.sh
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
 
     - name: Configure and build code
       run: |
         cmake --preset ${{ matrix.cmake_preset }}
-        cmake --build --preset ${{ matrix.cmake_preset }}
-        cp build/${{ matrix.cmake_preset }}/bin/ws_restore build/${{ matrix.cmake_preset }}/bin/ws_restore_notest
+        cmake --build --preset ${{ matrix.cmake_preset }} -j
 
     - name: Run bats non-sudo tests
+      env:
+        PRESET: ${{ matrix.cmake_preset }}
       run: |
-        PRESET=${{ matrix.cmake_preset }} bats --filter-tags \!sudo  bats/test/
+        bats --filter-tags '!sudo' bats/test/
 
     - name: Run bats sudo tests
+      env:
+        PRESET: ${{ matrix.cmake_preset }}
       run: |
-        sudo PRESET=${{ matrix.cmake_preset }} bats --filter-tags sudo  bats/test/
+        sudo PRESET="$PRESET" bats --filter-tags sudo bats/test/
