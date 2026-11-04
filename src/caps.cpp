@@ -183,7 +183,9 @@ void Cap::lower_cap(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos s
         if (cap_set_proc(caps) == -1) {
             spdlog::error("problem lowering effective capabilities {}.", srcpos.getSrcPos());
             cap_t cap = cap_get_proc();
-            spdlog::info("running with capabilities: {}", cap_to_text(cap, NULL));
+            char *cap_text = cap_to_text(cap, NULL);
+            spdlog::debug("Running with capabilities: {}", cap_text);
+            cap_free(cap_text);
             cap_free(cap);
             exit(1);
         }
@@ -226,7 +228,9 @@ void Cap::raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos srcpos) {
         if (cap_set_proc(caps) == -1) {
             spdlog::error("problem raising effective capabilities. {}", srcpos.getSrcPos());
             cap_t cap = cap_get_proc();
-            spdlog::debug("Running with capabilities: {}", cap_to_text(cap, NULL));
+            char *cap_text = cap_to_text(cap, NULL);
+            spdlog::debug("Running with capabilities: {}", cap_text);
+            cap_free(cap_text);
             cap_free(cap);
             exit(1);
         }
