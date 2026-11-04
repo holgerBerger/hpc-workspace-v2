@@ -745,15 +745,7 @@ std::string trimright(const char* in) {
 
 // thread safe ctime implementation, use this where std::ctime was used
 // please note: this does NOT append a \n!
-std::string ctime(const time_t* timer) {
-    char buffer[80];
-
-    auto ret = std::strftime(buffer, sizeof(buffer), "%c", localtime(timer));
-    if (ret == 0) {
-        spdlog::warn("bad strftime call in utils::ctime");
-    }
-    return std::string(buffer);
-}
+std::string ctime(const time_t* timer) { return ctime(*timer); }
 
 // thread safe ctime implementation, use this where std::ctime was used
 // please note: this does NOT append a \n!
