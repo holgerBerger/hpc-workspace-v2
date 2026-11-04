@@ -106,8 +106,29 @@ TEST_CASE("utils", "[utils]") {
     }
 
     SECTION("ctime") {
-        auto t = 1754337449L;
-        REQUIRE(utils::ctime(&t) == std::string("Mon Aug  4 21:57:29 2025"));
+        // utils::ctime formats in local time, pin the zone so the result is host independent
+        const char* old_tz = getenv("TZ");
+        const std::string saved_tz = old_tz ? old_tz : "";
+        const bool had_tz = old_tz != nullptr;
+        setenv("TZ", "UTC", 1);
+        tzset();
+
+        time_t t = 1754337449;
+        const auto res_ptr = utils::ctime(&t);
+        const auto res_val = utils::ctime(t);
+        const auto res_max = utils::ctime(LLONG_MAX);
+        const auto res_min = utils::ctime(LLONG_MIN);
+
+        if (had_tz)
+            setenv("TZ", saved_tz.c_str(), 1);
+        else
+            unsetenv("TZ");
+        tzset();
+
+        REQUIRE(res_ptr == std::string("Mon Aug  4 19:57:29 2025"));
+        REQUIRE(res_val == std::string("Mon Aug  4 19:57:29 2025"));
+        REQUIRE(res_max == "(date out of range)");
+        REQUIRE(res_min == "(date out of range)");
     }
 
     SECTION("mail") {
