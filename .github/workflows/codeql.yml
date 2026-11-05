@@ -7,19 +7,23 @@ on:
     branches: [ "master" ]
   schedule:
     - cron: '26 14 * * 6'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
-    name: Analyze (${{ matrix.language }})
-    runs-on: 'ubuntu-latest'
+    name: Analyze (${{ matrix.language }}${{ matrix.variant && format(', {0}', matrix.variant) || '' }})
+    runs-on: 'ubuntu-24.04'
     permissions:
-      # required for all workflows
+      # required to upload code scanning results
       security-events: write
-
-      # required to fetch internal or private CodeQL packs
-      packages: read
-
-      # only required for workflows in private repositories
+      # required for private repositories
       actions: read
       contents: read
 
@@ -27,61 +31,84 @@ jobs:
       fail-fast: false
       matrix:
         include:
+        # Privilege elevation code is selected at compile time (WS_CAPA), so both
+        # variants have to be built for CodeQL to see all code paths.
         - language: cpp
           build-mode: manual
+          variant: capabilities
+          ws_use_capabilities: "ON"
+        - language: cpp
+          build-mode: manual
+          variant: suid
+          ws_use_capabilities: "OFF"
+        # scan the workflow files themselves (injection, permissions, ...)
+        - language: actions
+          build-mode: none
 
     steps:
     - name: Install OS package dependencies
+      if: matrix.language == 'cpp'
       run: |
-        sudo apt install libboost-all-dev libcap-dev libcurl4t64 libcurl4-openssl-dev
-
+        sudo apt-get update
+        sudo apt-get install -y \
+          libboost-system-dev \
+          libboost-program-options-dev \
+          libcurl4-openssl-dev \
+          libcap-dev
 
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
 
-    # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-        # If you wish to specify custom queries, you can do so here or in a config file.
-        # By default, queries listed here will override any specified in a config file.
-        # Prefix the list here with "+" to use these queries and those in the config file.
+        # security-and-quality is a superset of security-extended (which in turn
+        # extends the default suite) - this is the most comprehensive standard suite
+        queries: security-and-quality
 
-        # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
-        queries: security-extended,security-and-quality
     - name: Build code
+      if: matrix.build-mode == 'manual'
       run: |
-        #cd external
-        #./get_externals.sh
-        #cd ..
-        cmake -DCMAKE_BUILD_TYPE=Release .
-        cmake --build .
+        cmake --preset release -DWS_USE_CAPABILITIES=${{ matrix.ws_use_capabilities }}
+        cmake --build --preset release -j
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
       with:
-        category: "/language:${{matrix.language}}"
+        category: "/language:${{ matrix.language }}${{ matrix.variant && format('/variant:{0}', matrix.variant) || '' }}"
         output: sarif-results
         upload: failure-only
 
-    - name: Upload full loc as a Build Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: sarif-results
-        path: sarif-results
-        retention-days: 1
-
+    # Dependencies fetched via FetchContent are compiled as part of the build and
+    # thus extracted by CodeQL. The paths/paths-ignore config options have no
+    # effect for compiled languages, so results are filtered after analysis.
     - name: Filter CodeQL results
+      if: matrix.language == 'cpp'
       uses: advanced-security/filter-sarif@v1
       with:
         patterns: |
-          -external/
+          -fetchdeps/**
+          -_deps/**
+          -external/**
+          -build/**
+          -vcpkg/**
+          -vcpkg_installed/**
         input: sarif-results/cpp.sarif
         output: sarif-results/cpp.sarif
 
-    - name: Upload CodeQL results
-      uses: github/codeql-action/upload-sarif@v3
+    - name: Upload SARIF as a Build Artifact
+      uses: actions/upload-artifact@v7
       with:
-        sarif_file: sarif-results/cpp.sarif
+        name: sarif-results-${{ matrix.language }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}
+        path: sarif-results
+        retention-days: 7
+
+    - name: Upload CodeQL results
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: sarif-results
+        category: "/language:${{ matrix.language }}${{ matrix.variant && format('/variant:{0}', matrix.variant) || '' }}"
