@@ -745,25 +745,20 @@ std::string trimright(const char* in) {
 
 // thread safe ctime implementation, use this where std::ctime was used
 // please note: this does NOT append a \n!
-std::string ctime(const time_t* timer) {
-    char buffer[80];
-
-    auto ret = std::strftime(buffer, sizeof(buffer), "%c", localtime(timer));
-    if (ret == 0) {
-        spdlog::warn("bad strftime call in utils::ctime");
-    }
-    return std::string(buffer);
-}
+std::string ctime(const time_t* timer) { return ctime(*timer); }
 
 // thread safe ctime implementation, use this where std::ctime was used
 // please note: this does NOT append a \n!
-std::string ctime(const time_t ctimer) {
+std::string ctime(const time_t timer) {
+    struct tm tm_buf = {};
+    if (localtime_r(&timer, &tm_buf) == nullptr) {
+        spdlog::warn("utils::ctime: timestamp {} out of range for localtime_r", timer);
+        return "(date out of range)";
+    }
     char buffer[80];
-
-    time_t timer = ctimer;
-    auto ret = std::strftime(buffer, sizeof(buffer), "%c", localtime(&timer));
-    if (ret == 0) {
-        spdlog::warn("bad strftime call in utils::ctime");
+    if (std::strftime(buffer, sizeof(buffer), "%c", &tm_buf) == 0) {
+        spdlog::warn("utils::ctime: formatted timestamp {} does not fit into {} byte buffer", timer, sizeof(buffer));
+        return "(date not formattable)";
     }
     return std::string(buffer);
 }
