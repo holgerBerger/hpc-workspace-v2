@@ -26,6 +26,8 @@ add_library(ws_common
     utils.cpp
     utils.h
     UserConfig.cpp
+    ws.cpp
+    ws.h
 )
 target_compile_features(ws_common PUBLIC cxx_std_17)
 

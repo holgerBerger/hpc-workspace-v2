@@ -9,7 +9,7 @@
  *  a workspace is a temporary directory created in behalf of a user with a limited lifetime.
  *
  *  (c) Holger Berger 2021,2023,2024,2025
- *  (c) Christoph Niethammer 2025
+ *  (c) Christoph Niethammer 2025,2026
  *
  *  hpc-workspace-v2 is based on workspace by Holger Berger, Thomas Beisel and Martin Hecht
  *
@@ -33,8 +33,6 @@
 #include "fmt/ranges.h" // IWYU pragma: keep
 #include <memory>
 #include <string>
-
-#include <regex> // buggy in redhat 7
 
 #include <syslog.h>
 #include <time.h>
@@ -146,9 +144,7 @@ void commandline(po::variables_map& opt, string& name, string& filesystem, strin
     traceflag = opt.count("trace");
 
     // validate workspace name against nasty characters
-    // TODO: remove regexp dependency
-    static const regex e(ws::workspace_name_regex);
-    if (!regex_match(name, e)) {
+    if (!ws::isValidWorkspaceName(name)) {
         spdlog::error("Illegal workspace name, use ASCII characters and numbers, '-','.' and '_' only!");
         exit(1);
     }
