@@ -135,7 +135,7 @@ void commandline(po::variables_map& opt, string& filesystem, string& mailaddress
     UserConfig userconfig(userconf);
 
     // check if Workspace name is correctly formatted
-    if (opt.count("name") && ws::isValidWorkspaceName(name)) {
+    if (opt.count("name") && utils::isValidWorkspaceName(name)) {
         // check if mail option is present and evaluate
         if (!opt.count("mail")) {
             mailaddress = userconfig.getMailaddress();

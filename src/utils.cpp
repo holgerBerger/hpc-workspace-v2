@@ -9,6 +9,7 @@
  *  a workspace is a temporary directory created in behalf of a user with a limited lifetime.
  *
  *  (c) Holger Berger 2021,2023,2024,2025
+ *  (c) Christoph Niethammer 2026
  *  (c) Maria Hampel 2025
  *
  *  hpc-workspace-v2 is based on workspace by Holger Berger, Thomas Beisel and Martin Hecht
@@ -314,6 +315,21 @@ bool isValidEmail(const std::string& email) {
     }
 
     return true;
+}
+
+bool isValidWorkspaceName(const std::string& name) {
+    // Implemented without std::regex
+    if (name.empty()) {
+        return false;
+    }
+    auto isAsciiAlnum = [](unsigned char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+    };
+    if (!isAsciiAlnum(name.front())) {
+        return false;
+    }
+    return std::all_of(name.begin() + 1, name.end(),
+                       [&](unsigned char c) { return isAsciiAlnum(c) || c == '.' || c == '_' || c == '-'; });
 }
 
 // get first line of a multiline string

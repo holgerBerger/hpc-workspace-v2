@@ -484,3 +484,40 @@ TEST_CASE("utils::HasGroupIntersection", "[utils]") {
         REQUIRE(h.hasCommonGroups("daemon") == h.hasCommonGroups("daemon"));
     }
 }
+
+TEST_CASE("utils::isValidWorkspaceName", "[utils]") {
+    SECTION("valid names") {
+        REQUIRE(utils::isValidWorkspaceName("a"));
+        REQUIRE(utils::isValidWorkspaceName("9"));
+        REQUIRE(utils::isValidWorkspaceName("myws"));
+        REQUIRE(utils::isValidWorkspaceName("My_WS-1.0"));
+        REQUIRE(utils::isValidWorkspaceName("a.."));
+        REQUIRE(utils::isValidWorkspaceName("user-name-1700000000"));
+    }
+
+    SECTION("empty name") { REQUIRE_FALSE(utils::isValidWorkspaceName("")); }
+
+    SECTION("invalid first character") {
+        REQUIRE_FALSE(utils::isValidWorkspaceName("."));
+        REQUIRE_FALSE(utils::isValidWorkspaceName(".."));
+        REQUIRE_FALSE(utils::isValidWorkspaceName(".ws"));
+        REQUIRE_FALSE(utils::isValidWorkspaceName("-ws"));
+        REQUIRE_FALSE(utils::isValidWorkspaceName("_ws"));
+    }
+
+    SECTION("invalid characters") {
+        REQUIRE_FALSE(utils::isValidWorkspaceName("a/b"));
+        REQUIRE_FALSE(utils::isValidWorkspaceName("a b"));
+        REQUIRE_FALSE(utils::isValidWorkspaceName("a\nb"));
+        REQUIRE_FALSE(utils::isValidWorkspaceName("a;rm"));
+        REQUIRE_FALSE(utils::isValidWorkspaceName("a*"));
+        REQUIRE_FALSE(utils::isValidWorkspaceName(std::string("a\0b", 3)));
+        REQUIRE_FALSE(utils::isValidWorkspaceName("\xc3\xa4"));  // UTF-8 umlaut
+        REQUIRE_FALSE(utils::isValidWorkspaceName("a\xc3\xa4")); // non-ASCII after valid start
+    }
+
+    SECTION("long names do not crash") {
+        REQUIRE(utils::isValidWorkspaceName(std::string(1000000, 'a')));
+        REQUIRE_FALSE(utils::isValidWorkspaceName(std::string(1000000, 'a') + "/"));
+    }
+}

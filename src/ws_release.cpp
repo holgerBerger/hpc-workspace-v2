@@ -144,7 +144,7 @@ void commandline(po::variables_map& opt, string& name, string& filesystem, strin
     traceflag = opt.count("trace");
 
     // validate workspace name against nasty characters
-    if (!ws::isValidWorkspaceName(name)) {
+    if (!utils::isValidWorkspaceName(name)) {
         spdlog::error("Illegal workspace name, use ASCII characters and numbers, '-','.' and '_' only!");
         exit(1);
     }

@@ -69,13 +69,3 @@ target_link_libraries(db_test
         Catch2::Catch2WithMain
 )
 catch_discover_tests(db_test)
-
-add_executable(ws_test
-    ws_test.cpp
-)
-target_link_libraries(ws_test
-    PRIVATE
-        ws_common
-        Catch2::Catch2WithMain
-)
-catch_discover_tests(ws_test)

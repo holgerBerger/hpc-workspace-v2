@@ -158,13 +158,13 @@ void commandline(po::variables_map& opt, string& name, string& target, string& f
 
         if (!listflag) {
             // validate workspace name against nasty characters
-            if (!ws::isValidWorkspaceName(name)) {
+            if (!utils::isValidWorkspaceName(name)) {
                 spdlog::error("Illegal workspace name, use ASCII characters and numbers, '-','.' and '_' only!");
                 exit(1);
             }
             // the target is used just like name to build the DB entry ID <user>-<target>,
             // so it must pass the same charset validation (L3)
-            if (opt.count("target") && !ws::isValidWorkspaceName(target)) {
+            if (opt.count("target") && !utils::isValidWorkspaceName(target)) {
                 spdlog::error("Illegal workspace name, use ASCII characters and numbers, '-','.' and '_' only!");
                 exit(1);
             }

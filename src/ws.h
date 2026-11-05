@@ -41,12 +41,6 @@ enum intent { LIST, USE, CREATE, EXTEND, RELEASE, RESTORE };
 // get enum for name, for parsing ACLs
 const std::map<std::string, int> intentnames = {{"list", LIST},     {"use", USE},         {"create", CREATE},
                                                 {"extend", EXTEND}, {"release", RELEASE}, {"restore", RESTORE}};
-
-/** validate workspace name
- *
- *  The first character must be ASCII alphanumeric, the rest ASCII alphanumeric, '.', '_' or '-'.
- */
-bool isValidWorkspaceName(const std::string& name);
 } // namespace ws
 
 #endif

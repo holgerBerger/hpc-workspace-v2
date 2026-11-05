@@ -77,6 +77,12 @@ void setCLocal();
 // validate an email address (approximation)
 bool isValidEmail(const std::string& email);
 
+/** validate workspace name
+ *
+ *  The first character must be ASCII alphanumeric, the rest ASCII alphanumeric, '.', '_' or '-'.
+ */
+bool isValidWorkspaceName(const std::string& name);
+
 // get first line of a multiline string
 std::string getFirstLine(const std::string& multilineString);
 
