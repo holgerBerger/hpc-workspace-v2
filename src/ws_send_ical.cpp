@@ -10,6 +10,7 @@
  *
  *  (c) Holger Berger 2021,2023,2024,2025
  *  (c) Maria Hampel 2025
+ *  (c) Christoph Niethammer 2026
  *
  *  hpc-workspace-v2 is based on workspace by Holger Berger, Thomas Beisel and Martin Hecht
  *
@@ -32,7 +33,6 @@
 #include "fmt/ostream.h"
 #include "fmt/ranges.h" // IWYU pragma: keep
 // #include <iostream>
-#include <regex>
 #include <string>
 
 #include <syslog.h>
@@ -135,8 +135,7 @@ void commandline(po::variables_map& opt, string& filesystem, string& mailaddress
     UserConfig userconfig(userconf);
 
     // check if Workspace name is correctly formatted
-    static const regex e("^[[:alnum:]][[:alnum:]_.-]*$");
-    if (opt.count("name") && regex_match(name, e)) {
+    if (opt.count("name") && ws::isValidWorkspaceName(name)) {
         // check if mail option is present and evaluate
         if (!opt.count("mail")) {
             mailaddress = userconfig.getMailaddress();

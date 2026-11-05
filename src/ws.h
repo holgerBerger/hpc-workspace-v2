@@ -11,6 +11,7 @@
  *  a workspace is a temporary directory created in behalf of a user with a limited lifetime.
  *
  *  (c) Holger Berger 2025
+ *  (c) Christoph Niethammer 2026
  *
  *  hpc-workspace-v2 is based on workspace by Holger Berger, Thomas Beisel and Martin Hecht
  *
@@ -34,15 +35,18 @@
 
 namespace ws {
 
-// regex for workspace name check
-const auto workspace_name_regex = R"(^[a-zA-Z0-9][a-zA-Z0-9\._-]*$)";
-
 // intent for ACLs
 enum intent { LIST, USE, CREATE, EXTEND, RELEASE, RESTORE };
 
 // get enum for name, for parsing ACLs
 const std::map<std::string, int> intentnames = {{"list", LIST},     {"use", USE},         {"create", CREATE},
                                                 {"extend", EXTEND}, {"release", RELEASE}, {"restore", RESTORE}};
+
+/** validate workspace name
+ *
+ *  The first character must be ASCII alphanumeric, the rest ASCII alphanumeric, '.', '_' or '-'.
+ */
+bool isValidWorkspaceName(const std::string& name);
 } // namespace ws
 
 #endif
