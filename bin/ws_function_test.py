@@ -56,11 +56,11 @@ def run_cmd(cmd_list, capture_output=True, interactive=False):
     stderr_val = subprocess.PIPE if capture_output else None
 
     return subprocess.run(
-        cmd,
+        cmd_list,
         universal_newlines=True,
         stdout=stdout_val,
         stderr=stderr_val,
-        shell=use_shell
+        shell=isinstance(cmd_list, str)
     )
 
 def merge_yaml(base: dict, extra: dict) -> dict:
