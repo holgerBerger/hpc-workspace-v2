@@ -9,7 +9,7 @@ on HPC systems.
 
 This version has reached a usable state and offers several new tools
 and features not present in v1. The database format is backwards compatible with v1,
-config files can be reused with light adjustments.
+config files can be reused with slight adjustments.
 
 Please use the [discussion tab](https://github.com/holgerBerger/hpc-workspace-v2/discussions) if you would like to share input.
 

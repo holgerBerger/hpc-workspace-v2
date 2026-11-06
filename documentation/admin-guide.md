@@ -103,6 +103,10 @@ With V2, the setuid version and the capability version are both under regression
 
 You can check ```ws_allocate -V``` to see if capability mode was compiled in.
 
+NFS seems to be not capable of carrying capability information, so the setuid version should be used instead if
+the installation location is a NFS mount. Spectrum Scale, Lustre, and local linux filesystems
+support capabilities. 
+
 
 ### Installation with rpm
 

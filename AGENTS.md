@@ -48,7 +48,7 @@ vm/            — Vagrant files for Rocky/Alma Linux VMs
 
 ## Privilege Model (Critical Gotcha)
 
-The privilege system has **three modes**, selected at compile-time and runtime:
+The privilege system has **three modes**, selected at compile-time (can exclude capability mode if not available) and runtime:
 
 1. **Capabilities mode** (`WS_CAPA` defined, `libcap` found): Tools use Linux capabilities instead of SUID. Checked via `Cap::hasCaps()`.
 2. **SUID mode** (no libcap): Binaries are setuid root. Checked via `Cap::isSetuid()`.
@@ -75,7 +75,6 @@ The `Cap` class wraps all privilege operations. Tools call `raise_cap()` before 
 - Config files live in `bats/ws.conf` and `bats/ws.d/`
 - Bats tests in `bats/test_cap/` and `bats/test_setuid/` test capability and SUID modes respectively
 - Non-sudo tests run in "user mode" (no privilege elevation)
-- Tags: use `--filter-tags '!sudo'` for non-privileged, `--filter-tags sudo` for privileged
 
 ## Configuration Format
 
