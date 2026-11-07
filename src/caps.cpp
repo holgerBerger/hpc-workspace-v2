@@ -217,6 +217,7 @@ void Cap::drop_caps(std::vector<cap_value_t> capabilities, uid_t uid, utils::Src
             spdlog::error("problem with permitted capabilities. {}", srcpos.getSrcPos());
             if (debugflag)
                 dump();
+            cap_free(cap_state);
             exit(1);
         }
 
@@ -251,6 +252,7 @@ void Cap::lower_cap(std::vector<cap_value_t> capabilities, uid_t uid, utils::Src
         if (cap_set_flag(cap_state, CAP_EFFECTIVE, static_cast<int>(capabilities.size()), capabilities.data(),
                          CAP_CLEAR) == -1) {
             spdlog::error("problem with effective capabilities {}.", srcpos.getSrcPos());
+            cap_free(cap_state);
             exit(1);
         }
 
@@ -261,6 +263,7 @@ void Cap::lower_cap(std::vector<cap_value_t> capabilities, uid_t uid, utils::Src
             spdlog::debug("Running with capabilities: {}", cap_text);
             cap_free(cap_text);
             cap_free(current_cap_state);
+            cap_free(cap_state);
             exit(1);
         }
 
@@ -295,6 +298,7 @@ void Cap::raise_cap(std::vector<cap_value_t> capabilities, utils::SrcPos srcpos)
         if (cap_set_flag(cap_state, CAP_EFFECTIVE, static_cast<int>(capabilities.size()), capabilities.data(),
                          CAP_SET) == -1) {
             spdlog::error("problem with effective capabilities {}.", srcpos.getSrcPos());
+            cap_free(cap_state);
             exit(1);
         }
 
@@ -305,6 +309,7 @@ void Cap::raise_cap(std::vector<cap_value_t> capabilities, utils::SrcPos srcpos)
             spdlog::debug("Running with capabilities: {}", cap_text);
             cap_free(cap_text);
             cap_free(current_cap_state);
+            cap_free(cap_state);
             exit(1);
         }
 
