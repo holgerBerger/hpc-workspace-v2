@@ -102,6 +102,7 @@ set(CTEST_CUSTOM_COVERAGE_EXCLUDE
     "/tests/"
     "/build/"
     "^/usr/"
+    "^[^/]" # relative paths: dependencies like Catch2 compiled with relative source paths
 )
 
 # report project sources that were never executed (no .gcda) as 0% instead of omitting them;
@@ -161,12 +162,62 @@ if(DASHBOARD_RUN_BATS)
     endif()
 endif()
 
-ctest_coverage(RETURN_VALUE _coverage_ret)
+# Coverage: instead of ctest_coverage(), which only reports line coverage, run
+# "gcov -b -x" and upload the .gcov files as a GcovTar; CDash parses them
+# itself including branch coverage. Honors CTEST_CUSTOM_COVERAGE_EXCLUDE and
+# CTEST_EXTRA_COVERAGE_GLOB.
+include(CTestCoverageCollectGCOV)
+set(_gcov_tarball "${CTEST_BINARY_DIRECTORY}/gcov.tar.bz2")
+set(_coverage_dir "${CTEST_BINARY_DIRECTORY}/Testing/CoverageInfo")
+# drop .gcov and uncovered files of earlier runs
+file(REMOVE_RECURSE "${_coverage_dir}" "${CTEST_BINARY_DIRECTORY}/uncovered")
+file(REMOVE "${_gcov_tarball}")
+ctest_coverage_collect_gcov(
+    TARBALL "${_gcov_tarball}"
+    TARBALL_COMPRESSION BZIP2
+    QUIET
+)
+if(EXISTS "${_gcov_tarball}")
+    # CDash's GcovTar parser counts a branch as untested only if gcov reports
+    # "taken 0%"; branches in code that never ran ("never executed") would be
+    # counted as tested, giving e.g. 100% branch coverage for unexecuted files.
+    # Rewrite them and repack the tarball from the module's file list.
+    file(STRINGS "${_coverage_dir}/coverage_file_list.txt" _tar_files)
+    foreach(_f IN LISTS _tar_files)
+        if(_f MATCHES "\\.gcov$")
+            file(READ "${CTEST_BINARY_DIRECTORY}/${_f}" _content)
+            string(REGEX REPLACE "(\nbranch +[0-9]+) never executed" "\\1 taken 0%" _content "${_content}")
+            file(WRITE "${CTEST_BINARY_DIRECTORY}/${_f}" "${_content}")
+        endif()
+    endforeach()
+    file(REMOVE "${_gcov_tarball}")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E tar cjf "${_gcov_tarball}"
+                "--mtime=1970-01-01 0:0:0 UTC" --format=gnutar
+                "--files-from=${_coverage_dir}/coverage_file_list.txt"
+        WORKING_DIRECTORY "${CTEST_BINARY_DIRECTORY}"
+        RESULT_VARIABLE _tar_ret
+    )
+    if(NOT _tar_ret EQUAL 0)
+        message(FATAL_ERROR "repacking ${_gcov_tarball} failed")
+    endif()
+else()
+    message(WARNING "no coverage data collected")
+endif()
 
 if(DASHBOARD_SUBMIT)
     ctest_submit(${_submit_args} RETURN_VALUE _submit_ret)
     if(NOT _submit_ret EQUAL 0)
         message(FATAL_ERROR "submission to CDash failed")
+    endif()
+    if(EXISTS "${_gcov_tarball}")
+        ctest_submit(${_submit_args}
+            CDASH_UPLOAD "${_gcov_tarball}"
+            CDASH_UPLOAD_TYPE GcovTar
+            RETURN_VALUE _submit_ret)
+        if(NOT _submit_ret EQUAL 0)
+            message(FATAL_ERROR "coverage upload to CDash failed")
+        endif()
     endif()
 endif()
 

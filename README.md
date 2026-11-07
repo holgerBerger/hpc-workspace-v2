@@ -383,7 +383,8 @@ Test and coverage results can be submitted to the CDash dashboard of the project
 [my.cdash.org](https://my.cdash.org) (settings in `CTestConfig.cmake`).
 The CTest script `cmake/dashboard.cmake` configures and builds the `coverage` preset
 (gcov instrumentation, no sanitizers) in `build/coverage`, runs the unit tests and the
-non-sudo bats tests, collects the coverage data with `gcov` and submits everything to CDash:
+non-sudo bats tests, collects line and branch coverage with `gcov -b` and submits everything
+to CDash (coverage is uploaded as a `GcovTar` via CMake's `CTestCoverageCollectGCOV` module):
 
 ```
 ctest -S cmake/dashboard.cmake -V
