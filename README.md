@@ -377,6 +377,55 @@ note: setcap tests will fail with ASAN error messages if sysctl `fs.suid_dumpabl
 Update: turned out that capability version seems to have restrictions in docker, can only be tested fully in VM
 TODO: remove capability tests from docker
 
+### Coverage runs with CDash
+
+Test and coverage results can be submitted to the CDash dashboard of the project at
+[my.cdash.org](https://my.cdash.org) (settings in `CTestConfig.cmake`).
+The CTest script `cmake/dashboard.cmake` configures and builds the `coverage` preset
+(gcov instrumentation, no sanitizers) in `build/coverage`, runs the unit tests and the
+non-sudo bats tests, collects the coverage data with `gcov` and submits everything to CDash:
+
+```
+ctest -S cmake/dashboard.cmake -V
+```
+
+Requirements:
+
+- gcc and `gcov`, plus the build dependencies listed above
+- for the bats tests: `bats` with `bats-support`, `bats-assert` and `bats-file`
+- a mail server accepting mails on `localhost` port 25 (e.g. postfix), as the tests
+  sending mails (`ws_send_ical`, reminders in `ws_expirer`, ...) fail without one
+- write access to `/tmp`, where the bats tests create their workspaces
+
+If bats or a local mail server are not available, skip the bats tests. The coverage then
+only includes the code exercised by the unit tests:
+
+```
+ctest -DDASHBOARD_RUN_BATS=OFF -S cmake/dashboard.cmake -V
+```
+
+Further options, passed as `-D<name>=<value>` before `-S`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `DASHBOARD_MODEL` | `Experimental` | CDash track: `Experimental`, `Nightly` or `Continuous` |
+| `DASHBOARD_RUN_BATS` | `ON` if bats is found | run the non-sudo bats tests for coverage |
+| `DASHBOARD_SUBMIT` | `ON` | set to `OFF` for a local run without submitting |
+| `DASHBOARD_FRESH` | `OFF` | wipe `build/coverage` before building |
+| `DASHBOARD_SITE` | host name | site name shown on CDash |
+| `DASHBOARD_BUILD_NAME` | `<os>-gcc<version>-coverage-<branch>` | build name shown on CDash |
+| `DASHBOARD_JOBS` | number of cores | parallel build and test jobs |
+
+If the CDash project requires authenticated submissions, export the project token as
+`CDASH_AUTH_TOKEN` before running the script.
+
+Notes:
+
+- only the unit test results show up as tests on CDash; the bats tests run only to
+  generate coverage, and their results are visible in the console output
+- the script exits with an error if unit or bats tests fail, after the results have been submitted
+- the sudo bats tests and the setuid/capability test suites are not part of the coverage run
+
 ### Testing with VMs
 
 Vagrant files are provided to allow testing with rocky linux 8, rocky linux 9 and alma linux 10.
