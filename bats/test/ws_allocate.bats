@@ -650,3 +650,46 @@ cleanup() {
     ws_release --config bats/ws.conf $ws_name
     ws_release --config bats/ws.conf TEST
 }
+
+# root may create a workspace for another user: directory, DB entry and default group must
+# belong to that user, not to root
+# bats test_tags=sudo
+@test "ws_allocate as root with -u creates workspace owned by that user" {
+    if [ "$EUID" -ne 0 ]; then
+        skip "Needs to be run as root"
+    fi
+    target=nobody
+    target_group=$(id -gn "$target")
+    dbentry="/tmp/ws/ws2-db/${target}-ROOTFOROTHER"
+    rm -f "$dbentry" "/tmp/ws/ws2-db/root-ROOTFOROTHER"
+
+    run ws_allocate --config bats/ws.conf -u "$target" ROOTFOROTHER 1
+    assert_success
+    assert_output --regexp "/${target}-ROOTFOROTHER"
+
+    assert_file_exists "$dbentry"
+    assert_file_not_exists "/tmp/ws/ws2-db/root-ROOTFOROTHER"
+    run grep -x "user: ${target}" "$dbentry"
+    assert_success
+
+    wsdir=$(awk '/^workspace:/ {print $2}' "$dbentry")
+    assert_dir_exists "$wsdir"
+    [ "$(stat -c %U "$wsdir")" = "$target" ]
+    [ "$(stat -c %G "$wsdir")" = "$target_group" ]
+
+    rm -rf "$wsdir" "$dbentry"
+}
+
+# bats test_tags=sudo
+@test "ws_allocate as root with -u for an unknown user fails without creating anything" {
+    if [ "$EUID" -ne 0 ]; then
+        skip "Needs to be run as root"
+    fi
+    run ws_allocate --config bats/ws.conf -u no_such_user_xyz ROOTNOUSER 1
+    assert_failure
+    assert_output --partial "user <no_such_user_xyz> does not exist"
+    assert_file_not_exists /tmp/ws/ws2-db/no_such_user_xyz-ROOTNOUSER
+    assert_file_not_exists /tmp/ws/ws2-db/root-ROOTNOUSER
+    assert_not_exist /tmp/ws/ws2/1/no_such_user_xyz-ROOTNOUSER
+    assert_not_exist /tmp/ws/ws2/2/no_such_user_xyz-ROOTNOUSER
+}

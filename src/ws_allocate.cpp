@@ -639,6 +639,15 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
             exit(-2);
         }
 
+        // owner of the new workspace: root may create workspaces for other users (-u), directory,
+        // DB entry and default group then belong to that user (same condition as in createWorkspace)
+        const bool for_other_user = !user_option.empty() && getuid() == 0;
+        const std::string owner = for_other_user ? user_option : username;
+        if (for_other_user && !user::exists(owner)) {
+            spdlog::error("user <{}> does not exist, can not create workspace.", owner);
+            return false;
+        }
+
         // if it does not exist, create it
         spdlog::info("creating workspace.");
 
@@ -657,12 +666,12 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
             return false;
         }
 
-        // check which group to use, from commandline or use current group
+        // check which group to use, from commandline or use the owner's primary group
         string primarygroup = "";
         if (groupreadable != "" || groupwritable != "") {
             primarygroup = (groupreadable != "") ? groupreadable : groupwritable;
         } else {
-            primarygroup = user::getGroupname();
+            primarygroup = for_other_user ? user::getGroupname(owner) : user::getGroupname();
         }
 
         // check if any group option is set
@@ -679,15 +688,20 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
         auto extensions = config.getFsConfig(newfilesystem).maxextensions;
         auto expiration = time(NULL) + duration * 24 * 3600;
 
-        auto id = fmt::format("{}-{}", username, name);
-        creationDB->createEntry(id, username, wsdir, time(NULL), expiration, reminder, extensions, groupflag,
-                                primarygroup, mailaddress, comment);
+        auto id = fmt::format("{}-{}", owner, name);
+        creationDB->createEntry(id, owner, wsdir, time(NULL), expiration, reminder, extensions, groupflag, primarygroup,
+                                mailaddress, comment);
 
         fmt::print("{}\n", wsdir);
         fmt::print(stderr, "remaining extensions  : {}\n", extensions);
         fmt::print(stderr, "remaining time in days: {}\n", (expiration - time(NULL)) / (24 * 3600));
 
-        syslog(LOG_INFO, "created for user <%s> DB <%s> with space <%s>.", username.c_str(), id.c_str(), wsdir.c_str());
+        if (for_other_user)
+            syslog(LOG_INFO, "created for user <%s> by <%s> DB <%s> with space <%s>.", owner.c_str(), username.c_str(),
+                   id.c_str(), wsdir.c_str());
+        else
+            syslog(LOG_INFO, "created for user <%s> DB <%s> with space <%s>.", owner.c_str(), id.c_str(),
+                   wsdir.c_str());
     }
     return true;
 }

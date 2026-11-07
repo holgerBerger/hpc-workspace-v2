@@ -12,6 +12,7 @@
  *  a workspace is a temporary directory created in behalf of a user with a limited lifetime.
  *
  *  (c) Holger Berger 2021,2023,2024
+ *  (c) Christoph Niethammer 2026
  *
  *  hpc-workspace-v2 is based on workspace by Holger Berger, Thomas Beisel and Martin Hecht
  *
@@ -47,6 +48,8 @@ bool isnotSetuid();
 bool isSetuid();
 // ret7urn name of current effective group
 std::string getGroupname();
+// return name of the primary group of a given user, empty if user or group are unknown
+std::string getGroupname(const std::string& username);
 // return list of groups of current process
 std::vector<std::string> getGrouplist();
 // return a list of groupnames for a given user
