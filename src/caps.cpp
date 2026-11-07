@@ -79,42 +79,42 @@ Cap::Cap() {
 
     if (!issetuid) {
 #ifdef WS_CAPA
-        cap_t caps, oldcaps;
+        cap_t cap_state, saved_cap_state;
         cap_value_t cap_list[1];
 
-        caps = cap_get_proc();
-        if (NULL == caps) {
+        cap_state = cap_get_proc();
+        if (NULL == cap_state) {
             spdlog::error("Failed to obtain capabilities.");
             exit(1);
         }
-        oldcaps = cap_dup(caps);
-        if (NULL == oldcaps) {
+        saved_cap_state = cap_dup(cap_state);
+        if (NULL == saved_cap_state) {
             spdlog::error("Failed copying capabilities.");
-            cap_free(caps);
+            cap_free(cap_state);
             exit(1);
         }
 
         cap_list[0] = CAP_DAC_OVERRIDE; // this has to be set for all executables using this!
 
-        if (cap_set_flag(caps, CAP_EFFECTIVE, 1, cap_list, CAP_SET) == -1) {
+        if (cap_set_flag(cap_state, CAP_EFFECTIVE, 1, cap_list, CAP_SET) == -1) {
             spdlog::error("Failed updating effective capability set.");
-            cap_free(caps);
-            cap_free(oldcaps);
+            cap_free(cap_state);
+            cap_free(saved_cap_state);
             exit(1);
         }
 
-        if (cap_set_proc(caps) == 0) {
-            if (cap_set_proc(oldcaps) != 0) {
+        if (cap_set_proc(cap_state) == 0) {
+            if (cap_set_proc(saved_cap_state) != 0) {
                 spdlog::error("Failed resetting capabilities.");
-                cap_free(caps);
-                cap_free(oldcaps);
+                cap_free(cap_state);
+                cap_free(saved_cap_state);
                 exit(1);
             }
             hascaps = true;
         }
 
-        cap_free(caps);
-        cap_free(oldcaps);
+        cap_free(cap_state);
+        cap_free(saved_cap_state);
 #endif
     }
 
@@ -201,35 +201,34 @@ void Cap::become_db(utils::SrcPos srcpos) {
 void Cap::become_caller(utils::SrcPos srcpos) { set_identity(user_uid, user_gid, GroupsMode::Restore, srcpos); }
 
 // drop root/effective capabilities (not necessary), and verify the permitted set
-void Cap::drop_caps(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos srcpos) {
+void Cap::drop_caps(std::vector<cap_value_t> capabilities, uid_t uid, utils::SrcPos srcpos) {
     if (traceflag) {
-        spdlog::trace("Cap::dropcap( {}, {}, {})", uid, cap_arg, srcpos.getSrcPos());
+        spdlog::trace("Cap::dropcap( {}, {}, {})", uid, capabilities, srcpos.getSrcPos());
         if (debugflag)
             dump();
     }
 #ifdef WS_CAPA
     if (hascaps) {
-        cap_t caps;
-
-        caps = cap_init();
+        cap_t cap_state = cap_init();
 
         // setting caps we should have in PERMITTED set
-        if (cap_set_flag(caps, CAP_PERMITTED, static_cast<int>(cap_arg.size()), cap_arg.data(), CAP_SET) == -1) {
+        if (cap_set_flag(cap_state, CAP_PERMITTED, static_cast<int>(capabilities.size()), capabilities.data(),
+                         CAP_SET) == -1) {
             spdlog::error("problem with permitted capabilities. {}", srcpos.getSrcPos());
             if (debugflag)
                 dump();
             exit(1);
         }
 
-        if (cap_set_proc(caps) != 0) {
+        if (cap_set_proc(cap_state) != 0) {
             spdlog::error("problem setting permitted capabilities.");
             if (debugflag)
                 dump();
-            cap_free(caps);
+            cap_free(cap_state);
             exit(1);
         }
 
-        cap_free(caps);
+        cap_free(cap_state);
     }
 #endif
 
@@ -240,33 +239,32 @@ void Cap::drop_caps(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos s
 }
 
 // remove a capability from the effective set
-void Cap::lower_cap(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos srcpos) {
+void Cap::lower_cap(std::vector<cap_value_t> capabilities, uid_t uid, utils::SrcPos srcpos) {
     if (traceflag) {
         spdlog::trace("Cap::lower_cap( {}, {})", uid, srcpos.getSrcPos());
         dump();
     }
 #ifdef WS_CAPA
     if (hascaps) {
-        cap_t caps;
+        cap_t cap_state = cap_get_proc();
 
-        caps = cap_get_proc();
-
-        if (cap_set_flag(caps, CAP_EFFECTIVE, static_cast<int>(cap_arg.size()), cap_arg.data(), CAP_CLEAR) == -1) {
+        if (cap_set_flag(cap_state, CAP_EFFECTIVE, static_cast<int>(capabilities.size()), capabilities.data(),
+                         CAP_CLEAR) == -1) {
             spdlog::error("problem with effective capabilities {}.", srcpos.getSrcPos());
             exit(1);
         }
 
-        if (cap_set_proc(caps) == -1) {
+        if (cap_set_proc(cap_state) == -1) {
             spdlog::error("problem lowering effective capabilities {}.", srcpos.getSrcPos());
-            cap_t cap = cap_get_proc();
-            char *cap_text = cap_to_text(cap, NULL);
+            cap_t current_cap_state = cap_get_proc();
+            char* cap_text = cap_to_text(current_cap_state, NULL);
             spdlog::debug("Running with capabilities: {}", cap_text);
             cap_free(cap_text);
-            cap_free(cap);
+            cap_free(current_cap_state);
             exit(1);
         }
 
-        cap_free(caps);
+        cap_free(cap_state);
     }
 #endif
 
@@ -285,33 +283,32 @@ void Cap::lower_cap(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos s
 }
 
 // add a capability to the effective set
-void Cap::raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos srcpos) {
+void Cap::raise_cap(std::vector<cap_value_t> capabilities, utils::SrcPos srcpos) {
     if (traceflag) {
-        spdlog::trace("Cap::raise_cap( {}, {})", cap_arg, srcpos.getSrcPos());
+        spdlog::trace("Cap::raise_cap( {}, {})", capabilities, srcpos.getSrcPos());
         dump();
     }
 #ifdef WS_CAPA
     if (hascaps) {
-        cap_t caps;
+        cap_t cap_state = cap_get_proc();
 
-        caps = cap_get_proc();
-
-        if (cap_set_flag(caps, CAP_EFFECTIVE, static_cast<int>(cap_arg.size()), cap_arg.data(), CAP_SET) == -1) {
+        if (cap_set_flag(cap_state, CAP_EFFECTIVE, static_cast<int>(capabilities.size()), capabilities.data(),
+                         CAP_SET) == -1) {
             spdlog::error("problem with effective capabilities {}.", srcpos.getSrcPos());
             exit(1);
         }
 
-        if (cap_set_proc(caps) == -1) {
+        if (cap_set_proc(cap_state) == -1) {
             spdlog::error("problem raising effective capabilities. {}", srcpos.getSrcPos());
-            cap_t cap = cap_get_proc();
-            char *cap_text = cap_to_text(cap, NULL);
+            cap_t current_cap_state = cap_get_proc();
+            char* cap_text = cap_to_text(current_cap_state, NULL);
             spdlog::debug("Running with capabilities: {}", cap_text);
             cap_free(cap_text);
-            cap_free(cap);
+            cap_free(current_cap_state);
             exit(1);
         }
 
-        cap_free(caps);
+        cap_free(cap_state);
     }
 #endif
 
@@ -324,10 +321,10 @@ void Cap::raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos srcpos) {
 // helper to dump current capabilities
 void Cap::dump() const {
 #ifdef WS_CAPA
-    cap_t cap = cap_get_proc();
-    char* cap_text = cap_to_text(cap, NULL);
+    cap_t cap_state = cap_get_proc();
+    char* cap_text = cap_to_text(cap_state, NULL);
     spdlog::debug("running with capabilities: {}", cap_text);
     cap_free(cap_text);
-    cap_free(cap);
+    cap_free(cap_state);
 #endif
 }
