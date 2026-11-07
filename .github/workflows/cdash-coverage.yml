@@ -1,0 +1,52 @@
+name: "CDash coverage"
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  schedule:
+    - cron: '30 1 * * *' # after CTEST_NIGHTLY_START_TIME (01:00 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Coverage (CDash)
+    runs-on: 'ubuntu-24.04'
+
+    steps:
+    - name: Install OS package dependencies to build and test hpc-workspace
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libboost-system-dev \
+          libboost-program-options-dev \
+          libcurl4-openssl-dev \
+          libcap-dev \
+          postfix s-nail \
+          bats bats-support bats-assert bats-file
+        sudo sed -i 's/^inet_interfaces = localhost$/inet_interfaces = loopback-only/' /etc/postfix/main.cf
+        sudo systemctl enable --now postfix
+
+    - name: Checkout repository
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+
+    - name: Run CTest dashboard and submit to CDash
+      env:
+        # optional, only needed if the CDash project requires authenticated submissions
+        CDASH_AUTH_TOKEN: ${{ secrets.CDASH_AUTH_TOKEN }}
+        DASHBOARD_MODEL: ${{ github.event_name == 'schedule' && 'Nightly' || (github.event_name == 'push' && 'Continuous' || 'Experimental') }}
+      run: |
+        ctest -V \
+          -DDASHBOARD_MODEL="$DASHBOARD_MODEL" \
+          -DDASHBOARD_SITE="github-actions-ubuntu-24.04" \
+          -S cmake/dashboard.cmake
