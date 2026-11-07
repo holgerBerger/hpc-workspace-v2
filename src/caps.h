@@ -81,9 +81,9 @@ class Cap {
     Cap();
 
     // functions that can be called to raise and lower caps
-    void drop_caps(std::vector<cap_value_t> cap_arg, uid_t uid, utils::SrcPos srcpos);
-    void lower_cap(std::vector<cap_value_t> cap_arg, uid_t dbuid, utils::SrcPos);
-    void raise_cap(std::vector<cap_value_t> cap_arg, utils::SrcPos);
+    void drop_caps(std::vector<cap_value_t> capabilities, uid_t uid, utils::SrcPos srcpos);
+    void lower_cap(std::vector<cap_value_t> capabilities, uid_t dbuid, utils::SrcPos);
+    void raise_cap(std::vector<cap_value_t> capabilities, utils::SrcPos);
 
     // tell the Cap object which uid/gid own the database (call once after parsing the
     // config); lower_cap()/become_db() use this to switch uid and gid as a pair
