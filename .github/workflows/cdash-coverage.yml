@@ -45,8 +45,15 @@ jobs:
         # optional, only needed if the CDash project requires authenticated submissions
         CDASH_AUTH_TOKEN: ${{ secrets.CDASH_AUTH_TOKEN }}
         DASHBOARD_MODEL: ${{ github.event_name == 'schedule' && 'Nightly' || (github.event_name == 'push' && 'Continuous' || 'Experimental') }}
+        # pull requests check out a temporary merge commit (PR head merged into master), so the
+        # tested code is what will land on master; report PR number and PR head commit to CDash
+        # (both empty for other events)
+        DASHBOARD_PR: ${{ github.event.pull_request.number }}
+        DASHBOARD_REVISION: ${{ github.event.pull_request.head.sha }}
       run: |
         ctest -V \
           -DDASHBOARD_MODEL="$DASHBOARD_MODEL" \
           -DDASHBOARD_SITE="github-actions-ubuntu-24.04" \
+          -DDASHBOARD_PR="$DASHBOARD_PR" \
+          -DDASHBOARD_REVISION="$DASHBOARD_REVISION" \
           -S cmake/dashboard.cmake
