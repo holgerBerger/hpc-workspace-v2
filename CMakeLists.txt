@@ -47,9 +47,9 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 set(WS_USE_CAPABILITIES "AUTO" CACHE STRING "Use capabilities for privilege elevation. AUTO=auto-detect, ON=require libcap, OFF=force SUID only")
 set_property(CACHE WS_USE_CAPABILITIES PROPERTY STRINGS AUTO ON OFF)
 
-# Setuid UID and GID options
-set(WS_SETUID_UID "" CACHE STRING "UID for setuid binaries (empty = root)")
-set(WS_SETUID_GID "" CACHE STRING "GID for setuid binaries (empty = root)")
+# Setuid owner and group of the privileged binaries (SUID mode only), names or numeric ids
+set(WS_SETUID_UID "root" CACHE STRING "Owner (user name or UID) of the setuid binaries")
+set(WS_SETUID_GID "root" CACHE STRING "Group (group name or GID) of the setuid binaries")
 
 if(WS_USE_CAPABILITIES STREQUAL "OFF")
     message(STATUS "Capabilities disabled by user. Building with SUID only.")

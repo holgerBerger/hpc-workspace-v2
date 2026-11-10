@@ -293,19 +293,22 @@ install(TARGETS
 set(WS_INSTALL_SET_PRIVILEGES ON CACHE BOOL "Set capabilities or setuid on privileged executables during install")
 
 if(WS_INSTALL_SET_PRIVILEGES)
+    # must come after install(TARGETS) above, same DESTINATION and COMPONENT as there
+    include("${PROJECT_SOURCE_DIR}/cmake/ws_set_privileges.cmake")
     if(LIBCAP)
-        install(SCRIPT "${CMAKE_SOURCE_DIR}/src/setcap_install.cmake")
+        # keep in sync with the %caps lines in hpc-workspace-v2.spec
+        ws_set_privileges(TARGETS ws_allocate ws_release
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            CAPABILITIES "CAP_DAC_OVERRIDE=p CAP_CHOWN=p CAP_FOWNER=p"
+            COMPONENT Runtime)
+        ws_set_privileges(TARGETS ws_restore
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            CAPABILITIES "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p CAP_FOWNER=p"
+            COMPONENT Runtime)
     else()
-        set(_WS_CHOWN_OWNER "${WS_SETUID_UID}")
-        if(_WS_CHOWN_OWNER STREQUAL "")
-            set(_WS_CHOWN_OWNER "root")
-        endif()
-
-        set(_WS_CHOWN_GROUP "${WS_SETUID_GID}")
-        if(_WS_CHOWN_GROUP STREQUAL "")
-            set(_WS_CHOWN_GROUP "root")
-        endif()
-
-        install(SCRIPT "${CMAKE_SOURCE_DIR}/src/setuid_install.cmake")
+        ws_set_privileges(TARGETS ws_allocate ws_release ws_restore
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            SETUID OWNER "${WS_SETUID_UID}" GROUP "${WS_SETUID_GID}"
+            COMPONENT Runtime)
     endif()
 endif()
