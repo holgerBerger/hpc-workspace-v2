@@ -36,12 +36,12 @@ RUN ./install.sh /opt/bats && \
     ./docker/install_libs.sh assert 2.1.0 && \
     ./docker/install_libs.sh file 0.4.0 
 
-WORKDIR /tmp/ws
+WORKDIR /tmp/docker
 
 COPY entrypoint.sh .
 RUN chmod a+x ./entrypoint.sh
 
-COPY .lcovrc /tmp/ws
+COPY .lcovrc /tmp/docker
 
 ARG DOCKER_USER=usera
 ARG OTHER_USER=userb
@@ -53,7 +53,7 @@ RUN addgroup  $DOCKER_USER && adduser --home /home/$DOCKER_USER --system --group
     adduser vagrant userb && \
     adduser $DOCKER_USER sudo && \
     echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
-    chown -R usera /tmp/ws && \
+    chown -R usera /tmp/docker && \
     sed -i 's/^inet_interfaces = localhost$/inet_interfaces = loopback-only/' /etc/postfix/main.cf  && \
     echo localhost > /etc/mailname && \
     locale-gen en_US.UTF-8 && \
@@ -64,4 +64,4 @@ USER $DOCKER_USER
 
 COPY .lcovrc /home/usera
 
-ENTRYPOINT ["/tmp/ws/entrypoint.sh"]
+ENTRYPOINT ["/tmp/docker/entrypoint.sh"]

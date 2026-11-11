@@ -114,12 +114,31 @@ SUDO
   if [ "$run_bats_test" = true ]; then
     OLDPATH=$PATH
 
+  # create structure 
+  echo .......................................
+  echo ...preparing environment...............
+  echo .......................................
+  sudo build/release/bin/ws_prepare 
+
+
+
     echo "##################"
     echo "running user tests"
     echo "##################"
     export PATH=build/debug/bin:$PATH
     bats bats/test
     export PATH=$OLDPATH
+
+    # delete old stuff
+    sudo rm -rf /tmp/ws
+    sudo mkdir /tmp/ws
+    sudo chown daemon:daemon /tmp/ws
+
+  # create structure 
+  echo .......................................
+  echo ...preparing environment...............
+  echo .......................................
+  sudo build/release/bin/ws_prepare 
 
     # silence leak errors for setuid as it does not work
     export ASAN_OPTIONS=detect_leaks=0
