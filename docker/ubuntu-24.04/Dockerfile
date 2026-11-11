@@ -48,10 +48,14 @@ ARG OTHER_USER=userb
 RUN addgroup  $DOCKER_USER && adduser --home /home/$DOCKER_USER --system --group  $DOCKER_USER  && \
     addgroup  $OTHER_USER && adduser --home /home/$OTHER_USER   --system --group  $OTHER_USER   && adduser $OTHER_USER $DOCKER_USER && \
     adduser --home /home/mean-user-name   --system --ingroup userb mean-user-name && \
+    adduser --home /home/vagrant  --system --group  userb vagrant && \
+    adduser vagrant usera && \
+    adduser vagrant userb && \
     adduser $DOCKER_USER sudo && \
     echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
     chown -R usera /tmp/ws && \
     sed -i 's/^inet_interfaces = localhost$/inet_interfaces = loopback-only/' /etc/postfix/main.cf  && \
+    echo localhost > /etc/mailname && \
     locale-gen en_US.UTF-8 && \
     update-locale LANG=en_US.UTF-8
 

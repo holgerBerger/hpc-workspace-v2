@@ -41,15 +41,15 @@ if [ "$run_bats_test" = true ] || [ "$run_ctest_test" = true ]; then
   cd hpc-workspace-v2
 
   if [ "$run_coverage" = true ]; then
-    cmake --preset debug -DCMAKE_CXX_FLAGS=--coverage -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
+    cmake --preset debug-ninja -DCMAKE_CXX_FLAGS=--coverage -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
   else
-    cmake --preset debug -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
+    cmake --preset debug-ninja -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
   fi
 
-  cmake --build --preset debug -j
+  cmake --build --preset debug-ninja -j
 
   cmake --preset release -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
-  cmake --build --preset release -j
+  cmake --build --preset release ninja -j
 
   cp build/debug/bin/ws_restore build/debug/bin/ws_restore_notest
   cp build/release/bin/ws_restore build/release/bin/ws_restore_notest
