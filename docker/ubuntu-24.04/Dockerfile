@@ -3,23 +3,28 @@ FROM ubuntu:24.04
 WORKDIR /root
 
 RUN apt-get update && apt-get install -y \
-    git \
+    acl \
     build-essential \
     cmake \
+    elvis-tiny \
+    git \
+    locales \
     libboost-system-dev \
     libboost-program-options-dev \
     libncurses-dev \
     libcap-dev \
-    elvis-tiny \
     libcap2-bin \
     libcap-dev \
     libcap2 \
     lld \
+    ninja-build \
     wget \
-    sudo \
     lcov \
     libcurl4t64 \
-    libcurl4-openssl-dev
+    libcurl4-openssl-dev \
+    postfix \
+    sudo \
+    s-nail
 
 
 # Installing bats and libraries based on documentation and their Dockerfile
@@ -42,9 +47,14 @@ ARG DOCKER_USER=usera
 ARG OTHER_USER=userb
 RUN addgroup  $DOCKER_USER && adduser --home /home/$DOCKER_USER --system --group  $DOCKER_USER  && \
     addgroup  $OTHER_USER && adduser --home /home/$OTHER_USER   --system --group  $OTHER_USER   && adduser $OTHER_USER $DOCKER_USER && \
+    adduser --home /home/mean-user-name   --system --ingroup userb mean-user-name && \
     adduser $DOCKER_USER sudo && \
     echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
-    chown -R usera /tmp/ws
+    chown -R usera /tmp/ws && \
+    sed -i 's/^inet_interfaces = localhost$/inet_interfaces = loopback-only/' /etc/postfix/main.cf  && \
+    locale-gen en_US.UTF-8 && \
+    update-locale LANG=en_US.UTF-8
+
 
 USER $DOCKER_USER
 

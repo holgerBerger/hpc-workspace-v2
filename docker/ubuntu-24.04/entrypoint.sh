@@ -1,5 +1,7 @@
 #!/bin/bash
 
+sudo postfix start
+
 command="$1"
 
 
@@ -36,9 +38,7 @@ if [ "$run_bats_test" = true ] || [ "$run_ctest_test" = true ]; then
   cd /tmp
 
   git clone https://github.com/holgerBerger/hpc-workspace-v2.git
-  cd hpc-workspace-v2/external
-  ./get_externals.sh
-  cd ..
+  cd hpc-workspace-v2
 
   if [ "$run_coverage" = true ]; then
     cmake --preset debug -DCMAKE_CXX_FLAGS=--coverage -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
