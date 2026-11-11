@@ -46,10 +46,10 @@ if [ "$run_bats_test" = true ] || [ "$run_ctest_test" = true ]; then
     cmake --preset debug-ninja -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
   fi
 
-  cmake --build --preset debug-ninja -j
+  cmake --build --preset debug -j
 
-  cmake --preset release -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
-  cmake --build --preset release ninja -j
+  cmake --preset release-ninja -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"
+  cmake --build --preset release -j
 
   cp build/debug/bin/ws_restore build/debug/bin/ws_restore_notest
   cp build/release/bin/ws_restore build/release/bin/ws_restore_notest
@@ -60,7 +60,7 @@ if [ "$run_bats_test" = true ] || [ "$run_ctest_test" = true ]; then
   cp build/release/bin/ws_release /tmp/setuid
   cp build/release/bin/ws_restore /tmp/setuid
   cp build/release/bin/ws_restore_notest /tmp/setuid
-  sudo chown root /tmp/setuid/ws_allocate
+  sudo chown root /tmp/setuid/ws_allocate /tmp/setuid/ws_release /tmp/setuid/ws_restore /tmp/setuid/ws_restore_notest
   sudo chmod u+s /tmp/setuid/ws_allocate
   sudo chmod u+s /tmp/setuid/ws_release
   sudo chmod u+s /tmp/setuid/ws_restore

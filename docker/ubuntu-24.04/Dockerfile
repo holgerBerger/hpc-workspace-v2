@@ -48,7 +48,7 @@ ARG OTHER_USER=userb
 RUN addgroup  $DOCKER_USER && adduser --home /home/$DOCKER_USER --system --group  $DOCKER_USER  && \
     addgroup  $OTHER_USER && adduser --home /home/$OTHER_USER   --system --group  $OTHER_USER   && adduser $OTHER_USER $DOCKER_USER && \
     adduser --home /home/mean-user-name   --system --ingroup userb mean-user-name && \
-    adduser --home /home/vagrant  --system --group  userb vagrant && \
+    adduser --home /home/vagrant  --system --group vagrant && \
     adduser vagrant usera && \
     adduser vagrant userb && \
     adduser $DOCKER_USER sudo && \
