@@ -12,8 +12,11 @@
 #                         coverage includes the tools (default ON if bats found)
 #   DASHBOARD_SUBMIT      OFF: do everything except submitting (default ON)
 #   DASHBOARD_SITE        CDash site name (default: host name)
-#   DASHBOARD_BUILD_NAME  CDash build name (default: <os>-gcc<ver>-coverage[-<branch>])
+#   DASHBOARD_BUILD_NAME  CDash build name (default: <os>-gcc<ver>-coverage[-pr<N>][-<branch>])
 #   DASHBOARD_JOBS        parallel build/test jobs (default: number of cores)
+#   DASHBOARD_PR          pull request number, added to the default build name
+#   DASHBOARD_REVISION    revision reported to CDash instead of the checked out HEAD,
+#                         e.g. the PR head commit when CI tests a temporary merge commit
 #
 # If the CDash project requires authenticated submissions, export the project
 # token as CDASH_AUTH_TOKEN.
@@ -70,6 +73,9 @@ else()
     execute_process(COMMAND uname -s OUTPUT_VARIABLE _os OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(COMMAND gcc -dumpfullversion OUTPUT_VARIABLE _gccver OUTPUT_STRIP_TRAILING_WHITESPACE)
     set(CTEST_BUILD_NAME "${_os}-gcc${_gccver}-coverage")
+    if(DASHBOARD_PR)
+        string(APPEND CTEST_BUILD_NAME "-pr${DASHBOARD_PR}")
+    endif()
     if(DEFINED ENV{GITHUB_HEAD_REF} AND NOT "$ENV{GITHUB_HEAD_REF}" STREQUAL "")
         set(_branch "$ENV{GITHUB_HEAD_REF}") # pull request source branch
     elseif(DEFINED ENV{GITHUB_REF_NAME})
@@ -92,6 +98,11 @@ set(CTEST_CONFIGURE_COMMAND "\"${CMAKE_COMMAND}\" -S \"${CTEST_SOURCE_DIRECTORY}
 find_program(CTEST_GIT_COMMAND NAMES git)
 set(CTEST_UPDATE_COMMAND "${CTEST_GIT_COMMAND}")
 set(CTEST_UPDATE_VERSION_ONLY ON) # only report the revision, never touch the checkout
+if(DASHBOARD_REVISION)
+    # CI for pull requests tests a temporary merge commit that exists in no branch;
+    # report the commit the build belongs to instead
+    set(CTEST_UPDATE_VERSION_OVERRIDE "${DASHBOARD_REVISION}")
+endif()
 
 # files not to report coverage for (regexes on absolute paths)
 set(CTEST_CUSTOM_COVERAGE_EXCLUDE
