@@ -76,6 +76,19 @@ TEST_CASE("user::getGroupname", "[user]") {
     REQUIRE(grp == std::string(g->gr_name));
 }
 
+TEST_CASE("user::getGroupname(username)", "[user]") {
+    SECTION("known user returns the primary group from passwd") {
+        const struct passwd* pw = getpwuid(getuid());
+        REQUIRE(pw != nullptr);
+        const struct group* g = getgrgid(pw->pw_gid);
+        REQUIRE(g != nullptr);
+        REQUIRE(user::getGroupname(pw->pw_name) == std::string(g->gr_name));
+    }
+    SECTION("unknown user returns empty, not a crash") {
+        REQUIRE(user::getGroupname("no_such_user_hopefully_xyz").empty());
+    }
+}
+
 TEST_CASE("user::getGrouplist", "[user]") {
     const std::vector<std::string> groups = user::getGrouplist();
     // every returned name must be resolvable in the group database
