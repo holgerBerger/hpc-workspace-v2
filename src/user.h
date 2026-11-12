@@ -44,7 +44,6 @@ std::string getUsername();
 std::string getUserhome();
 std::string getUserhome(const std::string& username);
 bool isRoot();
-bool isnotSetuid();
 bool isSetuid();
 // ret7urn name of current effective group
 std::string getGroupname();
