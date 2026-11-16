@@ -45,12 +45,24 @@ COPY .lcovrc /tmp/docker
 
 ARG DOCKER_USER=usera
 ARG OTHER_USER=userb
+# Mirror the user/group graph of vm/alma-10/Vagrantfile, which bats/test_setuid
+# and bats/test_cap assume. In Docker the test runner is $DOCKER_USER, so it
+# needs the memberships the VM's runner (vagrant) has.
+#   userb:          primary userb, member of vagrant + usera
+#   mean-user-name: primary userb, member of vagrant + usera
+#   vagrant:        primary vagrant, member of usera + userb
+#   usera:          member of vagrant (tests run ws_allocate -G vagrant as the
+#                   current user; on the VM that user is vagrant itself)
 RUN addgroup  $DOCKER_USER && adduser --home /home/$DOCKER_USER --system --group  $DOCKER_USER  && \
     addgroup  $OTHER_USER && adduser --home /home/$OTHER_USER   --system --group  $OTHER_USER   && adduser $OTHER_USER $DOCKER_USER && \
-    adduser --home /home/mean-user-name   --system --ingroup userb mean-user-name && \
     adduser --home /home/vagrant  --system --group vagrant && \
-    adduser vagrant usera && \
-    adduser vagrant userb && \
+    adduser vagrant $DOCKER_USER && \
+    adduser vagrant $OTHER_USER && \
+    adduser --home /home/mean-user-name   --system --ingroup $OTHER_USER mean-user-name && \
+    adduser mean-user-name vagrant && \
+    adduser mean-user-name $DOCKER_USER && \
+    adduser $OTHER_USER vagrant && \
+    adduser $DOCKER_USER vagrant && \
     adduser $DOCKER_USER sudo && \
     echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
     chown -R usera /tmp/docker && \

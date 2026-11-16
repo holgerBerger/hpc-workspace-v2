@@ -77,32 +77,11 @@ if [ "$run_bats_test" = true ] || [ "$run_ctest_test" = true ]; then
   sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p CAP_FOWNER=p" /tmp/cap/ws_restore
   sudo setcap "CAP_DAC_OVERRIDE=p CAP_DAC_READ_SEARCH=p CAP_FOWNER=p" /tmp/cap/ws_restore_notest
 
-  # create a config for setuid 
+  # generate a config identical to the VM setup (which copies bats/ws.conf to
+  # /etc), except the database owner is the current user, not bin:bin
   export MYUID=$(id -u)
   export MYGID=$(id -g)
-  sudo tee /etc/ws.conf >/dev/null <<SUDO
-dbuid: $MYUID
-dbgid: $MYGID
-admins: [root]
-adminmail: [root@a.com]
-clustername: bats
-duration: 10
-maxextensions: 3
-smtphost: mailhost
-default: ws2
-workspaces:
-  ws1:
-    database: /tmp/ws/ws1-db
-    deleted: .removed
-    keeptime: 7
-    spaces: [/tmp/ws/ws1]
-  ws2:
-    database: /tmp/ws/ws2-db
-    deleted: .removed
-    spaceseletion: mostspace
-    keeptime: 7
-    spaces: [/tmp/ws/ws2/1, /tmp/ws/ws2/2]
-SUDO
+  sed -e "s/^dbuid:.*/dbuid: $MYUID/" -e "s/^dbgid:.*/dbgid: $MYGID/" bats/ws.conf | sudo tee /etc/ws.conf >/dev/null
 
   if [ "$run_coverage" = true ]; then
     lcov --capture --initial --config-file /tmp/ws/.lcovrc --directory . -o ws_base.info
@@ -118,9 +97,8 @@ SUDO
   echo .......................................
   echo ...preparing environment...............
   echo .......................................
-  sudo build/release/bin/ws_prepare 
-
-
+  sudo rm -rf /tmp/ws
+  mkdir /tmp/ws
 
     echo "##################"
     echo "running user tests"
