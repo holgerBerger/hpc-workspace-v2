@@ -313,8 +313,8 @@ bool validateDuration(const Config& config, const std::string filesystem, int& d
         }
         if (getuid() != 0 && ((duration > configduration) || (duration < 0))) {
             duration = configduration;
-            spdlog::error("Duration longer than allowed for this workspace");
-            spdlog::error("  setting to allowed maximum of {}", duration);
+            spdlog::warn("Duration longer than allowed for this workspace");
+            spdlog::warn("  setting to allowed maximum of {}", duration);
         }
     }
 
