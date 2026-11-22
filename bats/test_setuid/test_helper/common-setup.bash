@@ -29,8 +29,13 @@ _common_setup() {
         echo ws2  > /tmp/ws/ws2-db/.ws_db_magic
     fi
 
-    if [ -f /.dockerenv ]
+    # In non-login contexts (containers, CI) bash does not set USER, and the
+    # /.dockerenv marker is Docker-only: podman writes /run/.containerenv
+    # instead. Derive the name from the real uid so the tests work everywhere
+    # and follow the configured test user instead of hardcoding usera.
+    if [ -z "${USER:-}" ]
     then
-        USER=usera
+        USER=$(id -un)
     fi
+    export USER
 }
