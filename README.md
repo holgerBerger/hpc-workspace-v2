@@ -278,12 +278,12 @@ C++ language level requirement might evolve from c++17 to c++20 if there is reas
 - [x] ws_expirer (migrated to C++)
 - [x] ws_validate_config (migrated to C++)
 - [x] ws_prepare (new in C++)
-
+- [x] bash completion testing
+- [x] review what gets logged for security reasons, should not leak details of other workspaces anymore (v1.x version did)
 
 ### Todo 
 
-- [ ] review what gets logged for security reasons, should not leak details of other workspaces anymore (v1.x version did)
-- [x] bash completion testing
+
 
 ### Future Development
 
@@ -355,13 +355,12 @@ higher level tests (user mode only)
 bats bats/test
 ```
 
-### testing with docker
-(docker testing has limitations, VM testing is better)
+### testing with docker/podman
 
 ```
 cd docker
 sudo docker build ubuntu-24.04 -t hpcwsv2
-sudo docker run hpcwsv2 testall
+sudo docker run --cap-add=DAC_READ_SEARCH hpcwsv2 testall
 ```
 
 Tests in docker allow coverage analysis
@@ -369,13 +368,13 @@ Tests in docker allow coverage analysis
 ```
 cd docker
 mkdir coverage
-sudo docker run  -v $PWD/coverage:/ws/coverage_report hpcw lcov
+sudo docker run --cap-add=DAC_READ_SEARCH -v $PWD/coverage:/ws/coverage_report hpcw lcov
 sudo chown -R $USERNAME coverage
 ```
 
 note: setcap tests will fail with ASAN error messages if sysctl `fs.suid_dumpable = 2`
-Update: turned out that capability version seems to have restrictions in docker, can only be tested fully in VM
-TODO: remove capability tests from docker
+
+Same options apply to podman (which can be used with `sudo`).
 
 ### Coverage runs with CDash
 
