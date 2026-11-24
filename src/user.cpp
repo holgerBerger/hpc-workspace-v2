@@ -87,9 +87,6 @@ bool isRoot() {
     return getuid() == 0;
 }
 
-// check if this process is not setuid
-bool isnotSetuid() { return getuid() == geteuid(); }
-
 // check if this process is setuid
 bool isSetuid() { return getuid() != geteuid(); }
 

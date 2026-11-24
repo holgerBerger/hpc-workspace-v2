@@ -62,10 +62,7 @@ TEST_CASE("user::isRoot", "[user]") {
 }
 
 TEST_CASE("user::setuid checks", "[user]") {
-    REQUIRE(user::isnotSetuid() == (getuid() == geteuid()));
     REQUIRE(user::isSetuid() == (getuid() != geteuid()));
-    // the two are exact complements
-    REQUIRE(user::isSetuid() != user::isnotSetuid());
 }
 
 TEST_CASE("user::getGroupname", "[user]") {
