@@ -176,6 +176,8 @@ each call will consume an extension, unless the new expiration date is shorter
 than the previous one. You can also shorten the lifetime if no extensions
 are available anymore.
 
+If the number of days exceeds the maximum allowed duration the user is asked to confirm before the duration is capped to the maximum allowed duration. If denied, no extension is consumed. For usage in scripts, this question can be answered with ```-y``` to always accept. If controlling terminal is not a pty, the question is not displayed and the duration is capped to the maximum allowed duration.
+
 You can extend group members workspaces if they had been created using ```ws_allocate -G <GROUPNAME>```
 (to create a writable group workspace) using ```ws_allocate -x -u <USERNAME> <ID> <DAYS>```.
 

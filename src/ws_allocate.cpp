@@ -8,7 +8,7 @@
  *  c++ version of workspace utility
  *  a workspace is a temporary directory created in behalf of a user with a limited lifetime.
  *
- *  (c) Holger Berger 2021,2023,2024,2025
+ *  (c) Holger Berger 2021,2023,2024,2025,2026
  *  (c) Christoph Niethammer 2025,2026
  *
  *  hpc-workspace-v2 is based on workspace by Holger Berger, Thomas Beisel and Martin Hecht
@@ -70,7 +70,7 @@ template <> struct fmt::formatter<po::options_description> : ostream_formatter {
  */
 void commandline(po::variables_map& opt, string& name, int& duration, string& filesystem, bool& extension,
                  int& reminder, string& mailaddress, string& user, string& groupreadable, string& groupwritable,
-                 string& comment, int argc, char** argv, std::string& userconf, std::string& configfile) {
+                 bool& yes, string& comment, int argc, char** argv, std::string& userconf, std::string& configfile) {
     // define all options
 
     po::options_description cmd_options("\nOptions");
@@ -86,6 +86,7 @@ void commandline(po::variables_map& opt, string& name, int& duration, string& fi
         ("username,u", po::value<string>(&user), "username")
         ("groupreadable,g", po::value<string>(&groupreadable)->implicit_value(""), "for group <arg> readable workspace, current group if none given")
         ("groupwritable,G", po::value<string>(&groupwritable)->implicit_value(""), "for group <arg> writable workspace, current group if none given")
+        ("yes,y", po::bool_switch(&yes), "answer yes to all questions (default: no)")
         ("comment,c", po::value<string>(&comment), "comment")("config", po::value<string>(&configfile), "config file");
     // clang-format on
 
@@ -313,8 +314,8 @@ bool validateDuration(const Config& config, const std::string filesystem, int& d
         }
         if (getuid() != 0 && ((duration > configduration) || (duration < 0))) {
             duration = configduration;
-            spdlog::warn("Duration longer than allowed for this workspace");
-            spdlog::warn("  setting to allowed maximum of {}", duration);
+            spdlog::warn("duration longer than allowed for this workspace");
+            spdlog::warn("setting to allowed maximum of {}", duration);
         }
     }
 
@@ -364,7 +365,7 @@ int countWorkspaces(const Config& config, const std::string username, const std:
  */
 bool allocate(const Config& config, const po::variables_map& opt, int duration, string filesystem, const string name,
               const bool extensionflag, const int reminder, const string mailaddress, string user_option,
-              const string groupreadable, const string groupwritable, const string comment) {
+              const string groupreadable, const string groupwritable, const bool yes, const string comment) {
     if (traceflag)
         spdlog::trace("allocate({}, {}, {}, {}, {}, {}, {}, {},{}, {})", duration, filesystem, name, extensionflag,
                       reminder, mailaddress, user_option, groupreadable, groupwritable, comment);
@@ -582,10 +583,36 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
                     configduration = config.durationdefault();
                 }
                 //}
+
+                // exit if no extension available before interaction with user.
+                if (dbentry->getExtension() <= 0) {
+                    spdlog::error("no more extensions!");
+                    exit(-1);
+                }
+
                 if (getuid() != 0 && ((duration > configduration) || (duration < 0))) {
-                    duration = configduration;
-                    spdlog::error("Duration longer than allowed for this workspace.");
-                    spdlog::error("setting to allowed maximum of {}", duration);
+                    // prompt only when we're really attached to a terminal, otherwise
+                    // (pipe, batch job, cron) reading would block or fail
+                    if (!yes && isatty(STDIN_FILENO)) {
+                        spdlog::warn("duration longer than allowed for this workspace, {} > {}", duration,
+                                     configduration);
+                        fmt::print(
+                            stderr,
+                            "Do you want to continue (consuming an extension) with the allowed maximum of {}? [y/n]: ",
+                            configduration);
+                        string answer;
+                        cin >> answer;
+                        if (answer != "y" && answer != "Y") {
+                            spdlog::error("Aborting, workspace not extended!");
+                            exit(-1);
+                        }
+                        duration = configduration;
+                        spdlog::warn("continuing with allowed maximum of {}", duration);
+                    } else {
+                        duration = configduration;
+                        spdlog::warn("duration longer than allowed for this workspace.");
+                        spdlog::warn("setting to allowed maximum of {}", duration);
+                    }
                 }
                 exp = time(NULL) + duration * 24 * 3600;
             } else {
@@ -716,6 +743,7 @@ int main(int argc, char** argv) {
     string comment;
     string configfile;
     int reminder = 0;
+    bool yes = false;
     po::variables_map opt;
     std::string user_conf;
 
@@ -742,7 +770,7 @@ int main(int argc, char** argv) {
 
     // check commandline, get flags which are used to create ws object or for workspace allocation
     commandline(opt, name, duration, filesystem, extensionflag, reminder, mailaddress, user_option, groupreadable,
-                groupwritable, comment, argc, argv, user_conf, configfile);
+                groupwritable, yes, comment, argc, argv, user_conf, configfile);
 
     // find which config files to read
     //   user can change this if no setuid installation OR if root
@@ -789,7 +817,7 @@ int main(int argc, char** argv) {
 
     // allocate workspace
     if (!allocate(config, opt, duration, filesystem, name, extensionflag, reminder, mailaddress, user_option,
-                  groupreadable, groupwritable, comment)) {
+                  groupreadable, groupwritable, yes, comment)) {
         return -1;
     }
 }

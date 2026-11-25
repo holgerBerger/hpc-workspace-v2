@@ -5,7 +5,7 @@ ws_allocate \- create a workspace directory and return its path
 
 .SH SYNOPSIS
 .B ws_allocate
-[\-h] [\-V] [\-x] [\-g [GROUPNAME]] [\-G [GROUPNAME]] [--] [\-u USERNAME] [\-F FILESYSTEM] [\-d DURATION] [\-n NAME] [\-r DAYS] [\-m MAILADDRESS] [\-c COMMENT] NAME DURATION
+[\-h] [\-V] [\-y] [\-x] [\-g [GROUPNAME]] [\-G [GROUPNAME]] [--] [\-u USERNAME] [\-F FILESYSTEM] [\-d DURATION] [\-n NAME] [\-r DAYS] [\-m MAILADDRESS] [\-c COMMENT] NAME DURATION
 
 .SH DESCRIPTION
 Create a
@@ -87,6 +87,11 @@ and with
 .B \-r
 to add reminder to existing workspaces. If used with duration 0 or without a duration,
 it does not consume an extension.
+If used from a pty (interactive terminal), the user is asked to confirm the operation if the duration exceeds
+the maximum allowed duration, unless
+.B \-f
+is used to force the operation without confirmation. In that case or if confirmedthe duration is capped to the maximum allowed duration,
+and an extension is consumed. If not confirmed, the operation is aborted without extending the workspace and no extension is consumed.
 .TP
 \-F, \-\-filesystem FILESYSTEM
 select the filesystem to create the workspace in, there is always a default for this.
@@ -160,7 +165,9 @@ and it can be extended by group members with
 in behalf of the owner.
 If no group is given, the current group is taken (or group in .ws_user.conf file if present). Be careful to have another option behind it or append -- to the option
 list to make it clear that next argument is not the GROUPNAME argument.
-
+.TP
+\-y, \-\-yes
+answer yes to all questions (default: no)
 
 .SH EXAMPLES
 .TP
