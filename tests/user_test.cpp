@@ -105,7 +105,5 @@ TEST_CASE("user::getUserGroupList", "[user]") {
         REQUIRE(std::find(groups.begin(), groups.end(), "root") != groups.end());
     }
 
-    SECTION("unknown user returns empty") {
-        REQUIRE(user::getUserGroupList("this_user_does_not_exist_9f3a").empty());
-    }
+    SECTION("unknown user returns empty") { REQUIRE(user::getUserGroupList("this_user_does_not_exist_9f3a").empty()); }
 }

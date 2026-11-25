@@ -1,7 +1,7 @@
 #include <filesystem>
 #define CATCH_CONFIG_MAIN // This tells Catch to provide a main() - only do this in one cpp file
-#include <catch2/catch_test_macros.hpp>
 #include <algorithm>
+#include <catch2/catch_test_macros.hpp>
 #include <climits>
 #include <string>
 #include <vector>
@@ -359,7 +359,9 @@ TEST_CASE("utils::splitString", "[utils]") {
     SECTION("splits on delimiter") {
         REQUIRE(utils::splitString("a,b,c", ',') == std::vector<std::string>{"a", "b", "c"});
     }
-    SECTION("no delimiter is a single token") { REQUIRE(utils::splitString("abc", ',') == std::vector<std::string>{"abc"}); }
+    SECTION("no delimiter is a single token") {
+        REQUIRE(utils::splitString("abc", ',') == std::vector<std::string>{"abc"});
+    }
     SECTION("empty string yields no tokens") { REQUIRE(utils::splitString("", ',').empty()); }
     SECTION("consecutive delimiters yield empty tokens") {
         REQUIRE(utils::splitString("a,,b", ',') == std::vector<std::string>{"a", "", "b"});
@@ -394,7 +396,9 @@ TEST_CASE("utils::getFileContents", "[utils]") {
         REQUIRE(utils::getFileContents((dir / "empty").string()) == "");
     }
 
-    SECTION("missing file throws") { REQUIRE_THROWS_AS(utils::getFileContents((dir / "nothere").string()), std::exception); }
+    SECTION("missing file throws") {
+        REQUIRE_THROWS_AS(utils::getFileContents((dir / "nothere").string()), std::exception);
+    }
 
     fs::remove_all(dir);
 }
@@ -425,7 +429,9 @@ TEST_CASE("utils::dirEntries", "[utils]") {
         REQUIRE(all == std::vector<std::string>{"a.txt", "b.txt", "c.log", "sub"});
     }
 
-    SECTION("nonexistent directory returns empty") { REQUIRE(utils::dirEntries((dir / "gone").string(), "*", true).empty()); }
+    SECTION("nonexistent directory returns empty") {
+        REQUIRE(utils::dirEntries((dir / "gone").string(), "*", true).empty());
+    }
 
     fs::remove_all(dir);
 }
@@ -449,9 +455,7 @@ TEST_CASE("utils::getDBYamlReader", "[utils]") {
     REQUIRE((reader == "yaml-cpp" || reader == "RapidYAML"));
 }
 
-TEST_CASE("utils::SrcPos", "[utils]") {
-    REQUIRE(utils::SrcPos("f.cpp", 42, "foo").getSrcPos() == "f.cpp:42[foo]");
-}
+TEST_CASE("utils::SrcPos", "[utils]") { REQUIRE(utils::SrcPos("f.cpp", 42, "foo").getSrcPos() == "f.cpp:42[foo]"); }
 
 TEST_CASE("utils::getOwner and getID", "[utils]") {
     SECTION("single dash uses the simple split") {
