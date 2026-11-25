@@ -590,10 +590,28 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
                     exit(-1);
                 }
 
+                // prompt user to continue with remaining time if duration is shorter
+                if (getuid() != 0 && duration <= (dbentry->getRemaining() / (3600L * 24L))) {
+                    if ((!yes) && isatty(STDIN_FILENO)) {
+                        spdlog::warn("duration shorter than remaining time ({})",
+                                     (dbentry->getRemaining() / (3600L * 24L)));
+                        fmt::print(stderr,
+                                   "Do you want to continue (consuming an extension) shortening the duration? [y/n]: ");
+                        string answer;
+                        cin >> answer;
+                        if (answer != "y" && answer != "Y") {
+                            spdlog::warn("Aborting, workspace not extended!");
+                            exit(-1);
+                        }
+                    }
+                }
+
+                // validate duration, ask for confirmation if longer than allowed
+                // to give user opportunity to cancel before consuming an extension
                 if (getuid() != 0 && ((duration > configduration) || (duration < 0))) {
                     // prompt only when we're really attached to a terminal, otherwise
                     // (pipe, batch job, cron) reading would block or fail
-                    if (!yes && isatty(STDIN_FILENO)) {
+                    if ((!yes) && isatty(STDIN_FILENO)) {
                         spdlog::warn("duration longer than allowed for this workspace, {} > {}", duration,
                                      configduration);
                         fmt::print(
@@ -603,7 +621,7 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
                         string answer;
                         cin >> answer;
                         if (answer != "y" && answer != "Y") {
-                            spdlog::error("Aborting, workspace not extended!");
+                            spdlog::warn("Aborting, workspace not extended!");
                             exit(-1);
                         }
                         duration = configduration;
@@ -614,7 +632,8 @@ bool allocate(const Config& config, const po::variables_map& opt, int duration, 
                         spdlog::warn("setting to allowed maximum of {}", duration);
                     }
                 }
-                exp = time(NULL) + duration * 24 * 3600;
+
+                exp = time(NULL) + duration * 24L * 3600L;
             } else {
                 exp = -1;
             }
