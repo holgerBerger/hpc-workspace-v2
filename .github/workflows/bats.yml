@@ -36,7 +36,7 @@ jobs:
           libcap-dev
 
     - name: Checkout repository
-      uses: actions/checkout@v7
+      uses: actions/checkout@v7.0.1
       with:
         persist-credentials: false
 
@@ -73,7 +73,7 @@ jobs:
         sudo systemctl enable --now postfix
 
     - name: Checkout repository
-      uses: actions/checkout@v7
+      uses: actions/checkout@v7.0.1
       with:
         persist-credentials: false
 
